@@ -20,6 +20,39 @@ enum FoodType {
   EGG
 }
 
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE_CONSUMPTION
+  WASTAGE
+  ADJUSTMENT
+  RETURN
+  TRANSFER
+}
+
+enum AdjustmentType {
+  INCREASE
+  DECREASE
+}
+
+enum ValuationMethod {
+  FIFO
+  AVERAGE_COST
+}
+
+enum AlertType {
+  LOW_STOCK
+  OUT_OF_STOCK
+  EXPIRING_SOON
+  EXPIRED
+}
+
 model Category {
   id            String        @id @default(uuid())
   name          String
@@ -89,5 +122,252 @@ model MenuItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  recipeIngredients RecipeIngredient[]
+
   @@map("menu_items")
+}
+
+// ─────────────────────────────────────────────
+// INVENTORY / STOCK MANAGEMENT
+// ─────────────────────────────────────────────
+
+model Unit {
+  id           String   @id @default(uuid())
+  name         String   @unique // Kg, Gram, Liter, ml, Piece, Packet, Bottle, Box
+  abbreviation String?
+  createdAt    DateTime @default(now())
+
+  purchaseUnitIngredients    Ingredient[] @relation("PurchaseUnit")
+  consumptionUnitIngredients Ingredient[] @relation("ConsumptionUnit")
+
+  @@map("units")
+}
+
+model IngredientCategory {
+  id          String       @id @default(uuid())
+  name        String       @unique // Vegetables, Meat, Dairy, Beverages, Masala, Oil, Packaging, Cleaning
+  description String?
+  isEnabled   Boolean      @default(true)
+  ingredients Ingredient[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("ingredient_categories")
+}
+
+model Supplier {
+  id                 String   @id @default(uuid())
+  name               String
+  contactPerson      String?
+  phone              String?
+  email              String?
+  gstNumber          String?
+  address            String?
+  paymentTerms       String?
+  outstandingBalance Decimal  @default(0) @db.Decimal(12, 2)
+  isEnabled          Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  purchaseOrders  PurchaseOrder[]
+  purchaseEntries PurchaseEntry[]
+
+  @@map("suppliers")
+}
+
+model Ingredient {
+  id          String  @id @default(uuid())
+  name        String
+  itemCode    String  @unique
+  barcode     String?
+  description String?
+
+  categoryId String
+  category   IngredientCategory @relation(fields: [categoryId], references: [id])
+
+  purchaseUnitId    String
+  purchaseUnit      Unit    @relation("PurchaseUnit", fields: [purchaseUnitId], references: [id])
+  consumptionUnitId String
+  consumptionUnit   Unit    @relation("ConsumptionUnit", fields: [consumptionUnitId], references: [id])
+  conversionRatio   Decimal @default(1) @db.Decimal(12, 4) // 1 purchase unit = X consumption units
+
+  minimumStockLevel Decimal @default(0) @db.Decimal(12, 4)
+  isEnabled         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventoryStock     InventoryStock?
+  purchaseOrderItems PurchaseOrderItem[]
+  purchaseEntries    PurchaseEntry[]
+  stockMovements     StockMovement[]
+  stockAdjustments   StockAdjustment[]
+  wastageRecords     Wastage[]
+  expiryBatches      ExpiryBatch[]
+  recipeIngredients  RecipeIngredient[]
+  inventoryAlerts    InventoryAlert[]
+
+  @@map("ingredients")
+}
+
+model PurchaseOrder {
+  id               String              @id @default(uuid())
+  poNumber         String              @unique
+  supplierId       String
+  supplier         Supplier            @relation(fields: [supplierId], references: [id])
+  purchaseDate     DateTime            @default(now())
+  expectedDelivery DateTime?
+  status           PurchaseOrderStatus @default(DRAFT)
+  totalAmount      Decimal             @default(0) @db.Decimal(12, 2)
+  notes            String?
+
+  items           PurchaseOrderItem[]
+  purchaseEntries PurchaseEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  ingredientId    String
+  ingredient      Ingredient    @relation(fields: [ingredientId], references: [id])
+  quantity        Decimal       @db.Decimal(12, 4)
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  taxPercent      Decimal       @default(0) @db.Decimal(5, 2)
+  totalAmount     Decimal       @db.Decimal(12, 2)
+
+  @@map("purchase_order_items")
+}
+
+// Goods receipt — created when stock actually arrives. Increases InventoryStock
+// and creates a corresponding StockMovement + optional ExpiryBatch.
+model PurchaseEntry {
+  id              String         @id @default(uuid())
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  supplierId      String
+  supplier        Supplier       @relation(fields: [supplierId], references: [id])
+  ingredientId    String
+  ingredient      Ingredient     @relation(fields: [ingredientId], references: [id])
+
+  store            String    @default("Main Store")
+  invoiceNumber    String?
+  batchNumber      String?
+  expiryDate       DateTime?
+  quantityReceived Decimal   @db.Decimal(12, 4) // in purchase units
+  purchasePrice    Decimal   @db.Decimal(12, 2) // per purchase unit
+  gstPercent       Decimal   @default(0) @db.Decimal(5, 2)
+  discount         Decimal   @default(0) @db.Decimal(12, 2)
+  totalAmount      Decimal   @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@map("purchase_entries")
+}
+
+// Current on-hand snapshot per ingredient — always in consumption units.
+// Kept in sync by every StockMovement; avoids summing the whole ledger on every read.
+model InventoryStock {
+  id             String     @id @default(uuid())
+  ingredientId   String     @unique
+  ingredient     Ingredient @relation(fields: [ingredientId], references: [id])
+  quantityOnHand Decimal    @default(0) @db.Decimal(14, 4) // consumption units
+  averageCost    Decimal    @default(0) @db.Decimal(12, 4) // cost per consumption unit
+  store          String     @default("Main Store")
+  updatedAt      DateTime   @updatedAt
+
+  @@map("inventory_stock")
+}
+
+// Full audit ledger — every single stock change, of any kind, lands here.
+model StockMovement {
+  id            String            @id @default(uuid())
+  ingredientId  String
+  ingredient    Ingredient        @relation(fields: [ingredientId], references: [id])
+  type          StockMovementType
+  quantity      Decimal           @db.Decimal(14, 4) // signed: +in / -out, consumption units
+  previousStock Decimal           @db.Decimal(14, 4)
+  newStock      Decimal           @db.Decimal(14, 4)
+  reason        String?
+  referenceId   String? // e.g. PurchaseEntry.id, Wastage.id, order id
+  userId        String?
+  store         String            @default("Main Store")
+  createdAt     DateTime          @default(now())
+
+  @@index([ingredientId, createdAt])
+  @@map("stock_movements")
+}
+
+model StockAdjustment {
+  id           String         @id @default(uuid())
+  ingredientId String
+  ingredient   Ingredient     @relation(fields: [ingredientId], references: [id])
+  type         AdjustmentType
+  quantity     Decimal        @db.Decimal(14, 4)
+  reason       String
+  approvedBy   String?
+  notes        String?
+  createdAt    DateTime       @default(now())
+
+  @@map("stock_adjustments")
+}
+
+model Wastage {
+  id           String     @id @default(uuid())
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  store        String     @default("Main Store")
+  quantity     Decimal    @db.Decimal(14, 4)
+  reason       String
+  cost         Decimal    @db.Decimal(12, 2)
+  employeeId   String?
+  createdAt    DateTime   @default(now())
+
+  @@map("wastage")
+}
+
+model ExpiryBatch {
+  id                String     @id @default(uuid())
+  ingredientId      String
+  ingredient        Ingredient @relation(fields: [ingredientId], references: [id])
+  batchNumber       String
+  manufacturingDate DateTime?
+  expiryDate        DateTime
+  quantityRemaining Decimal    @db.Decimal(14, 4)
+  createdAt         DateTime   @default(now())
+
+  @@index([expiryDate])
+  @@map("expiry_batches")
+}
+
+// Links a MenuItem to the ingredients (and quantities) consumed per single unit sold.
+model RecipeIngredient {
+  id           String     @id @default(uuid())
+  menuItemId   String
+  menuItem     MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  quantity     Decimal    @db.Decimal(12, 4) // in ingredient's consumption unit
+  createdAt    DateTime   @default(now())
+
+  @@unique([menuItemId, ingredientId])
+  @@map("recipe_ingredients")
+}
+
+// Pre-computed alert rows so the dashboard doesn't have to scan everything live.
+model InventoryAlert {
+  id           String     @id @default(uuid())
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  type         AlertType
+  message      String
+  isResolved   Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  @@map("inventory_alerts")
 }

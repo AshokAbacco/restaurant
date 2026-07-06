@@ -1,0 +1,1 @@
+//client\src\inventory\inventoryRoutes.jsx
