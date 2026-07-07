@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import authService from "./authService";
 import {
   FiArrowLeft,
   FiCheckCircle,
@@ -12,6 +13,13 @@ import {
 } from "react-icons/fi";
 
 const ResetPassword = () => {
+  // ===========================
+  // TOKEN (from the emailed link, e.g. /reset-password?token=...)
+  // ===========================
+
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
+
   // ===========================
   // STATES
   // ===========================
@@ -122,6 +130,11 @@ const ResetPassword = () => {
   const validate = () => {
     const newErrors = {};
 
+    if (!token) {
+      newErrors.form =
+        "This reset link is invalid or missing a token. Please request a new one.";
+    }
+
     if (!formData.password) {
       newErrors.password = "Password is required";
     }
@@ -159,9 +172,12 @@ const ResetPassword = () => {
     try {
       setLoading(true);
 
-      // Backend integration later
+      const result = await authService.resetPassword(token, formData.password);
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (!result.success) {
+        setErrors({ form: result.message || "Unable to reset password." });
+        return;
+      }
 
       setSuccess(true);
     } finally {
@@ -240,6 +256,12 @@ const ResetPassword = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="mt-10 space-y-6">
+                  {errors.form && (
+                    <div className="rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3">
+                      {errors.form}
+                    </div>
+                  )}
+
                   {/* New Password */}
 
                   <div>

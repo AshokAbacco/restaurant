@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import authService from "./authService";
 import {
   FiArrowLeft,
   FiMail,
@@ -65,9 +66,12 @@ const ForgotPassword = () => {
     try {
       setLoading(true);
 
-      // Backend API will be integrated later
+      const result = await authService.forgotPassword(email);
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (!result.success) {
+        setError(result.message || "Something went wrong.");
+        return;
+      }
 
       setSuccess(true);
     } catch (err) {

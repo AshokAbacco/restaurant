@@ -703,6 +703,7 @@ enum RoleName {
   MANAGER
   CASHIER
   CHEF
+  KITCHEN
   WAITER
   STORE_KEEPER
 }
@@ -815,19 +816,54 @@ model UserAccount {
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String   @unique
 
-  username     String    @unique
-  email        String?   @unique
-  passwordHash String
-  pin          String? // optional, for POS quick login
-  role         RoleName
-  isActive     Boolean   @default(true)
-  lastLoginAt  DateTime?
+  username            String    @unique
+  email               String?   @unique
+  passwordHash        String
+  pin                 String? // optional, for POS quick login
+  role                RoleName
+  isActive            Boolean   @default(true)
+  lastLoginAt         DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]       @relation("RefreshTokensByUser")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([role])
   @@map("user_accounts")
+}
+
+// Short-lived token issued for the "forgot password" flow. Only the hash is
+// stored — the raw token is emailed to the user and never persisted.
+model PasswordResetToken {
+  id            String      @id @default(uuid())
+  userAccountId String
+  userAccount   UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  tokenHash     String      @unique
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// Long-lived refresh tokens (httpOnly cookie on the client). Stored hashed so
+// a DB leak doesn't hand out usable tokens; revoked on logout / password change.
+model RefreshToken {
+  id            String      @id @default(uuid())
+  userAccountId String
+  userAccount   UserAccount @relation("RefreshTokensByUser", fields: [userAccountId], references: [id], onDelete: Cascade)
+  tokenHash     String      @unique
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([userAccountId])
+  @@map("refresh_tokens")
 }
 
 // Daily rollup — one row per employee per day.

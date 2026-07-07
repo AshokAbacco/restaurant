@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import authService from "./authService";
 
 // ==========================================
 // AUTH CONTEXT
@@ -24,91 +25,42 @@ export const ROLES = {
 };
 
 // ==========================================
-// STORAGE KEYS
-// ==========================================
-
-const STORAGE_KEYS = {
-  USER: "restaurant_user",
-  TOKEN: "restaurant_token",
-};
-
-// ==========================================
-// DEMO USERS
-// Remove after backend integration
-// ==========================================
-
-const DEMO_USERS = [
-  {
-    id: 1,
-    name: "Restaurant Owner",
-    email: "owner@restaurant.com",
-    password: "123456",
-    role: ROLES.OWNER,
-    avatar: "",
-  },
-  {
-    id: 2,
-    name: "Restaurant Manager",
-    email: "manager@restaurant.com",
-    password: "123456",
-    role: ROLES.MANAGER,
-    avatar: "",
-  },
-  {
-    id: 3,
-    name: "POS Cashier",
-    email: "cashier@restaurant.com",
-    password: "123456",
-    role: ROLES.CASHIER,
-    avatar: "",
-  },
-  {
-    id: 4,
-    name: "Kitchen Staff",
-    email: "kitchen@restaurant.com",
-    password: "123456",
-    role: ROLES.KITCHEN,
-    avatar: "",
-  },
-];
-
-// ==========================================
 // PROVIDER
 // ==========================================
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
-  const [token, setToken] = useState(null);
-
   const [loading, setLoading] = useState(true);
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // ==========================================
-  // LOAD SESSION
+  // RESTORE SESSION ON LOAD
+  // Tries the httpOnly refresh cookie (if present) to get a fresh access
+  // token, then fetches /auth/me. If either step fails, the user is simply
+  // treated as logged out — no error thrown to the UI.
   // ==========================================
 
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem(STORAGE_KEYS.USER);
+    let cancelled = false;
 
-      const storedToken = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    (async () => {
+      const restoredUser = await authService.restoreSession();
 
-      if (storedUser && storedToken) {
-        setUser(JSON.parse(storedUser));
+      if (cancelled) return;
 
-        setToken(storedToken);
-
+      if (restoredUser) {
+        setUser(restoredUser);
         setIsAuthenticated(true);
       }
-    } catch (error) {
-      console.error(error);
 
-      localStorage.clear();
-    } finally {
       setLoading(false);
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ==========================================
@@ -119,90 +71,47 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
 
     try {
-      // Backend Integration Here
+      const result = await authService.login(email, password);
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      const foundUser = DEMO_USERS.find(
-        (u) =>
-          u.email.toLowerCase() === email.toLowerCase() &&
-          u.password === password,
-      );
-
-      if (!foundUser) {
-        throw new Error("Invalid credentials");
+      if (!result.success) {
+        return result;
       }
 
-      const fakeToken = "restaurant_demo_token_" + Date.now();
-
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(foundUser));
-
-      localStorage.setItem(STORAGE_KEYS.TOKEN, fakeToken);
-
-      setUser(foundUser);
-
-      setToken(fakeToken);
-
+      setUser(result.user);
       setIsAuthenticated(true);
 
-      return {
-        success: true,
-
-        user: foundUser,
-      };
-    } catch (error) {
-      return {
-        success: false,
-
-        message: error.message,
-      };
+      return { success: true, user: result.user };
     } finally {
       setLoading(false);
     }
   };
+
   // ==========================================
   // LOGOUT
   // ==========================================
 
-  const logout = () => {
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+  const logout = async () => {
+    await authService.logout();
 
     setUser(null);
-    setToken(null);
     setIsAuthenticated(false);
-
-    // Later:
-    // navigate("/login");
   };
 
   // ==========================================
-  // UPDATE USER
+  // UPDATE USER (local cache only — call a profile-update endpoint separately
+  // if the change needs to be persisted server-side)
   // ==========================================
 
   const updateUser = (updatedData) => {
-    const updatedUser = {
-      ...user,
-      ...updatedData,
-    };
-
-    setUser(updatedUser);
-
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+    setUser((prev) => ({ ...prev, ...updatedData }));
   };
 
   // ==========================================
   // CHANGE PASSWORD
-  // (Backend Later)
   // ==========================================
 
   const changePassword = async (currentPassword, newPassword) => {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    return {
-      success: true,
-      message: "Password updated successfully.",
-    };
+    return authService.changePassword(currentPassword, newPassword);
   };
 
   // ==========================================
@@ -249,8 +158,6 @@ export const AuthProvider = ({ children }) => {
     () => ({
       user,
 
-      token,
-
       loading,
 
       isAuthenticated,
@@ -287,7 +194,7 @@ export const AuthProvider = ({ children }) => {
 
       canViewProfit,
     }),
-    [user, token, loading, isAuthenticated],
+    [user, loading, isAuthenticated],
   );
   // ==========================================
   // PROVIDER
