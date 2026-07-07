@@ -10,6 +10,7 @@ import billSplitsRoutes from "./bill-splits/billSplits.routes.js";
 import invoicesRoutes from "./invoices/invoices.routes.js";
 import deliveryPartnersRoutes from "./delivery-partners/deliveryPartners.routes.js";
 import loyaltyRoutes from "./loyalty/loyalty.routes.js";
+import kotRoutes from "./kot/kot.routes.js";
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use("/bill-splits", billSplitsRoutes);
 router.use("/invoices", invoicesRoutes);
 router.use("/delivery-partners", deliveryPartnersRoutes);
 router.use("/loyalty", loyaltyRoutes);
+router.use("/kot", kotRoutes);
 
 export default router;
