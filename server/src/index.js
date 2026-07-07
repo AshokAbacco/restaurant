@@ -5,6 +5,7 @@ import inventoryRoutes from "./inventory/inventory.routes.js";
 import expensesRoutes from "./expenses/expenses.routes.js";
 import employeeRoutes from "./employees/employees.routes.js";
 import posRoutes from "./pos/pos.routes.js";
+import kdsRoutes from "./kds/kds.routes.js";
 
 const app = express();
 
@@ -27,5 +28,6 @@ app.use("/api/inventory", inventoryRoutes);
 app.use("/api/expenses", expensesRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/pos", posRoutes);
+app.use("/api/kds", kdsRoutes);
 
 export default app;

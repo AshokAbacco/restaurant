@@ -81,10 +81,11 @@ model SubCategory {
 }
 
 model KitchenSection {
-  id        String     @id @default(uuid())
-  name      String     @unique
-  menuItems MenuItem[]
-  createdAt DateTime   @default(now())
+  id            String         @id @default(uuid())
+  name          String         @unique
+  menuItems     MenuItem[]
+  kitchenOrders KitchenOrder[]
+  createdAt     DateTime       @default(now())
 
   @@map("kitchen_sections")
 }
@@ -781,6 +782,10 @@ model Employee {
   ordersAsWaiter    Order[]         @relation("OrdersByWaiter")
   discountsApproved OrderDiscount[] @relation("DiscountsApprovedBy")
 
+  kitchenOrdersAsChef  KitchenOrder[]          @relation("KOTsByChef")
+  kitchenStatusChanges KitchenOrderStatusLog[] @relation("KOTStatusChangedBy")
+  kitchenNotes         KitchenNote[]           @relation("KitchenNotesByChef")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -992,9 +997,23 @@ enum DiscountType {
 }
 
 enum KotStatus {
-  SENT
+  NEW
+  ACCEPTED
   PREPARING
   READY
+  SERVED
+  COMPLETED
+  CANCELLED
+  RECALLED
+}
+
+enum KotPriority {
+  NORMAL
+  VIP
+  ONLINE_DELIVERY
+  EXPRESS
+  SENIOR_CITIZEN
+  SPECIAL_REQUEST
 }
 
 enum SplitType {
@@ -1231,18 +1250,48 @@ model BillSplit {
   @@map("bill_splits")
 }
 
+// One KOT per (Order, KitchenSection) pair — each station that has items in
+// the order gets its own ticket, so Tandoor/Bar/Dessert can each track and
+// recall independently instead of sharing one monolithic ticket.
 model KitchenOrder {
-  id        String    @id @default(uuid())
+  id        String      @id @default(uuid())
   orderId   String
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  kotNumber String    @unique
-  status    KotStatus @default(SENT)
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kotNumber String      @unique
+  status    KotStatus   @default(NEW)
+  priority  KotPriority @default(NORMAL)
 
-  items KitchenOrderItem[]
+  kitchenSectionId String
+  kitchenSection   KitchenSection @relation(fields: [kitchenSectionId], references: [id])
+
+  chefId String?
+  chef   Employee? @relation("KOTsByChef", fields: [chefId], references: [id])
+
+  // target time is a snapshot (sum/max of item prep times) so it doesn't
+  // shift if MenuItem.prepTimeMinutes changes later
+  targetPrepMinutes Int?
+  isDelayed         Boolean @default(false)
+  recallCount       Int     @default(0)
+
+  // key lifecycle timestamps — cheap to read for live timers/dashboard;
+  // full history of every transition lives in KitchenOrderStatusLog
+  acceptedAt  DateTime?
+  readyAt     DateTime?
+  servedAt    DateTime?
+  completedAt DateTime?
+  recalledAt  DateTime?
+
+  items      KitchenOrderItem[]
+  statusLogs KitchenOrderStatusLog[]
+  notes      KitchenNote[]
 
   printedAt DateTime?
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
+  @@index([status])
+  @@index([kitchenSectionId, status])
+  @@index([isDelayed])
   @@map("kitchen_orders")
 }
 
@@ -1255,6 +1304,43 @@ model KitchenOrderItem {
   quantity       Int
 
   @@map("kitchen_order_items")
+}
+
+// Append-only audit trail — every status transition a KOT goes through,
+// including repeated Recall -> Prepare cycles. Powers delay/recall reports.
+model KitchenOrderStatusLog {
+  id             String       @id @default(uuid())
+  kitchenOrderId String
+  kitchenOrder   KitchenOrder @relation(fields: [kitchenOrderId], references: [id], onDelete: Cascade)
+
+  fromStatus KotStatus?
+  toStatus   KotStatus
+
+  changedById String?
+  changedBy   Employee? @relation("KOTStatusChangedBy", fields: [changedById], references: [id])
+
+  reason String? // e.g. "Recalled by waiter", "Modified item"
+
+  createdAt DateTime @default(now())
+
+  @@index([kitchenOrderId, createdAt])
+  @@map("kitchen_order_status_logs")
+}
+
+// Chef-authored notes on a ticket, visible to managers.
+// e.g. "Waiting for ingredient", "Delayed due to rush"
+model KitchenNote {
+  id             String       @id @default(uuid())
+  kitchenOrderId String
+  kitchenOrder   KitchenOrder @relation(fields: [kitchenOrderId], references: [id], onDelete: Cascade)
+
+  chefId String?
+  chef   Employee? @relation("KitchenNotesByChef", fields: [chefId], references: [id])
+
+  note      String
+  createdAt DateTime @default(now())
+
+  @@map("kitchen_notes")
 }
 
 model Invoice {

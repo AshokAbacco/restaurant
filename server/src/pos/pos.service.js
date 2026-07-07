@@ -1,5 +1,6 @@
 // server/src/pos/pos.service.js
 import prisma from "../config/prisma.js";
+import { createKitchenOrdersForOrder } from "../kds/kds.service.js";
 
 /**
  * Generates the next sequential order number, e.g. ORD-000123.
@@ -168,6 +169,15 @@ export async function createOrder(payload) {
     await prisma.restaurantTable.update({ where: { id: tableId }, data: { status: "OCCUPIED" } });
   }
 
+  // Generate one KOT per kitchen station for this order (KDS module).
+  // Failure here shouldn't fail the whole order — the order is already
+  // placed/paid-for-later; log it so it can be re-sent to the kitchen manually.
+  try {
+    await createKitchenOrdersForOrder(order.id);
+  } catch (err) {
+    console.error(`[POS] Failed to generate KOTs for order ${order.id}:`, err.message);
+  }
+
   return order;
 }
 
@@ -330,6 +340,15 @@ export async function addItemsToOrder(orderId, items) {
       notes: item.notes,
     })),
   });
+
+  // Send the newly added items to the kitchen too. createKitchenOrdersForOrder
+  // only tickets items that don't already have a KitchenOrderItem, so this is
+  // safe to call again without duplicating tickets for items sent earlier.
+  try {
+    await createKitchenOrdersForOrder(orderId);
+  } catch (err) {
+    console.error(`[POS] Failed to generate KOTs for added items on order ${orderId}:`, err.message);
+  }
 
   return recalculateOrderTotals(orderId);
 }
