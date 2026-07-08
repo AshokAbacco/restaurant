@@ -1,6 +1,6 @@
 // client/src/menu/pages/MenuList.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { FiPlus, FiSearch, FiUpload, FiDownload, FiSliders, FiClock, FiInfo } from "react-icons/fi";
+import { FiPlus, FiSearch, FiUpload, FiDownload, FiSliders, FiClock, FiInfo, FiFileText } from "react-icons/fi";
 import { useAuth } from "../../auth/AuthContext";
 import MenuTabs from "../MenuTabs";
 import MenuItemFormModal from "../components/MenuItemFormModal";
@@ -134,6 +134,21 @@ const MenuList = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleDownloadSample = () => {
+    const headers = ["name", "sku", "categoryName", "sellingPrice", "costPrice", "gstPercent", "foodType", "description"];
+    const sampleRows = [
+      ["Chicken Biryani", "BIR-001", "Biryani", "320", "150", "5", "NON_VEG", "Fragrant basmati rice with spiced chicken"],
+      ["Veg Manchurian", "CHI-001", "Chinese", "220", "90", "5", "VEG", "Crispy vegetable balls in tangy sauce"],
+      ["Cold Coffee", "BEV-001", "Beverages", "130", "45", "12", "VEG", "Chilled coffee blended with ice cream"],
+    ];
+    const csv = [headers.join(","), ...sampleRows.map((r) => r.map((v) => `"${v}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "menu-import-sample.csv"; a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <MenuTabs />
@@ -147,8 +162,8 @@ const MenuList = () => {
               <p className="text-xs text-gray-400 mt-0.5">Update many items at once using a CSV file</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowImportHelp(!showImportHelp)} className="text-gray-400 hover:text-blue-600" title="CSV format help">
-                <FiInfo size={16} />
+              <button onClick={() => setShowImportHelp(!showImportHelp)} className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium">
+                <FiInfo size={14} /> {showImportHelp ? "Hide format guide" : "How do I format the file?"}
               </button>
               <input id="menu-csv-import-input" type="file" accept=".csv" onChange={handleImportFile} className="hidden" />
               {canDelete && (
@@ -164,10 +179,80 @@ const MenuList = () => {
             </div>
           </div>
           {showImportHelp && (
-            <div className="mt-3 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-900">
-              <strong>Required CSV columns:</strong> name, sku, categoryName, sellingPrice.{" "}
-              <strong>Optional:</strong> costPrice, gstPercent, foodType (VEG/NON_VEG/EGG), description.{" "}
-              The categoryName must exactly match an existing category name. Export a CSV first to see the exact format.
+            <div className="mt-3 bg-blue-50 border border-blue-100 rounded-lg px-4 py-4 text-xs text-blue-900">
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-semibold">CSV column reference</p>
+                <button
+                  onClick={handleDownloadSample}
+                  className="inline-flex items-center gap-1.5 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 font-medium px-3 py-1.5 rounded-lg"
+                >
+                  <FiFileText size={13} /> Download Sample CSV
+                </button>
+              </div>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="text-blue-700">
+                    <th className="pr-4 pb-2 font-semibold">Column</th>
+                    <th className="pr-4 pb-2 font-semibold">Required?</th>
+                    <th className="pr-4 pb-2 font-semibold">What to enter</th>
+                    <th className="pb-2 font-semibold">Example</th>
+                  </tr>
+                </thead>
+                <tbody className="align-top">
+                  <tr className="border-t border-blue-100">
+                    <td className="pr-4 py-1.5 font-medium">name</td>
+                    <td className="pr-4 py-1.5">Required</td>
+                    <td className="pr-4 py-1.5">The dish or drink's full name</td>
+                    <td className="py-1.5">Chicken Biryani</td>
+                  </tr>
+                  <tr className="border-t border-blue-100">
+                    <td className="pr-4 py-1.5 font-medium">sku</td>
+                    <td className="pr-4 py-1.5">Required</td>
+                    <td className="pr-4 py-1.5">A unique code for this item — no two items can share one</td>
+                    <td className="py-1.5">BIR-001</td>
+                  </tr>
+                  <tr className="border-t border-blue-100">
+                    <td className="pr-4 py-1.5 font-medium">categoryName</td>
+                    <td className="pr-4 py-1.5">Required</td>
+                    <td className="pr-4 py-1.5">Must exactly match an existing category name (see Categories tab)</td>
+                    <td className="py-1.5">Biryani</td>
+                  </tr>
+                  <tr className="border-t border-blue-100">
+                    <td className="pr-4 py-1.5 font-medium">sellingPrice</td>
+                    <td className="pr-4 py-1.5">Required</td>
+                    <td className="pr-4 py-1.5">Price the customer pays, numbers only</td>
+                    <td className="py-1.5">320</td>
+                  </tr>
+                  <tr className="border-t border-blue-100">
+                    <td className="pr-4 py-1.5 font-medium">costPrice</td>
+                    <td className="pr-4 py-1.5">Optional</td>
+                    <td className="pr-4 py-1.5">What it costs you to make — leave blank if unknown</td>
+                    <td className="py-1.5">150</td>
+                  </tr>
+                  <tr className="border-t border-blue-100">
+                    <td className="pr-4 py-1.5 font-medium">gstPercent</td>
+                    <td className="pr-4 py-1.5">Optional</td>
+                    <td className="pr-4 py-1.5">Tax percentage — leave blank to default to 0</td>
+                    <td className="py-1.5">5</td>
+                  </tr>
+                  <tr className="border-t border-blue-100">
+                    <td className="pr-4 py-1.5 font-medium">foodType</td>
+                    <td className="pr-4 py-1.5">Optional</td>
+                    <td className="pr-4 py-1.5">One of: VEG, NON_VEG, EGG — defaults to VEG if left blank</td>
+                    <td className="py-1.5">NON_VEG</td>
+                  </tr>
+                  <tr className="border-t border-blue-100">
+                    <td className="pr-4 py-1.5 font-medium">description</td>
+                    <td className="pr-4 py-1.5">Optional</td>
+                    <td className="pr-4 py-1.5">Short description shown to customers</td>
+                    <td className="py-1.5">Fragrant basmati rice with spiced chicken</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="mt-3 text-blue-700">
+                Tip: click "Download Sample CSV" above, open it in Excel/Sheets, replace the example rows with your
+                own items, save as CSV, then use "Bulk Import" to upload it.
+              </p>
             </div>
           )}
         </div>
