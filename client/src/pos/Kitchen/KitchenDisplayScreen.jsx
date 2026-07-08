@@ -1,7 +1,7 @@
 // src/pos/KitchenDisplayScreen.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
-import KotCard from "./components/KotCard";
-import { getKitchenDisplay, updateKotStatus } from "./api/posApi";
+import KotCard from "./KotCard";
+import { getKitchenDisplay, updateKotStatus } from "../api/posApi";
 
 const POLL_INTERVAL_MS = 8000;
 
