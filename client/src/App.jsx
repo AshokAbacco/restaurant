@@ -13,6 +13,8 @@ import Login from "./auth/Login";
 import ForgotPassword from "./auth/ForgotPassword";
 import ResetPassword from "./auth/ResetPassword";
 import ProtectedRoute from "./auth/ProtectedRoute";
+import ReportsRoutes from "./reports/reportsRoutes";
+import ProfitLossRoutes from "./profitLoss/profitLossRoutes";
 
 // ==============================================
 // Layout
@@ -78,6 +80,12 @@ function App() {
           {/* POS */}
 
           <Route path="/pos/*" element={<PosRoutes />} />
+
+          {/* Reports */}
+          <Route path="/reports/*" element={<ReportsRoutes />} />
+
+          {/* Profit Loss */}
+          <Route path="/profit-loss/*" element={<ProfitLossRoutes />} />
 
           {/* Settings */}
 
