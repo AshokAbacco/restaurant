@@ -120,8 +120,8 @@ model MenuItem {
   description        String?
   prepTimeMinutes    Int?
   targetServeMinutes Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   recipeIngredients RecipeIngredient[]
   orderItems        OrderItem[]
@@ -1068,7 +1068,7 @@ model RestaurantTable {
   capacity Int?
   section  String? // e.g. "Indoor", "Rooftop"
   status   TableStatus @default(FREE)
-  store    String      @default("Main Store")
+  store    String?     @default("Main Store")
 
   orders Order[]
 

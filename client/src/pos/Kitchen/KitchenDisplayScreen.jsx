@@ -1,7 +1,7 @@
 // src/pos/KitchenDisplayScreen.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
-import KotCard from "./components/KotCard";
-import { getKitchenDisplay, updateKotStatus } from "./api/posApi";
+import KotCard from "./KotCard";
+import { getKitchenDisplay, updateKotStatus } from "../api/posApi";
 
 const POLL_INTERVAL_MS = 8000;
 
@@ -11,7 +11,7 @@ export default function KitchenDisplayScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
-
+ 
   const load = useCallback(async () => {
     try {
       const data = await getKitchenDisplay();

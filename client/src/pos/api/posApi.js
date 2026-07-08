@@ -39,6 +39,14 @@ export const getTables = (params = {}) => {
 // customer, item count, total, and kitchen status in one call.
 export const getTablesBoard = () => request("/pos/tables/board");
 
+export const createTable = (payload) =>
+  request("/pos/tables", { method: "POST", body: JSON.stringify(payload) });
+
+export const updateTable = (id, payload) =>
+  request(`/pos/tables/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+
+export const deleteTable = (id) => request(`/pos/tables/${id}`, { method: "DELETE" });
+
 export const updateOrderStatus = (orderId, status) =>
   request(`/pos/orders/${orderId}/status`, {
     method: "PUT",
@@ -74,3 +82,6 @@ export const updateKotStatus = (id, status, reason) =>
     method: "PUT",
     body: JSON.stringify({ status, reason }),
   });
+
+// add near getMenuItems
+export const getAddOns = () => request(`/pos/add-ons?isEnabled=true`); 
