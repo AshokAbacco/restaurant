@@ -11,7 +11,7 @@ export default function KitchenDisplayScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
-
+ 
   const load = useCallback(async () => {
     try {
       const data = await getKitchenDisplay();
