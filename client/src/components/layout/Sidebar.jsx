@@ -63,11 +63,11 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       icon: <FiClipboard />,
     },
 
-    {
-      name: "Tables",
-      path: "/tables",
-      icon: <FiGrid />,
-    },
+    // {
+    //   name: "Tables",
+    //   path: "/tables",
+    //   icon: <FiGrid />,
+    // },
 
     {
       name: "Menu",
@@ -153,11 +153,11 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       icon: <FiClipboard />,
     },
 
-    {
-      name: "Tables",
-      path: "/tables",
-      icon: <FiGrid />,
-    },
+    // {
+    //   name: "Tables",
+    //   path: "/tables",
+    //   icon: <FiGrid />,
+    // },
 
     {
       name: "Menu",
