@@ -13,6 +13,76 @@ export async function listTables({ status, section, store }) {
   });
 }
 
+// Kitchen stage ranking, lowest = least progressed. Used to pick the
+// "current" kitchen status for an order that may have multiple tickets
+// (one per kitchen section) — we show the LEAST advanced one, since a table
+// isn't really "Ready" until every section's ticket is ready.
+const KITCHEN_STAGE_RANK = { NEW: 0, ACCEPTED: 1, PREPARING: 2, READY: 3, SERVED: 4, COMPLETED: 5 };
+
+function deriveKitchenStatus(kitchenOrders) {
+  const active = kitchenOrders.filter((k) => k.status !== "CANCELLED");
+  if (active.length === 0) return null;
+  return active.reduce((least, k) =>
+    KITCHEN_STAGE_RANK[k.status] < KITCHEN_STAGE_RANK[least.status] ? k : least
+  ).status;
+}
+
+// Table-wise view for the Orders page: every table plus its active order's
+// customer, item count, total, and current kitchen status, in one call —
+// so the frontend doesn't have to stitch together /tables + /orders itself.
+//
+// IMPORTANT: kitchenStatus is read directly from the order's live
+// KitchenOrder rows (the exact same rows the Kitchen Display reads from),
+// not from Order.status. This is deliberate — mirroring the kitchen status
+// onto a separate field on Order requires a sync step that runs on every
+// single kitchen status update, and if that sync ever misses a case (or the
+// updated code doesn't get deployed), the two pages silently drift apart.
+// Reading the same underlying rows both pages already share removes the
+// possibility of drift entirely — there's nothing to keep in sync.
+export async function getTablesBoard({ store } = {}) {
+  const tables = await prisma.restaurantTable.findMany({
+    where: store ? { store } : {},
+    include: {
+      orders: {
+        where: { status: { notIn: ["COMPLETED", "CANCELLED", "REFUNDED"] } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: {
+          customer: { select: { name: true } },
+          items: { select: { id: true, quantity: true } },
+          kitchenOrders: { select: { status: true } },
+        },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  return tables.map((table) => {
+    const order = table.orders[0] || null;
+    return {
+      id: table.id,
+      name: table.name,
+      capacity: table.capacity,
+      section: table.section,
+      status: table.status,
+      order: order
+        ? {
+            id: order.id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            // The field the Orders page badge and "Complete Service" button
+            // should use — always mirrors the Kitchen Display exactly.
+            kitchenStatus: deriveKitchenStatus(order.kitchenOrders),
+            customerName: order.customer?.name || null,
+            itemCount: order.items.reduce((sum, i) => sum + i.quantity, 0),
+            grandTotal: order.grandTotal,
+            createdAt: order.createdAt,
+          }
+        : null,
+    };
+  });
+}
+
 export async function getTableById(id) {
   return prisma.restaurantTable.findUnique({
     where: { id },

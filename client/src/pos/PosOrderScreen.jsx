@@ -1,9 +1,9 @@
 // src/pos/PosOrderScreen.jsx
-import { useState } from "react";
+import { useRef, useState } from "react";
 import TableStrip from "./components/TableStrip";
 import MenuBrowser from "./components/MenuBrowser";
 import OrderTicket from "./components/OrderTicket";
-import { createOrder, sendToKitchen } from "./api/posApi";
+import { placeOrderAndSendToKitchen } from "./api/posApi";
 
 export default function PosOrderScreen() {
   const [orderType, setOrderType] = useState("DINE_IN");
@@ -12,6 +12,10 @@ export default function PosOrderScreen() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState(null);
   const [lastOrder, setLastOrder] = useState(null);
+  // A ref, not state — state updates are async, so a fast double-click can
+  // fire both handlers before a re-render disables the button. The ref
+  // updates immediately, so the second click bails out synchronously.
+  const submittingRef = useRef(false);
 
   function addItem(menuItem) {
     setCart((prev) => {
@@ -56,10 +60,15 @@ export default function PosOrderScreen() {
   }
 
   async function placeOrder() {
+    if (submittingRef.current) return; // already in flight — ignore the extra click
+    submittingRef.current = true;
     setError(null);
     setPlacing(true);
     try {
-      const order = await createOrder({
+      // One atomic call — either the order + kitchen ticket both succeed and
+      // get saved, or the whole thing fails and NOTHING is persisted. No more
+      // partial state where an Order exists but never made it to the kitchen.
+      const order = await placeOrderAndSendToKitchen({
         orderType,
         tableId: orderType === "DINE_IN" ? tableId : undefined,
         store: "Main Store",
@@ -70,12 +79,6 @@ export default function PosOrderScreen() {
         })),
       });
 
-      // Fire every item straight to the kitchen on placement.
-      const orderItemIds = order.items.map((i) => i.id);
-      if (orderItemIds.length) {
-        await sendToKitchen(order.id, orderItemIds);
-      }
-
       setLastOrder(order);
       setCart([]);
       setTableId(null);
@@ -83,6 +86,7 @@ export default function PosOrderScreen() {
       setError(err.message);
     } finally {
       setPlacing(false);
+      submittingRef.current = false;
     }
   }
 

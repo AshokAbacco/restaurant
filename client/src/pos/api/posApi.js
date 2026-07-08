@@ -35,12 +35,28 @@ export const getTables = (params = {}) => {
   return request(`/pos/tables${qs ? `?${qs}` : ""}`);
 };
 
+// Table-wise board for the Orders page — each table with its active order's
+// customer, item count, total, and kitchen status in one call.
+export const getTablesBoard = () => request("/pos/tables/board");
+
+export const updateOrderStatus = (orderId, status) =>
+  request(`/pos/orders/${orderId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
+
 export const searchCustomers = (q) => request(`/pos/customers/search?q=${encodeURIComponent(q)}`);
 export const createCustomer = (payload) =>
   request("/pos/customers", { method: "POST", body: JSON.stringify(payload) });
 
 export const createOrder = (payload) =>
   request("/pos/orders", { method: "POST", body: JSON.stringify(payload) });
+
+// Atomic version — creates the order and sends it to the kitchen in one
+// backend transaction. If the kitchen send fails, nothing is saved at all.
+// Use this instead of createOrder + sendToKitchen as two separate calls.
+export const placeOrderAndSendToKitchen = (payload) =>
+  request("/pos/orders/place", { method: "POST", body: JSON.stringify(payload) });
 
 export const sendToKitchen = (orderId, orderItemIds) =>
   request(`/pos/kot/orders/${orderId}`, {

@@ -9,6 +9,14 @@ export async function getTables(req, res) {
   }
 }
 
+export async function getTablesBoard(req, res) {
+  try {
+    res.json(await tablesService.getTablesBoard(req.query));
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch tables board", error: err.message });
+  }
+}
+
 export async function getTable(req, res) {
   try {
     const table = await tablesService.getTableById(req.params.id);

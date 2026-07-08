@@ -54,7 +54,7 @@ const Header = ({ onMenuClick }) => {
 
       "/pos": "Point Of Sale",
 
-      "/orders": "Orders",
+      "/pos/orders": "Orders",
 
       "/tables": "Table Management",
 

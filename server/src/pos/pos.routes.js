@@ -7,10 +7,10 @@ import addOnsRoutes from "./add-ons/addOns.routes.js";
 import discountsRoutes from "./discounts/discounts.routes.js";
 import paymentsRoutes from "./payments/payments.routes.js";
 import billSplitsRoutes from "./bill-splits/billSplits.routes.js";
+import kotRoutes from "./kot/kot.routes.js";
 import invoicesRoutes from "./invoices/invoices.routes.js";
 import deliveryPartnersRoutes from "./delivery-partners/deliveryPartners.routes.js";
 import loyaltyRoutes from "./loyalty/loyalty.routes.js";
-import kotRoutes from "./kot/kot.routes.js";
 
 const router = Router();
 
@@ -18,6 +18,7 @@ const router = Router();
 router.get("/orders", posController.getOrders);
 router.get("/orders/:id", posController.getOrder);
 router.post("/orders", posController.createOrder);
+router.post("/orders/place", posController.placeOrderAndSendToKitchen);
 router.put("/orders/:id/status", posController.updateOrderStatus);
 router.post("/orders/:id/cancel", posController.cancelOrder);
 router.post("/orders/:id/hold", posController.holdOrder);
@@ -32,9 +33,9 @@ router.use("/add-ons", addOnsRoutes);
 router.use("/discounts", discountsRoutes);
 router.use("/payments", paymentsRoutes);
 router.use("/bill-splits", billSplitsRoutes);
+router.use("/kot", kotRoutes);
 router.use("/invoices", invoicesRoutes);
 router.use("/delivery-partners", deliveryPartnersRoutes);
 router.use("/loyalty", loyaltyRoutes);
-router.use("/kot", kotRoutes);
 
 export default router;

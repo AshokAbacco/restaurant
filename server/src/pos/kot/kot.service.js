@@ -1,8 +1,8 @@
 // server/src/pos/kot/kot.service.js
 import prisma from "../../config/prisma.js";
 
-async function generateKotNumber() {
-  const count = await prisma.kitchenOrder.count();
+async function generateKotNumber(client = prisma) {
+  const count = await client.kitchenOrder.count();
   return `KOT-${String(count + 1).padStart(6, "0")}`;
 }
 
@@ -10,12 +10,29 @@ async function generateKotNumber() {
 // kitchenSectionId and creates ONE KitchenOrder per section — e.g. grill items
 // and dessert items on the same order become two separate physical tickets,
 // since kitchenSectionId is a required field on KitchenOrder.
-export async function sendToKitchen(orderId, orderItemIds) {
-  const orderItems = await prisma.orderItem.findMany({
+//
+// Accepts an optional `client` — pass a Prisma transaction client (tx) to run
+// this as part of a larger atomic operation (see pos.service.js's
+// createOrderAndSendToKitchen), otherwise it uses the regular global client.
+export async function sendToKitchen(orderId, orderItemIds, client = prisma) {
+  const orderItems = await client.orderItem.findMany({
     where: { id: { in: orderItemIds }, orderId },
-    include: { menuItem: true },
+    include: {
+      menuItem: true,
+      kitchenOrderItems: { include: { kitchenOrder: { select: { status: true } } } },
+    },
   });
   if (orderItems.length === 0) throw new Error("No matching order items to send");
+
+  // Refuse items that are already sitting on a live (non-cancelled) ticket —
+  // prevents duplicate KOTs from a double-click or a client retry.
+  const alreadySent = orderItems.filter((i) =>
+    i.kitchenOrderItems.some((koi) => koi.kitchenOrder.status !== "CANCELLED")
+  );
+  if (alreadySent.length > 0) {
+    const names = alreadySent.map((i) => i.menuItem.name).join(", ");
+    throw new Error(`These items have already been sent to the kitchen: ${names}`);
+  }
 
   const unassigned = orderItems.filter((i) => !i.menuItem.kitchenSectionId);
   if (unassigned.length > 0) {
@@ -36,13 +53,13 @@ export async function sendToKitchen(orderId, orderItemIds) {
   const createdKots = [];
 
   for (const [kitchenSectionId, items] of bySection) {
-    const kotNumber = await generateKotNumber();
+    const kotNumber = await generateKotNumber(client);
     const targetPrepMinutes = items.reduce(
       (sum, i) => sum + (i.menuItem.prepTimeMinutes || 0) * i.quantity,
       0
     );
 
-    const kitchenOrder = await prisma.kitchenOrder.create({
+    const kitchenOrder = await client.kitchenOrder.create({
       data: {
         order: { connect: { id: orderId } },
         kotNumber,
@@ -69,7 +86,7 @@ export async function sendToKitchen(orderId, orderItemIds) {
     createdKots.push(kitchenOrder);
   }
 
-  await prisma.order.update({ where: { id: orderId }, data: { status: "ACCEPTED" } });
+  await client.order.update({ where: { id: orderId }, data: { status: "ACCEPTED" } });
 
   // Return a single KOT directly when there's only one (the common case),
   // otherwise the full array — callers should handle both, but this keeps
@@ -115,6 +132,19 @@ const LIFECYCLE_TIMESTAMP_FIELD = {
   RECALLED: "recalledAt",
 };
 
+// Maps a KOT reaching a given status onto the parent Order's status, so the
+// Orders page badge actually cycles Accepted -> Preparing -> Ready -> Served
+// instead of jumping straight from Accepted to Ready (the old code only
+// synced on READY, which also meant an Order could never reach SERVED at
+// all — "Complete Service" was permanently disabled as a result).
+// `from`: only sync if the order is currently in one of these states, so an
+// out-of-order/duplicate KOT update can't push the order backwards.
+const ORDER_SYNC_FROM_KOT_STATUS = {
+  PREPARING: { from: ["ACCEPTED"], to: "PREPARING" },
+  READY: { from: ["ACCEPTED", "PREPARING"], to: "READY" },
+  SERVED: { from: ["READY"], to: "SERVED" },
+};
+
 export async function updateKotStatus(id, status, { changedById, reason } = {}) {
   const existing = await prisma.kitchenOrder.findUnique({ where: { id } });
   if (!existing) throw new Error("Kitchen order not found");
@@ -133,10 +163,11 @@ export async function updateKotStatus(id, status, { changedById, reason } = {}) 
     },
   });
 
-  if (status === "READY") {
+  const sync = ORDER_SYNC_FROM_KOT_STATUS[status];
+  if (sync) {
     const order = await prisma.order.findUnique({ where: { id: kot.orderId } });
-    if (order.status === "PREPARING" || order.status === "ACCEPTED") {
-      await prisma.order.update({ where: { id: kot.orderId }, data: { status: "READY" } });
+    if (order && sync.from.includes(order.status)) {
+      await prisma.order.update({ where: { id: kot.orderId }, data: { status: sync.to } });
     }
   }
 

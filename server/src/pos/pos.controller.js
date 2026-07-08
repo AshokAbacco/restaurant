@@ -28,6 +28,19 @@ export async function createOrder(req, res) {
   }
 }
 
+// Creates the order and sends it to the kitchen as a single atomic operation —
+// if the kitchen send fails for any reason, nothing is persisted (no orphan
+// Order left behind). The POS "Send to Kitchen" button should call this
+// instead of createOrder + sendToKitchen as two separate requests.
+export async function placeOrderAndSendToKitchen(req, res) {
+  try {
+    const order = await posService.createOrderAndSendToKitchen(req.body);
+    res.status(201).json(order);
+  } catch (err) {
+    res.status(400).json({ message: "Failed to place order", error: err.message });
+  }
+}
+
 export async function updateOrderStatus(req, res) {
   try {
     const order = await posService.updateOrderStatus(req.params.id, req.body.status);
