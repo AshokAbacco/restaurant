@@ -1,7 +1,7 @@
 // src/pos/KitchenDisplayScreen.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
-import KotCard from "./Kotcard";
-import { getKitchenDisplay, updateKotStatus } from "../api/posApi";
+import KotCard from "./components/KotCard";
+import { getKitchenDisplay, updateKotStatus } from "./api/posApi";
 
 const POLL_INTERVAL_MS = 8000;
 
@@ -57,55 +57,34 @@ export default function KitchenDisplayScreen() {
     }
   }
 
-  async function handleCancel(id) {
-    setUpdatingId(id);
-    try {
-      await updateKotStatus(id, "CANCELLED", "Cancelled from kitchen display");
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUpdatingId(null);
-    }
-  }
-
   return (
     <div className="flex h-screen flex-col bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-blue-600">
-              <path
-                d="M4 8h16M4 8a2 2 0 012-2h12a2 2 0 012 2M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8M9 12h6"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+      <header className="border-b border-slate-200 bg-white px-6 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
+              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-blue-600">
+                <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M3 9h18" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900">Kitchen Display</h1>
+              <p className="text-xs text-slate-400">
+                {visibleKots.length} active ticket{visibleKots.length === 1 ? "" : "s"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">Kitchen Display</h1>
-            <p className="text-xs text-slate-500">
-              {visibleKots.length} active ticket{visibleKots.length === 1 ? "" : "s"}
-            </p>
-          </div>
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
         </div>
-        {error && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600">
-            {error}
-          </p>
-        )}
       </header>
 
       {sections.length > 0 && (
-        <div className="flex gap-2 border-b border-slate-200 bg-white px-6 py-3">
+        <div className="flex gap-2 border-b border-slate-200 bg-white px-6 py-2">
           <button
             onClick={() => setActiveSectionId("ALL")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              activeSectionId === "ALL"
-                ? "bg-blue-600 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              activeSectionId === "ALL" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             All Stations
@@ -115,9 +94,7 @@ export default function KitchenDisplayScreen() {
               key={s.id}
               onClick={() => setActiveSectionId(s.id)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeSectionId === s.id
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                activeSectionId === s.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               {s.name}
@@ -128,23 +105,10 @@ export default function KitchenDisplayScreen() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <p className="text-sm text-slate-500">Loading tickets…</p>
+          <p className="text-sm text-slate-400">Loading tickets…</p>
         ) : visibleKots.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
-                <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6 text-blue-500">
-                  <path
-                    d="M5 13l4 4L19 7"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <p className="text-slate-500">No active tickets. All caught up.</p>
-            </div>
+            <p className="text-slate-400">No active tickets. All caught up.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -153,7 +117,6 @@ export default function KitchenDisplayScreen() {
                 key={kot.id}
                 kot={kot}
                 onAdvance={handleAdvance}
-                onCancel={handleCancel}
                 updating={updatingId === kot.id}
               />
             ))}

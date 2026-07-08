@@ -1,13 +1,13 @@
 // server/src/pos/pos.service.js
 import prisma from "../config/prisma.js";
-import { createKitchenOrdersForOrder } from "../kds/kds.service.js";
+import * as kotService from "./kot/kot.service.js";
 
 /**
  * Generates the next sequential order number, e.g. ORD-000123.
  * NOTE: simple count-based approach, same pattern as employees/expenses codes.
  */
-async function generateOrderNumber() {
-  const count = await prisma.order.count();
+async function generateOrderNumber(client = prisma) {
+  const count = await client.order.count();
   const next = count + 1;
   return `ORD-${String(next).padStart(6, "0")}`;
 }
@@ -19,12 +19,15 @@ async function generateHoldNumber() {
 
 // Statuses that are allowed to follow the current status. Keeps the kitchen/
 // front-of-house flow honest instead of letting the client jump states.
+// COMPLETED is reachable from every active status (not just SERVED) because
+// "Complete Service" on the Orders page is a checkout/close-out action —
+// staff may need to close a table even if a dish never made it past PREPARING.
 const STATUS_FLOW = {
-  NEW: ["ACCEPTED", "CANCELLED", "ON_HOLD"],
-  ON_HOLD: ["NEW", "CANCELLED"],
-  ACCEPTED: ["PREPARING", "CANCELLED"],
-  PREPARING: ["READY", "CANCELLED"],
-  READY: ["SERVED", "OUT_FOR_DELIVERY"],
+  NEW: ["ACCEPTED", "CANCELLED", "ON_HOLD", "COMPLETED"],
+  ON_HOLD: ["NEW", "CANCELLED", "COMPLETED"],
+  ACCEPTED: ["PREPARING", "CANCELLED", "COMPLETED"],
+  PREPARING: ["READY", "CANCELLED", "COMPLETED"],
+  READY: ["SERVED", "OUT_FOR_DELIVERY", "COMPLETED"],
   SERVED: ["COMPLETED"],
   OUT_FOR_DELIVERY: ["COMPLETED"],
   COMPLETED: ["REFUNDED"],
@@ -32,9 +35,9 @@ const STATUS_FLOW = {
   REFUNDED: [],
 };
 
-async function computeItemPricing(items) {
+async function computeItemPricing(items, client = prisma) {
   const menuItemIds = items.map((i) => i.menuItemId);
-  const menuItems = await prisma.menuItem.findMany({
+  const menuItems = await client.menuItem.findMany({
     where: { id: { in: menuItemIds } },
   });
   const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));
@@ -73,11 +76,11 @@ async function computeItemPricing(items) {
   return { itemsData, subtotal, gstAmount };
 }
 
-async function resolveAddOnPricing(itemsData) {
+async function resolveAddOnPricing(itemsData, client = prisma) {
   const addOnIds = itemsData.flatMap((i) => i.addOns.map((a) => a.addOnId));
   if (addOnIds.length === 0) return { itemsData, addOnTotal: 0 };
 
-  const addOns = await prisma.addOn.findMany({ where: { id: { in: addOnIds } } });
+  const addOns = await client.addOn.findMany({ where: { id: { in: addOnIds } } });
   const addOnMap = new Map(addOns.map((a) => [a.id, a]));
 
   let addOnTotal = 0;
@@ -93,7 +96,7 @@ async function resolveAddOnPricing(itemsData) {
   return { itemsData, addOnTotal };
 }
 
-export async function createOrder(payload) {
+export async function createOrder(payload, client = prisma) {
   const {
     orderType,
     tableId,
@@ -114,15 +117,15 @@ export async function createOrder(payload) {
 
   if (!items || items.length === 0) throw new Error("Order must have at least one item");
 
-  const { itemsData, subtotal, gstAmount } = await computeItemPricing(items);
-  const { addOnTotal } = await resolveAddOnPricing(itemsData);
+  const { itemsData, subtotal, gstAmount } = await computeItemPricing(items, client);
+  const { addOnTotal } = await resolveAddOnPricing(itemsData, client);
 
   const grandTotal =
     subtotal + gstAmount + addOnTotal + Number(serviceChargeAmount || 0) + Number(deliveryCharge || 0) + Number(packagingCharge || 0);
 
-  const orderNumber = await generateOrderNumber();
+  const orderNumber = await generateOrderNumber(client);
 
-  const order = await prisma.order.create({
+  const order = await client.order.create({
     data: {
       orderNumber,
       orderType,
@@ -166,19 +169,32 @@ export async function createOrder(payload) {
 
   // Dine-in orders occupy the table immediately
   if (orderType === "DINE_IN" && tableId) {
-    await prisma.restaurantTable.update({ where: { id: tableId }, data: { status: "OCCUPIED" } });
-  }
-
-  // Generate one KOT per kitchen station for this order (KDS module).
-  // Failure here shouldn't fail the whole order — the order is already
-  // placed/paid-for-later; log it so it can be re-sent to the kitchen manually.
-  try {
-    await createKitchenOrdersForOrder(order.id);
-  } catch (err) {
-    console.error(`[POS] Failed to generate KOTs for order ${order.id}:`, err.message);
+    await client.restaurantTable.update({ where: { id: tableId }, data: { status: "OCCUPIED" } });
   }
 
   return order;
+}
+
+// Creates the order AND sends it to the kitchen as a single atomic unit.
+// If sendToKitchen fails for any reason (e.g. an item has no kitchen section),
+// the whole transaction rolls back — no Order, no OrderItem, no table status
+// change ever gets committed. This is the endpoint the POS UI should call
+// instead of createOrder + sendToKitchen as two separate requests, since that
+// two-step version can leave a real Order behind even when the kitchen send fails.
+export async function createOrderAndSendToKitchen(payload) {
+  return prisma.$transaction(
+    async (tx) => {
+      const order = await createOrder(payload, tx);
+
+      const orderItemIds = order.items.map((i) => i.id);
+      if (orderItemIds.length > 0) {
+        await kotService.sendToKitchen(order.id, orderItemIds, tx);
+      }
+
+      return order.id;
+    },
+    { timeout: 15000 }
+  ).then((orderId) => getOrderById(orderId));
 }
 
 export async function listOrders({ status, orderType, tableId, customerId, from, to, page = 1, limit = 20 }) {
@@ -340,15 +356,6 @@ export async function addItemsToOrder(orderId, items) {
       notes: item.notes,
     })),
   });
-
-  // Send the newly added items to the kitchen too. createKitchenOrdersForOrder
-  // only tickets items that don't already have a KitchenOrderItem, so this is
-  // safe to call again without duplicating tickets for items sent earlier.
-  try {
-    await createKitchenOrdersForOrder(orderId);
-  } catch (err) {
-    console.error(`[POS] Failed to generate KOTs for added items on order ${orderId}:`, err.message);
-  }
 
   return recalculateOrderTotals(orderId);
 }

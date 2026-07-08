@@ -52,14 +52,14 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
     },
 
     {
-      name: "Kitchen",
+      name: "Kitchen Orders",
       path: "/kitchen",
       icon: <FiCoffee />,
     },
 
     {
       name: "Orders",
-      path: "/orders",
+      path: "/pos/orders",
       icon: <FiClipboard />,
     },
 
