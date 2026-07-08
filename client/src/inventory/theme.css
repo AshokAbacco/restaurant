@@ -1,0 +1,99 @@
+/* client/src/inventory/theme.css
+   Design direction: a restaurant back-office, not a generic SaaS dashboard.
+   Palette draws from stainless kitchen equipment + printed order tickets.
+   Signature element: status badges styled like small ticket stubs
+   (see .ticket-pill) instead of generic rounded chips. */
+
+@import url("https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap");
+
+.inv-scope {
+  --inv-ink: #1c2321;
+  --inv-paper: #f6f6f4;
+  --inv-paper-raised: #ffffff;
+  --inv-steel: #5b6470;
+  --inv-steel-light: #e4e6e8;
+  --inv-line: #dcdfe0;
+  --inv-pine: #1f6f5c;
+  --inv-pine-dark: #15503f;
+  --inv-pine-tint: #e6f0ec;
+  --inv-amber: #b5790a;
+  --inv-amber-tint: #faf1de;
+  --inv-rust: #b23a1f;
+  --inv-rust-tint: #fbe9e4;
+
+  --inv-font-display: "Zilla Slab", ui-serif, Georgia, serif;
+  --inv-font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --inv-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  color: var(--inv-ink);
+  font-family: var(--inv-font-body);
+}
+
+.inv-scope h1,
+.inv-scope h2,
+.inv-scope h3 {
+  font-family: var(--inv-font-display);
+  letter-spacing: -0.01em;
+}
+
+.inv-scope .inv-mono {
+  font-family: var(--inv-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Signature element: a small torn-ticket-stub badge for statuses/alerts.
+   The dashed left edge + slight tilt nods to a printed order ticket without
+   tipping into decoration-for-its-own-sake. */
+.inv-scope .ticket-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem 0.15rem 0.5rem;
+  font-family: var(--inv-font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-left: 2px dashed currentColor;
+  border-radius: 0 3px 3px 0;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.inv-scope .ticket-pill--neutral {
+  color: var(--inv-steel);
+  background: var(--inv-steel-light);
+}
+.inv-scope .ticket-pill--good {
+  color: var(--inv-pine-dark);
+  background: var(--inv-pine-tint);
+}
+.inv-scope .ticket-pill--warn {
+  color: var(--inv-amber);
+  background: var(--inv-amber-tint);
+}
+.inv-scope .ticket-pill--bad {
+  color: var(--inv-rust);
+  background: var(--inv-rust-tint);
+}
+
+/* Low/out-of-stock rows get a left accent bar instead of a full highlighted
+   row — visible at a glance in a dense table without being gaudy. */
+.inv-scope .row-flag-warn {
+  box-shadow: inset 3px 0 0 var(--inv-amber);
+}
+.inv-scope .row-flag-bad {
+  box-shadow: inset 3px 0 0 var(--inv-rust);
+}
+
+.inv-scope :focus-visible {
+  outline: 2px solid var(--inv-pine);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inv-scope * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

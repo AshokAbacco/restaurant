@@ -15,6 +15,7 @@ import ResetPassword from "./auth/ResetPassword";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import ReportsRoutes from "./reports/reportsRoutes";
 import ProfitLossRoutes from "./profitLoss/profitLossRoutes";
+import InventoryRoutes from "./inventory/inventoryRoutes";
 
 // ==============================================
 // Layout
@@ -88,6 +89,8 @@ function App() {
 
           {/* Profit Loss */}
           <Route path="/profit-loss/*" element={<ProfitLossRoutes />} />
+          {/* Inventory */}
+          <Route path="/inventory/*" element={<InventoryRoutes />} />
 
           {/* Settings */}
 
