@@ -11,6 +11,12 @@ import { requireAuth, requireRole } from "../auth/auth.middleware.js";
 // - Delete                  -> OWNER only
 // - Reports / Export        -> OWNER, MANAGER
 // - Bulk Import             -> OWNER only
+//
+// IMPORTANT: literal routes like /menu/report and /menu/export MUST be
+// registered BEFORE /menu/:id. Express matches routes top-to-bottom, and
+// /menu/:id would otherwise treat "report"/"export" as an :id value,
+// causing a false 404 ("menu item not found") instead of hitting the
+// intended handler.
 // ==============================================
 
 const VIEW_ROLES = ["OWNER", "MANAGER", "CASHIER", "KITCHEN"];
@@ -37,7 +43,18 @@ router.post("/kitchen-sections", requireAuth, requireRole(...EDIT_ROLES), contro
 router.put("/kitchen-sections/:id", requireAuth, requireRole(...EDIT_ROLES), controller.updateKitchenSection);
 router.delete("/kitchen-sections/:id", requireAuth, requireRole("OWNER"), controller.deleteKitchenSection);
 
-// ---------- Menu Items ----------
+// ---------- Menu Items: literal routes FIRST ----------
+router.get("/menu/export", requireAuth, requireRole(...EDIT_ROLES), controller.exportMenuItems);
+router.get("/menu/report", requireAuth, requireRole(...EDIT_ROLES), controller.getMenuReport);
+router.post(
+  "/menu/import",
+  requireAuth,
+  requireRole("OWNER"),
+  upload.single("file"),
+  controller.importMenuItems
+);
+
+// ---------- Menu Items: core CRUD ----------
 router.get("/menu", requireAuth, requireRole(...VIEW_ROLES), controller.getMenuItems);
 router.get("/menu/:id", requireAuth, requireRole(...VIEW_ROLES), controller.getMenuItemById);
 router.post("/menu", requireAuth, requireRole(...EDIT_ROLES), controller.createMenuItem);
@@ -71,19 +88,6 @@ router.delete("/combos/items/:comboItemId", requireAuth, requireRole(...EDIT_ROL
 
 // ---------- Price History ----------
 router.get("/menu/:id/price-history", requireAuth, requireRole(...EDIT_ROLES), controller.getPriceHistory);
-
-// ---------- Bulk Import / Export ----------
-router.post(
-  "/menu/import",
-  requireAuth,
-  requireRole("OWNER"),
-  upload.single("file"),
-  controller.importMenuItems
-);
-router.get("/menu/export", requireAuth, requireRole(...EDIT_ROLES), controller.exportMenuItems);
-
-// ---------- Reports ----------
-router.get("/menu/report", requireAuth, requireRole(...EDIT_ROLES), controller.getMenuReport);
 
 // ---------- Image Upload (used by menu item / category / combo forms) ----------
 router.post(

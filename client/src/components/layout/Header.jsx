@@ -60,6 +60,18 @@ const Header = ({ onMenuClick }) => {
 
       "/menu": "Menu Management",
 
+      "/menu/categories": "Menu Categories",
+
+      "/menu/subcategories": "Sub Categories",
+
+      "/menu/kitchen-sections": "Kitchen Sections",
+
+      "/menu/addons": "Add-ons",
+
+      "/menu/combos": "Combo Meals",
+
+      "/menu/reports": "Menu Reports",
+
       "/inventory": "Inventory",
 
       "/customers": "Customers",

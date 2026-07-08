@@ -44,8 +44,11 @@ const logout = async () => {
 // ==============================================
 
 const restoreSession = async () => {
-  // Prime the access token via refresh (apiRequest's 401 fallback handles this
-  // automatically as long as we hit a protected endpoint first).
+  // Nothing stored → don't even hit the server
+  if (!getAccessToken()) {
+    return null;
+  }
+
   const { ok, data } = await apiRequest("/auth/me");
 
   if (!ok || !data?.success) {
@@ -55,7 +58,6 @@ const restoreSession = async () => {
 
   return data.user;
 };
-
 // ==============================================
 // CURRENT USER / TOKEN (in-memory only)
 // ==============================================

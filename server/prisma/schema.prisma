@@ -116,10 +116,10 @@ model MenuItem {
   isHiddenFromPOS Boolean    @default(false)
   status          ItemStatus @default(ACTIVE)
 
-  imageUrl        String?
-  description     String?
-  prepTimeMinutes Int?
-
+  imageUrl           String?
+  description        String?
+  prepTimeMinutes    Int?
+  targetServeMinutes Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

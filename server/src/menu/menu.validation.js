@@ -40,6 +40,10 @@ export function validateMenuItemInput(data, { isUpdate = false } = {}) {
     errors.push("gstPercent must be a number");
   }
 
+  if (data.targetServeMinutes !== undefined && data.targetServeMinutes !== null && isNaN(Number(data.targetServeMinutes))) {
+    errors.push("targetServeMinutes must be a number");
+  }
+
   if (data.foodType !== undefined && !["VEG", "NON_VEG", "EGG"].includes(data.foodType)) {
     errors.push("foodType must be one of VEG, NON_VEG, EGG");
   }

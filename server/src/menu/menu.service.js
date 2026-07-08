@@ -75,6 +75,7 @@ export const addMenuItem = async (data) => {
     imageUrl: data.imageUrl ?? null,
     description: data.description ?? null,
     prepTimeMinutes: data.prepTimeMinutes ? Number(data.prepTimeMinutes) : null,
+    targetServeMinutes: data.targetServeMinutes ? Number(data.targetServeMinutes) : null,
   });
 };
 
@@ -174,6 +175,7 @@ export const addVariant = async (menuItemId, data) => {
     name: data.name.trim(),
     price: Number(data.price),
     prepTimeMinutes: data.prepTimeMinutes ? Number(data.prepTimeMinutes) : null,
+    targetServeMinutes: data.targetServeMinutes ? Number(data.targetServeMinutes) : null,
     calories: data.calories ? Number(data.calories) : null,
   });
 };
