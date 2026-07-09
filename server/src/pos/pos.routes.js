@@ -11,6 +11,7 @@ import kotRoutes from "./kot/kot.routes.js";
 import invoicesRoutes from "./invoices/invoices.routes.js";
 import deliveryPartnersRoutes from "./delivery-partners/deliveryPartners.routes.js";
 import loyaltyRoutes from "./loyalty/loyalty.routes.js";
+import billingRoutes from "./billing/billing.routes.js";
 
 const router = Router();
 
@@ -37,5 +38,7 @@ router.use("/kot", kotRoutes);
 router.use("/invoices", invoicesRoutes);
 router.use("/delivery-partners", deliveryPartnersRoutes);
 router.use("/loyalty", loyaltyRoutes);
+// Complete Service -> Billing & Payment -> Invoice -> Free Table flow
+router.use("/billing", billingRoutes);
 
 export default router;

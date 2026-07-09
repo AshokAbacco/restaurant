@@ -100,3 +100,24 @@ export const updateKotStatus = (id, status, reason) =>
 
 // add near getMenuItems
 export const getAddOns = () => request(`/pos/add-ons?isEnabled=true`);
+
+// ==============================================
+// BILLING & PAYMENT
+// Complete Service -> Billing & Payment -> Invoice -> Free Table.
+// The table is only freed server-side once completeBilling succeeds with a
+// fully-paid order — nothing here frees it up front.
+// ==============================================
+
+// Read-only bill preview for the Billing & Payment modal: items, subtotal,
+// CGST/SGST, discount, grand total, and anything already paid so far.
+export const getBillingSummary = (orderId) => request(`/pos/billing/orders/${orderId}/summary`);
+
+// payload: { payments: [{ method, amount, transactionReference? }], discount? }
+// Records the payment(s), and only on full payment marks the order
+// COMPLETED, generates the invoice, and frees the table. Returns
+// { order, payments, invoice }.
+export const completeBilling = (orderId, payload) =>
+  request(`/pos/billing/orders/${orderId}/complete`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });

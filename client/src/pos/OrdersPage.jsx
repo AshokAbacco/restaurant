@@ -1,7 +1,8 @@
 // src/pos/OrdersPage.jsx
 import { useCallback, useEffect, useState } from "react";
 import TableOrderCard, { deriveTableCategory, CATEGORY_RANK } from "./components/TableOrderCard";
-import { getTablesBoard, updateOrderStatus } from "./api/posApi";
+import BillingPaymentModal from "./Billing/BillingPaymentModal";
+import { getTablesBoard } from "./api/posApi";
 
 const POLL_INTERVAL_MS = 8000;
 
@@ -9,8 +10,12 @@ export default function OrdersPage() {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [completingId, setCompletingId] = useState(null);
   const [filter, setFilter] = useState("ALL");
+
+  // Clicking "Complete Service" no longer frees the table directly — it
+  // opens the Billing & Payment modal instead. The table is only freed once
+  // that modal reports back a successful, fully-paid completion.
+  const [billingOrderId, setBillingOrderId] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -30,23 +35,13 @@ export default function OrdersPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  async function handleCompleteService(orderId) {
-    setCompletingId(orderId);
-    // Optimistically clear the order off its table immediately — timer stops
-    // and the card flips to "Available" right away instead of waiting on the
-    // next poll, matching "stop the timer immediately" from the spec.
-    setTables((prev) =>
-      prev.map((t) => (t.order?.id === orderId ? { ...t, status: "FREE", order: null } : t))
-    );
-    try {
-      await updateOrderStatus(orderId, "COMPLETED");
-      await load();
-    } catch (err) {
-      setError(err.message);
-      await load(); // resync with the real state if the update actually failed
-    } finally {
-      setCompletingId(null);
-    }
+  function handleCompleteService(orderId) {
+    setBillingOrderId(orderId);
+  }
+
+  async function handleBillingCompleted() {
+    setBillingOrderId(null);
+    await load(); // pick up the now-COMPLETED order / freed table from the server
   }
 
   const occupiedCount = tables.filter((t) => t.order).length;
@@ -121,12 +116,19 @@ export default function OrdersPage() {
                 key={table.id}
                 table={table}
                 onCompleteService={handleCompleteService}
-                completing={completingId === table.order?.id}
+                completing={billingOrderId === table.order?.id}
               />
             ))}
           </div>
         )}
       </div>
+
+      <BillingPaymentModal
+        orderId={billingOrderId}
+        isOpen={!!billingOrderId}
+        onClose={() => setBillingOrderId(null)}
+        onCompleted={handleBillingCompleted}
+      />
     </div>
   );
 }

@@ -26,46 +26,62 @@ export default function PosOrderScreen() {
   // updates immediately, so the second click bails out synchronously.
   const submittingRef = useRef(false);
 
+  // OrderTicket identifies every cart row by `cartLineId` (not menuItemId —
+  // two lines can share a menuItemId once add-ons make them distinct). Use
+  // crypto.randomUUID when it's available and fall back to a manual id.
+  function makeCartLineId() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    return `line_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   function addItem(menuItem) {
     setCart((prev) => {
-      const existing = prev.find((i) => i.menuItemId === menuItem.id);
+      // Only merge into an existing plain line (no add-ons yet) — once a
+      // line has add-ons it's no longer interchangeable with a fresh tap.
+      const existing = prev.find((i) => i.menuItemId === menuItem.id && (i.addOns || []).length === 0);
       if (existing) {
         return prev.map((i) =>
-          i.menuItemId === menuItem.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.cartLineId === existing.cartLineId ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
       return [
         ...prev,
         {
+          cartLineId: makeCartLineId(),
           menuItemId: menuItem.id,
           name: menuItem.name,
           sellingPrice: Number(menuItem.sellingPrice),
           gstPercent: Number(menuItem.gstPercent || 0),
           quantity: 1,
           notes: "",
+          addOns: [],
         },
       ];
     });
   }
 
-  function increment(menuItemId) {
-    setCart((prev) => prev.map((i) => (i.menuItemId === menuItemId ? { ...i, quantity: i.quantity + 1 } : i)));
+  function increment(cartLineId) {
+    setCart((prev) => prev.map((i) => (i.cartLineId === cartLineId ? { ...i, quantity: i.quantity + 1 } : i)));
   }
 
-  function decrement(menuItemId) {
+  function decrement(cartLineId) {
     setCart((prev) =>
       prev
-        .map((i) => (i.menuItemId === menuItemId ? { ...i, quantity: i.quantity - 1 } : i))
+        .map((i) => (i.cartLineId === cartLineId ? { ...i, quantity: i.quantity - 1 } : i))
         .filter((i) => i.quantity > 0)
     );
   }
 
-  function remove(menuItemId) {
-    setCart((prev) => prev.filter((i) => i.menuItemId !== menuItemId));
+  function remove(cartLineId) {
+    setCart((prev) => prev.filter((i) => i.cartLineId !== cartLineId));
   }
 
-  function setNote(menuItemId, notes) {
-    setCart((prev) => prev.map((i) => (i.menuItemId === menuItemId ? { ...i, notes } : i)));
+  function setNote(cartLineId, notes) {
+    setCart((prev) => prev.map((i) => (i.cartLineId === cartLineId ? { ...i, notes } : i)));
+  }
+
+  function editAddOns(cartLineId, addOns) {
+    setCart((prev) => prev.map((i) => (i.cartLineId === cartLineId ? { ...i, addOns } : i)));
   }
 
   async function placeOrder() {
@@ -82,6 +98,9 @@ export default function PosOrderScreen() {
           menuItemId: i.menuItemId,
           quantity: i.quantity,
           notes: i.notes || undefined,
+          ...(i.addOns && i.addOns.length
+            ? { addOns: i.addOns.map((a) => ({ addOnId: a.addOnId, quantity: a.quantity })) }
+            : {}),
         })),
       });
 
@@ -135,6 +154,7 @@ export default function PosOrderScreen() {
           onDecrement={decrement}
           onRemove={remove}
           onNoteChange={setNote}
+          onEditAddOns={editAddOns}
           onPlaceOrder={placeOrder}
           placing={placing}
           error={error}
