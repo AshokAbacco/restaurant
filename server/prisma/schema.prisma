@@ -438,6 +438,8 @@ model ExpenseCategory {
   description String?
   isDefault   Boolean @default(false) // true for seeded defaults (Rent, Electricity, etc.)
   isEnabled   Boolean @default(true)
+  icon        String? @default("FiTag")
+  color       String? @default("blue")
 
   expenses          Expense[]
   recurringExpenses RecurringExpense[]
@@ -446,6 +448,19 @@ model ExpenseCategory {
   updatedAt DateTime @updatedAt
 
   @@map("expense_categories")
+}
+
+model Store {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  address  String?
+  phone    String?
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stores")
 }
 
 // Core expense record. Utility bills and petty cash entries also live here

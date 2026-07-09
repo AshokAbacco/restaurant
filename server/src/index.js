@@ -11,6 +11,7 @@ import expensesRoutes from "./expenses/expenses.routes.js";
 import employeeRoutes from "./employees/employees.routes.js";
 import posRoutes from "./pos/pos.routes.js";
 import kdsRoutes from "./kds/kds.routes.js";
+import storesRoutes from "./stores/stores.routes.js";
 
 const app = express();
 
@@ -69,6 +70,12 @@ app.use(
   requireAuth,
   requireRole("OWNER", "MANAGER", "CHEF", "KITCHEN"),
   kdsRoutes,
+);
+app.use(
+  "/api/stores",
+  requireAuth,
+  requireRole("OWNER", "MANAGER"),
+  storesRoutes,
 );
 
 // ==============================================

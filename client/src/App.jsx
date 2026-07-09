@@ -38,6 +38,7 @@ import PosRoutes from "./pos/posRoutes";
 import SettingsRoutes from "./settings/settingsRoutes";
 import KitchenRoutes from "./pos/Kitchen/KitchenDisplayScreen";
 import KioskRoutes from "./kiosk/kioskRoutes";
+import ExpenseRoutes from "./expenses/expensesRoutes";
 
 // ==============================================
 // APP
@@ -91,6 +92,7 @@ function App() {
           <Route path="/profit-loss/*" element={<ProfitLossRoutes />} />
           {/* Inventory */}
           <Route path="/inventory/*" element={<InventoryRoutes />} />
+          <Route path="/expenses/*" element={<ExpenseRoutes />} />
 
           {/* Settings */}
 

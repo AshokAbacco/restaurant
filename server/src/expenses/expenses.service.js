@@ -48,7 +48,18 @@ export const createExpense = async (data, userId) => {
   const expenseNumber = await generateExpenseNumber();
 
   const expense = await prisma.expense.create({
-    data: { ...data, expenseNumber, createdBy: userId || null },
+    data: {
+      ...data,
+      expenseDate: new Date(data.expenseDate),
+      paymentDate: data.paymentDate ? new Date(data.paymentDate) : null,
+      supplierId: data.supplierId || null,
+      invoiceNumber: data.invoiceNumber || null,
+      transactionReference: data.transactionReference || null,
+      description: data.description || null,
+      paymentMethod: data.paymentMethod || null,
+      expenseNumber,
+      createdBy: userId || null,
+    },
   });
 
   await prisma.expenseAuditLog.create({
