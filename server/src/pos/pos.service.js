@@ -342,22 +342,34 @@ export async function transferTable(orderId, newTableId) {
   return prisma.order.update({ where: { id: orderId }, data: { tableId: newTableId } });
 }
 
+// Adds new items to an order that's already been placed (e.g. the customer
+// asks for 2 more items mid-meal). Returns both the updated order AND the
+// newly created OrderItem rows specifically — the caller needs those ids to
+// send ONLY the new items to the kitchen, not the whole order again.
 export async function addItemsToOrder(orderId, items) {
   const { itemsData } = await computeItemPricing(items);
   await resolveAddOnPricing(itemsData);
 
-  await prisma.orderItem.createMany({
-    data: itemsData.map((item) => ({
-      orderId,
-      menuItemId: item.menuItemId,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      totalPrice: item.totalPrice,
-      notes: item.notes,
-    })),
-  });
+  // Created one-by-one (not createMany) specifically so we get each row's id
+  // back — createMany doesn't return the created rows in Postgres.
+  const newItems = await Promise.all(
+    itemsData.map((item) =>
+      prisma.orderItem.create({
+        data: {
+          orderId,
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          notes: item.notes,
+        },
+        include: { menuItem: true },
+      })
+    )
+  );
 
-  return recalculateOrderTotals(orderId);
+  const order = await recalculateOrderTotals(orderId);
+  return { order, newItems };
 }
 
 async function recalculateOrderTotals(orderId) {

@@ -5,13 +5,19 @@ import { getKitchenDisplay, updateKotStatus } from "../api/posApi";
 
 const POLL_INTERVAL_MS = 8000;
 
+// Display grouping for the kitchen — Pending tickets need action first, Ready
+// next (waiting for pickup), Served last (already done, lowest urgency).
+// NEW/ACCEPTED/PREPARING all count as "Pending" here since the simplified
+// workflow only exposes Pending -> Ready -> Served as visible stages.
+const DISPLAY_RANK = { NEW: 0, ACCEPTED: 0, PREPARING: 0, READY: 1, SERVED: 2 };
+
 export default function KitchenDisplayScreen() {
   const [kots, setKots] = useState([]);
   const [activeSectionId, setActiveSectionId] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
- 
+
   const load = useCallback(async () => {
     try {
       const data = await getKitchenDisplay();
@@ -40,10 +46,32 @@ export default function KitchenDisplayScreen() {
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [kots]);
 
-  const visibleKots = useMemo(() => {
-    if (activeSectionId === "ALL") return kots;
-    return kots.filter((k) => k.kitchenSectionId === activeSectionId);
-  }, [kots, activeSectionId]);
+const visibleKots = useMemo(() => {
+  const filtered =
+    activeSectionId === "ALL"
+      ? kots
+      : kots.filter((k) => k.kitchenSectionId === activeSectionId);
+
+  return filtered.slice().sort((a, b) => {
+    // Pending -> Ready -> Served
+    const rankDiff =
+      (DISPLAY_RANK[a.status] ?? 0) -
+      (DISPLAY_RANK[b.status] ?? 0);
+
+    if (rankDiff !== 0) return rankDiff;
+
+    // SERVED: newest completed first
+    if (a.status === "SERVED" && b.status === "SERVED") {
+      const aTime = new Date(a.completedAt || a.servedAt || a.updatedAt || a.createdAt).getTime();
+      const bTime = new Date(b.completedAt || b.servedAt || b.updatedAt || b.createdAt).getTime();
+
+      return bTime - aTime;
+    }
+
+    // Pending & Ready: oldest first
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+}, [kots, activeSectionId]);
 
   async function handleAdvance(id, nextStatus) {
     setUpdatingId(id);

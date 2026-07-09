@@ -66,6 +66,21 @@ export const createOrder = (payload) =>
 export const placeOrderAndSendToKitchen = (payload) =>
   request("/pos/orders/place", { method: "POST", body: JSON.stringify(payload) });
 
+// Fetches a single order with its full item/payment/kitchen detail — used
+// when a staff member taps an OCCUPIED table to see what's already ordered
+// before adding more items to it.
+export const getOrder = (id) => request(`/pos/orders/${id}`);
+
+// Adds new items to an order that's already been placed (e.g. the customer
+// asks for 2 more items mid-meal). Returns { order, newItems } — newItems is
+// what you pass to sendToKitchen next, so only the new stuff gets a ticket,
+// not the whole order again.
+export const addItemsToOrder = (orderId, items) =>
+  request(`/pos/orders/${orderId}/items`, {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+
 export const sendToKitchen = (orderId, orderItemIds) =>
   request(`/pos/kot/orders/${orderId}`, {
     method: "POST",
@@ -84,4 +99,4 @@ export const updateKotStatus = (id, status, reason) =>
   });
 
 // add near getMenuItems
-export const getAddOns = () => request(`/pos/add-ons?isEnabled=true`); 
+export const getAddOns = () => request(`/pos/add-ons?isEnabled=true`);

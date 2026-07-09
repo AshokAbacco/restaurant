@@ -88,8 +88,8 @@ export async function transferTable(req, res) {
 
 export async function addItems(req, res) {
   try {
-    const order = await posService.addItemsToOrder(req.params.id, req.body.items);
-    res.json(order);
+    const result = await posService.addItemsToOrder(req.params.id, req.body.items);
+    res.json(result);
   } catch (err) {
     res.status(400).json({ message: "Failed to add items to order", error: err.message });
   }

@@ -3,17 +3,26 @@ import { useRef, useState } from "react";
 import TableStrip from "./components/TableStrip";
 import MenuBrowser from "./components/MenuBrowser";
 import OrderTicket from "./components/OrderTicket";
-import { placeOrderAndSendToKitchen } from "./api/posApi";
+import SuccessToast from "./components/SuccessToast";
+import { createOrder, sendToKitchen } from "./api/posApi";
 
 export default function PosOrderScreen() {
   const [orderType, setOrderType] = useState("DINE_IN");
-  const [tableId, setTableId] = useState(null);
+  // TableStrip's onSelect now hands back the FULL table object (id, status,
+  // and its active order if occupied) — not just an id string. Keep the
+  // whole object here since we'll need table.order shortly to support
+  // "add items to an existing order"; derive a plain id below for anything
+  // that only needs the id (the API payload, and the selectedTableId prop
+  // TableStrip uses to highlight the active selection).
+  const [selectedTable, setSelectedTable] = useState(null);
+  const tableId = selectedTable?.id ?? null;
   const [cart, setCart] = useState([]);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState(null);
   const [lastOrder, setLastOrder] = useState(null);
-  // A ref, not state — state updates are async, so a fast double-click can
-  // fire both handlers before a re-render disables the button. The ref
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  // A ref (not state) because state updates are async and a fast double-click
+  // can fire both handlers before a re-render disables the button. The ref
   // updates immediately, so the second click bails out synchronously.
   const submittingRef = useRef(false);
 
@@ -65,10 +74,7 @@ export default function PosOrderScreen() {
     setError(null);
     setPlacing(true);
     try {
-      // One atomic call — either the order + kitchen ticket both succeed and
-      // get saved, or the whole thing fails and NOTHING is persisted. No more
-      // partial state where an Order exists but never made it to the kitchen.
-      const order = await placeOrderAndSendToKitchen({
+      const order = await createOrder({
         orderType,
         tableId: orderType === "DINE_IN" ? tableId : undefined,
         store: "Main Store",
@@ -79,9 +85,16 @@ export default function PosOrderScreen() {
         })),
       });
 
+      // Fire every item straight to the kitchen on placement.
+      const orderItemIds = order.items.map((i) => i.id);
+      if (orderItemIds.length) {
+        await sendToKitchen(order.id, orderItemIds);
+      }
+
       setLastOrder(order);
+      setShowSuccessToast(true);
       setCart([]);
-      setTableId(null);
+      setSelectedTable(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,37 +104,25 @@ export default function PosOrderScreen() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
-            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-blue-600">
-              <path
-                d="M3 3h2l.4 2M7 13h10l3-8H5.4M7 13L5.4 5M7 13l-2 4h13M9 21a1 1 0 100-2 1 1 0 000 2zM18 21a1 1 0 100-2 1 1 0 000 2z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-          <h1 className="text-lg font-bold text-slate-900">POS · New Order</h1>
-        </div>
-        {lastOrder && (
-          <p className="mt-1 text-sm text-emerald-600">
-            Order <span className="font-mono font-semibold">{lastOrder.orderNumber}</span> sent to kitchen.
-          </p>
-        )}
+    <div className="flex h-screen flex-col bg-stone-50">
+      <header className="border-b border-stone-200 bg-white px-6 py-3">
+        <h1 className="font-mono text-lg font-bold text-stone-900">POS · New Order</h1>
       </header>
 
+      <SuccessToast
+        show={showSuccessToast}
+        message={lastOrder ? `Order ${lastOrder.orderNumber}` : undefined}
+        onClose={() => setShowSuccessToast(false)}
+      />
+
       {orderType === "DINE_IN" && (
-        <div className="border-b border-slate-200 bg-white px-6 py-3">
-          <TableStrip selectedTableId={tableId} onSelect={setTableId} />
+        <div className="border-b border-stone-200 bg-white px-6 py-3">
+          <TableStrip selectedTableId={tableId} onSelect={setSelectedTable} />
         </div>
       )}
 
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 md:grid-cols-[1fr_360px]">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white p-4">
           <MenuBrowser onAddItem={addItem} />
         </div>
 
