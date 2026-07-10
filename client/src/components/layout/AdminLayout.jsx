@@ -84,7 +84,7 @@ const AdminLayout = () => {
 
               {/* Content */}
 
-              <div className="relative z-10">
+              <div className="relative">
                 <div className="animate-fadeIn">
                   <Outlet />
                 </div>

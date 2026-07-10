@@ -1,13 +1,9 @@
-// ==============================================
-// src/expenses/pages/Reports.jsx
-// ==============================================
-
+// client/src/expenses/pages/Reports.jsx
 import { useEffect, useState } from "react";
 import expenseService from "../services/expenseService";
 import { FiBarChart2, FiInbox } from "react-icons/fi";
-
-const formatMoney = (value = 0) =>
-  `₹${Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+import { ui, formatMoney } from "../expenseTheme";
+import { ErrorBanner } from "../ExpenseUI";
 
 const Reports = () => {
   const [loading, setLoading] = useState(true);
@@ -46,62 +42,51 @@ const Reports = () => {
   );
 
   return (
-    <div className="">
+    <div>
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+      <div className={`${ui.card} p-6 mb-6`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1.5">From</label>
+            <label className={ui.labelSm}>From</label>
             <input
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 outline-none focus:border-blue-600"
+              className={ui.input}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1.5">To</label>
+            <label className={ui.labelSm}>To</label>
             <input
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 outline-none focus:border-blue-600"
+              className={ui.input}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Group By</label>
-            <select
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 outline-none focus:border-blue-600"
-            >
+            <label className={ui.labelSm}>Group By</label>
+            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className={ui.input}>
               <option value="category">Category</option>
               <option value="">All Expenses</option>
             </select>
           </div>
 
           <div className="flex items-end">
-            <button
-              onClick={loadReports}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 font-semibold"
-            >
+            <button onClick={loadReports} className={`${ui.btnPrimary} w-full py-2.5`}>
               Generate Report
             </button>
           </div>
         </div>
       </div>
 
-      {error && (
-        <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 text-red-600 px-5 py-4 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-6"><ErrorBanner>{error}</ErrorBanner></div>}
 
       {/* Total summary */}
       {!loading && reports.length > 0 && (
-        <div className="mb-6 bg-blue-600 rounded-2xl p-6 flex items-center justify-between text-white">
+        <div className="mb-6 bg-[#3FA34D] dark:bg-[#43B75A] rounded-2xl p-6 flex items-center justify-between text-white">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center">
               <FiBarChart2 />
@@ -116,23 +101,23 @@ const Reports = () => {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className={`${ui.card} overflow-hidden`}>
         {loading ? (
           <div className="p-6 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-14 rounded-xl bg-gray-100 animate-pulse" />
+              <div key={i} className="h-14 rounded-xl bg-[#F3F5EE] dark:bg-[#1E241C] animate-pulse" />
             ))}
           </div>
         ) : reports.length === 0 ? (
           <div className="p-16 text-center">
-            <FiInbox className="mx-auto text-4xl text-gray-300 mb-4" />
-            <p className="text-gray-500 font-medium">No data for this period</p>
-            <p className="text-gray-400 text-sm mt-1">Try a wider date range.</p>
+            <FiInbox className={`mx-auto text-4xl ${ui.faint} mb-4`} />
+            <p className={`font-medium ${ui.heading}`}>No data for this period</p>
+            <p className={`text-sm mt-1 ${ui.faint}`}>Try a wider date range.</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="text-left text-xs font-semibold text-gray-400 uppercase border-b border-gray-100">
+              <tr className={`text-left text-xs font-semibold uppercase border-b border-[#E7EAE1] dark:border-[#262B24] ${ui.faint}`}>
                 {groupBy === "category" ? (
                   <>
                     <th className="px-6 py-4">Category</th>
@@ -152,20 +137,20 @@ const Reports = () => {
             <tbody>
               {groupBy === "category"
                 ? reports.map((row, i) => (
-                    <tr key={i} className="border-b border-gray-50 last:border-0">
-                      <td className="px-6 py-4 font-medium text-gray-800">{row.category}</td>
-                      <td className="px-6 py-4 text-center text-gray-500">{row.count}</td>
-                      <td className="px-6 py-4 text-right font-semibold">{formatMoney(row.total)}</td>
+                    <tr key={i} className="border-b border-[#E7EAE1] dark:border-[#262B24] last:border-0">
+                      <td className={`px-6 py-4 font-medium ${ui.heading}`}>{row.category}</td>
+                      <td className={`px-6 py-4 text-center ${ui.muted}`}>{row.count}</td>
+                      <td className={`px-6 py-4 text-right font-semibold ${ui.heading}`}>{formatMoney(row.total)}</td>
                     </tr>
                   ))
                 : reports.map((expense) => (
-                    <tr key={expense.id} className="border-b border-gray-50 last:border-0">
-                      <td className="px-6 py-4 font-medium text-gray-800">{expense.title}</td>
-                      <td className="px-6 py-4 text-gray-500">{expense.category?.name}</td>
-                      <td className="px-6 py-4 text-right font-semibold">
+                    <tr key={expense.id} className="border-b border-[#E7EAE1] dark:border-[#262B24] last:border-0">
+                      <td className={`px-6 py-4 font-medium ${ui.heading}`}>{expense.title}</td>
+                      <td className={`px-6 py-4 ${ui.muted}`}>{expense.category?.name}</td>
+                      <td className={`px-6 py-4 text-right font-semibold ${ui.heading}`}>
                         {formatMoney(expense.totalPaid)}
                       </td>
-                      <td className="px-6 py-4 text-center text-gray-500">{expense.status}</td>
+                      <td className={`px-6 py-4 text-center ${ui.muted}`}>{expense.status}</td>
                     </tr>
                   ))}
             </tbody>

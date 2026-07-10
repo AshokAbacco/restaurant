@@ -1,6 +1,7 @@
 // server/src/menu/menu.service.js
 import * as repo from "./menu.repository.js";
 import { uploadToR2, deleteFromR2 } from "../config/r2.js";
+import * as XLSX from "xlsx";
 
 class AppError extends Error {
   constructor(message, statusCode = 400) {
@@ -288,60 +289,236 @@ export const editMenuItemWithPriceTracking = async (id, data, changedBy) => {
 export const getPriceHistory = (menuItemId) => repo.findPriceHistoryForItem(menuItemId);
 
 // ---------- Bulk Import / Export ----------
-// Expected CSV columns: name,sku,categoryName,sellingPrice,costPrice,gstPercent,foodType,description
+// Expected columns: name,sku,categoryName,sellingPrice,costPrice,gstPercent,foodType,description
+//
+// bulkImportMenuItems() now accepts BOTH a CSV file and an Excel file
+// (.xlsx/.xls). `originalName` (the uploaded file's name) is used to
+// decide which parser to use — everything downstream (validation,
+// category matching, row-by-row creation) is shared between the two.
 
-export const bulkImportMenuItems = async (fileBuffer) => {
+// Minimal RFC4180-style CSV line parser: respects quoted fields, commas
+// inside quotes, and doubled "" as an escaped quote. Needed because both
+// the "Download Sample CSV" and "Export CSV" client features wrap every
+// value in double quotes — a plain split(",") would leave the quote
+// characters stuck to every value and break category/SKU matching.
+function parseCsvLine(line) {
+  const values = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (line[i + 1] === '"') {
+          current += '"'; // escaped quote ("")
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ",") {
+        values.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+  }
+  values.push(current.trim());
+  return values;
+}
+
+// Parses either a CSV or an Excel buffer into { headers, dataRows }.
+// dataRows is an array of arrays (one per spreadsheet row, header excluded),
+// with values already coerced to trimmed strings so the rest of the import
+// logic doesn't need to care which format the file came in as.
+function parseImportFile(fileBuffer, originalName = "") {
+  const isExcel = /\.(xlsx|xls)$/i.test(originalName || "");
+
+  if (isExcel) {
+    const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) throw new AppError("Spreadsheet has no sheets", 400);
+
+    const sheet = workbook.Sheets[sheetName];
+    // header: 1 => array-of-arrays instead of objects, so column order and
+    // blank cells are preserved exactly like the CSV path.
+    const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
+
+    if (aoa.length < 2) throw new AppError("Spreadsheet has no data rows", 400);
+
+    const headers = aoa[0].map((h) => String(h ?? "").trim());
+    const dataRows = aoa
+      .slice(1)
+      .filter((r) => r.some((cell) => String(cell ?? "").trim() !== "")) // skip fully blank rows
+      .map((r) => headers.map((_, idx) => String(r[idx] ?? "").trim()));
+
+    return { headers, dataRows };
+  }
+
+  // CSV path
   const text = fileBuffer.toString("utf-8");
-  const rows = text.split(/\r?\n/).filter((r) => r.trim());
-  if (rows.length < 2) throw new AppError("CSV has no data rows", 400);
+  const lines = text.split(/\r?\n/).filter((r) => r.trim());
+  if (lines.length < 2) throw new AppError("CSV has no data rows", 400);
 
-  const headers = rows[0].split(",").map((h) => h.trim());
+  const headers = parseCsvLine(lines[0]);
+  const dataRows = lines.slice(1).map((line) => parseCsvLine(line));
+
+  return { headers, dataRows };
+}
+
+export const bulkImportMenuItems = async (fileBuffer, originalName = "") => {
+  const { headers, dataRows } = parseImportFile(fileBuffer, originalName);
+
   const requiredCols = ["name", "sku", "categoryName", "sellingPrice"];
+
   for (const col of requiredCols) {
     if (!headers.includes(col)) {
-      throw new AppError(`CSV missing required column: ${col}`, 400);
+      throw new AppError(`File missing required column: ${col}`, 400);
     }
   }
 
-  const results = { created: 0, skipped: 0, errors: [] };
+  const results = {
+    created: [],
+    updated: [],
+    skipped: [],
+    summary: {
+      totalRows: dataRows.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+    },
+  };
 
-  for (let i = 1; i < rows.length; i++) {
-    const values = rows[i].split(",").map((v) => v.trim());
-    const row = Object.fromEntries(headers.map((h, idx) => [h, values[idx]]));
+  const normalize = (value) =>
+    String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+
+  // Load all categories once
+  const categories = await repo.findAllCategories();
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const values = dataRows[i];
+
+    const row = Object.fromEntries(
+      headers.map((h, idx) => [h, values[idx] ?? ""])
+    );
+
+    const rowNum = i + 2;
 
     try {
-      const categories = await repo.findAllCategories();
-      const category = categories.find(
-        (c) => c.name.toLowerCase() === (row.categoryName || "").toLowerCase()
-      );
-      if (!category) {
-        results.errors.push(`Row ${i + 1}: category "${row.categoryName}" not found`);
-        results.skipped++;
+      if (
+        !row.name ||
+        !row.sku ||
+        !row.categoryName ||
+        row.sellingPrice === "" ||
+        row.sellingPrice === undefined
+      ) {
+        results.skipped.push({
+            row: rowNum,
+            sku: row.sku || "",
+            name: row.name || "",
+            reason: "Name, SKU, Category and Selling Price are required",
+        });
+
+        results.summary.skipped++;
         continue;
       }
 
-      const existingSku = await repo.findMenuItemBySku(row.sku);
-      if (existingSku) {
-        results.errors.push(`Row ${i + 1}: SKU "${row.sku}" already exists, skipped`);
-        results.skipped++;
-        continue;
-      }
-
-      await repo.createMenuItem({
-        name: row.name,
-        sku: row.sku,
-        categoryId: category.id,
-        sellingPrice: Number(row.sellingPrice) || 0,
-        costPrice: row.costPrice ? Number(row.costPrice) : null,
-        gstPercent: row.gstPercent ? Number(row.gstPercent) : 0,
-        foodType: ["VEG", "NON_VEG", "EGG"].includes(row.foodType) ? row.foodType : "VEG",
-        description: row.description || null,
+      if (isNaN(Number(row.sellingPrice))) {
+      results.skipped.push({
+          row: rowNum,
+          sku: row.sku,
+          name: row.name,
+          reason: `Invalid Selling Price (${row.sellingPrice})`,
       });
-      results.created++;
+
+      results.summary.skipped++;
+        continue;
+      }
+
+      let category = categories.find(
+          c => normalize(c.name) === normalize(row.categoryName)
+      );
+
+      if (!category) {
+          category = await repo.createCategory({
+              name: row.categoryName.trim(),
+              isEnabled: true,
+              displayOrder: 0,
+          });
+
+          categories.push(category);
+      }
+
+      const existingItem = await repo.findMenuItemBySku(row.sku);
+
+      const payload = {
+        name: row.name.trim(),
+        sku: row.sku.trim(),
+        categoryId: category.id,
+        sellingPrice: Number(row.sellingPrice),
+        costPrice:
+          row.costPrice !== "" && row.costPrice != null
+            ? Number(row.costPrice)
+            : null,
+        gstPercent:
+          row.gstPercent !== "" && row.gstPercent != null
+            ? Number(row.gstPercent)
+            : 0,
+        foodType: ["VEG", "NON_VEG", "EGG"].includes(row.foodType)
+          ? row.foodType
+          : "VEG",
+        description: row.description?.trim() || null,
+      };
+
+      if (existingItem) {
+      await repo.updateMenuItem(existingItem.id, payload);
+
+      results.updated.push({
+          sku: payload.sku,
+          name: payload.name,
+          categoryName: category.name,
+          sellingPrice: payload.sellingPrice,
+          updatedFields: [
+              "sellingPrice",
+              "costPrice",
+              "gstPercent",
+              "description",
+          ],
+      });
+
+      results.summary.updated++;
+      } else {
+      await repo.createMenuItem(payload);
+
+      results.created.push({
+          sku: payload.sku,
+          name: payload.name,
+          categoryName: category.name,
+          sellingPrice: payload.sellingPrice,
+      });
+
+      results.summary.created++;
+      }
     } catch (err) {
-      results.errors.push(`Row ${i + 1}: ${err.message}`);
-      results.skipped++;
-    }
+    results.skipped.push({
+        row: rowNum,
+        sku: row.sku || "",
+        name: row.name || "",
+        reason: err.message,
+    });
+
+    results.summary.skipped++;
+}
   }
 
   return results;

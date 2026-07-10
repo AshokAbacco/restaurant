@@ -400,7 +400,10 @@ export const importMenuItems = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "CSV file is required" });
     }
-    const result = await service.bulkImportMenuItems(req.file.buffer);
+    const result = await service.bulkImportMenuItems(
+    req.file.buffer,
+    req.file.originalname
+  );
     res.json({ success: true, data: result });
   } catch (err) {
     handleError(res, err);

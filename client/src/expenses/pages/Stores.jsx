@@ -1,11 +1,10 @@
-// ==============================================
-// src/expenses/pages/Stores.jsx
-// ==============================================
-
+// client/src/expenses/pages/Stores.jsx
 import { useEffect, useState } from "react";
 import expenseService from "../services/expenseService";
 import StoreModal from "../components/StoreModal";
 import { FiPlus, FiEdit2, FiTrash2, FiHome, FiInbox, FiMapPin, FiPhone } from "react-icons/fi";
+import { ui } from "../expenseTheme";
+import { ErrorBanner, SkeletonGrid, EmptyState } from "../ExpenseUI";
 
 const Stores = () => {
   const [stores, setStores] = useState([]);
@@ -67,9 +66,9 @@ const Stores = () => {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div>
       <div className="flex items-center justify-between mb-6">
-        <p className="text-gray-500 text-sm">
+        <p className={`text-sm ${ui.muted}`}>
           Stores/branches show up as the "Store" choice when adding an expense.
         </p>
 
@@ -78,80 +77,63 @@ const Stores = () => {
             setSelectedStore(null);
             setModalOpen(true);
           }}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl shadow-lg shadow-blue-600/20 shrink-0"
+          className={`${ui.btnPrimary} shrink-0`}
         >
           <FiPlus /> Add Store
         </button>
       </div>
 
-      {error && (
-        <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 text-red-600 px-5 py-4 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-6"><ErrorBanner>{error}</ErrorBanner></div>}
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-32 rounded-2xl bg-gray-100 animate-pulse" />
-          ))}
-        </div>
+        <SkeletonGrid count={3} className="h-32" />
       ) : stores.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-16 text-center">
-          <FiInbox className="mx-auto text-4xl text-gray-300 mb-4" />
-          <p className="text-gray-500 font-medium">No stores yet</p>
-          <p className="text-gray-400 text-sm mt-1">Add your first branch, like "Main Store."</p>
-        </div>
+        <EmptyState
+          icon={<FiInbox className="mx-auto" />}
+          title="No stores yet"
+          subtitle='Add your first branch, like "Main Store."'
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {stores.map((store) => (
-            <div
-              key={store.id}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col justify-between"
-            >
+            <div key={store.id} className={`${ui.card} p-5 flex flex-col justify-between`}>
               <div>
                 <div className="flex items-start justify-between">
-                  <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <div className="w-11 h-11 rounded-xl bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 flex items-center justify-center text-[#3FA34D] dark:text-[#43B75A]">
                     <FiHome />
                   </div>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      store.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                      store.isActive ? ui.badgeGreen : ui.badgeGray
                     }`}
                   >
                     {store.isActive ? "Active" : "Disabled"}
                   </span>
                 </div>
 
-                <h3 className="mt-4 font-bold text-gray-800">{store.name}</h3>
+                <h3 className={`mt-4 font-bold ${ui.heading}`}>{store.name}</h3>
 
                 {store.address && (
-                  <p className="text-sm text-gray-500 mt-1 flex items-start gap-1.5">
+                  <p className={`text-sm mt-1 flex items-start gap-1.5 ${ui.muted}`}>
                     <FiMapPin className="shrink-0 mt-0.5" size={14} />
                     <span className="line-clamp-2">{store.address}</span>
                   </p>
                 )}
                 {store.phone && (
-                  <p className="text-sm text-gray-500 mt-1 flex items-center gap-1.5">
+                  <p className={`text-sm mt-1 flex items-center gap-1.5 ${ui.muted}`}>
                     <FiPhone size={14} /> {store.phone}
                   </p>
                 )}
                 {!store.address && !store.phone && (
-                  <p className="text-sm text-gray-400 mt-1">No address or phone added.</p>
+                  <p className={`text-sm mt-1 ${ui.faint}`}>No address or phone added.</p>
                 )}
               </div>
 
-              <div className="flex items-center gap-4 mt-5 pt-4 border-t border-gray-50">
-                <button
-                  onClick={() => handleEdit(store)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
-                >
+              <div className="flex items-center gap-4 mt-5 pt-4 border-t border-[#E7EAE1] dark:border-[#262B24]">
+                <button onClick={() => handleEdit(store)} className={ui.linkEdit}>
                   <FiEdit2 size={14} /> Edit
                 </button>
-                <button
-                  onClick={() => handleDelete(store)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-600"
-                >
+                <button onClick={() => handleDelete(store)} className={ui.linkDanger}>
                   <FiTrash2 size={14} /> Remove
                 </button>
               </div>

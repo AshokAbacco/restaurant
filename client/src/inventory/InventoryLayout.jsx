@@ -1,11 +1,16 @@
 // client/src/inventory/InventoryLayout.jsx
 // Top-level sub-nav for the inventory section (sits inside AdminLayout's
 // content area — no sidebar of its own, since AdminLayout already has one).
-// Reduced from 13 flat tabs down to 6 groups: related screens (Ingredients/
-// Categories/Units/Suppliers, and Stock Ledger/Adjustments/Wastage/Expiry)
-// are combined behind their own secondary tab bar — see CatalogLayout.jsx
-// and StockLayout.jsx.
+// 6 top-level tabs; related screens (Ingredients/Categories/Units/Suppliers,
+// and Stock Ledger/Adjustments/Wastage/Expiry) are grouped behind their own
+// secondary pill nav — see CatalogLayout.jsx and StockLayout.jsx (unchanged,
+// they already re-theme automatically via theme.css's CSS variables).
+//
+// Redesigned to use the same shared PageHeader + segmented tab-pill pattern
+// as Menu Management and Expenses, so all three modules read as one product.
 import { NavLink, Outlet } from "react-router-dom";
+import { FiBox } from "react-icons/fi";
+import PageHeader from "../components/layout/PageHeader";
 import "./theme.css";
 
 const TABS = [
@@ -19,19 +24,25 @@ const TABS = [
 
 const InventoryLayout = () => {
   return (
-    <div className="inv-scope">
-      <nav className="mb-6 border-b border-[var(--inv-line)] overflow-x-auto">
-        <ul className="flex gap-1 min-w-max">
+    <div className="inv-scope space-y-6 bg-[var(--inv-paper)] min-h-screen -m-6 p-6 transition-colors">
+      <PageHeader
+        title="Inventory"
+        subtitle="Ingredients, stock levels, purchases, and recipes — all in one place."
+        icon={<FiBox />}
+      />
+
+      <nav className="bg-[var(--inv-paper-raised)] rounded-2xl border border-[var(--inv-line)] shadow-sm shadow-black/[0.02] p-1.5 transition-colors">
+        <ul className="flex gap-1 min-w-max overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map((tab) => (
             <li key={tab.to}>
               <NavLink
                 to={tab.to}
                 end={tab.end}
                 className={({ isActive }) =>
-                  `inline-block px-3.5 py-2.5 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                  `flex items-center px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
                     isActive
-                      ? "border-[var(--inv-pine)] text-[var(--inv-pine-dark)] font-medium"
-                      : "border-transparent text-[var(--inv-steel)] hover:text-[var(--inv-ink)]"
+                      ? "bg-[var(--inv-pine)] text-white shadow-sm"
+                      : "text-[var(--inv-steel)] hover:bg-[var(--inv-steel-light)] hover:text-[var(--inv-ink)]"
                   }`
                 }
               >
@@ -41,6 +52,7 @@ const InventoryLayout = () => {
           ))}
         </ul>
       </nav>
+
       <Outlet />
     </div>
   );

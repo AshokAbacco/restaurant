@@ -1,9 +1,9 @@
-// ==============================================
-// src/expenses/components/ExpenseForm.jsx
+// client/src/expenses/components/ExpenseForm.jsx
 // v2 — numbered step indicator, richer category tiles,
 // nicer review + success screens. Same validation/logic as before.
 // v3 — Store is now fetched from the database (Store model) instead of
 // a hardcoded array, so newly created stores show up automatically.
+// v4 — restyled to match the app's green/cream design system.
 // ==============================================
 
 import { useEffect, useMemo, useState } from "react";
@@ -28,6 +28,7 @@ import {
   FiDollarSign,
   FiCreditCard,
 } from "react-icons/fi";
+import { ui } from "../expenseTheme";
 
 // ==============================================
 // CONSTANTS
@@ -63,23 +64,28 @@ const iconFor = (name = "") =>
 // ==============================================
 
 const FieldLabel = ({ children, required }) => (
-  <label className="mb-2 flex items-center gap-1.5 font-medium text-gray-700">
+  <label className={ui.label}>
     {children}
     {required ? (
-      <span className="text-red-500">*</span>
+      <span className="text-[#EF5350]">*</span>
     ) : (
-      <span className="text-xs font-normal text-gray-400">(optional)</span>
+      <span className={`text-xs font-normal ${ui.faint}`}>(optional)</span>
     )}
   </label>
 );
 
 const FieldError = ({ message }) =>
   message ? (
-    <p className="mt-1.5 flex items-center gap-1 text-sm text-red-500">
+    <p className="mt-1.5 flex items-center gap-1 text-sm text-[#EF5350]">
       <FiAlertCircle className="shrink-0" />
       {message}
     </p>
   ) : null;
+
+const pillClass = (active) =>
+  `rounded-full border-2 px-4 py-2 text-sm font-medium transition-colors ${
+    active ? ui.pillActive : `border-[#E7EAE1] dark:border-[#262B24] ${ui.muted}`
+  }`;
 
 // ==============================================
 // FORM
@@ -278,25 +284,25 @@ const ExpenseForm = ({ mode = "create" }) => {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="mx-auto w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-            <FiCheck className="text-green-600 text-4xl" />
+          <div className="mx-auto w-20 h-20 rounded-full bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 flex items-center justify-center">
+            <FiCheck className="text-[#3FA34D] dark:text-[#43B75A] text-4xl" />
           </div>
-          <h2 className="mt-6 text-2xl font-bold text-gray-800">
+          <h2 className={`mt-6 text-2xl font-bold ${ui.heading}`}>
             {mode === "create" ? "Expense added" : "Changes saved"}
           </h2>
-          <p className="mt-2 text-gray-500">Taking you back to the list…</p>
+          <p className={`mt-2 ${ui.muted}`}>Taking you back to the list…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
+    <div className="mx-auto max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
+        <h1 className={`text-2xl font-bold ${ui.heading}`}>
           {mode === "create" ? "Add Expense" : "Edit Expense"}
         </h1>
-        <p className="mt-1 text-sm text-gray-500">A few quick steps — nothing to calculate by hand.</p>
+        <p className={`mt-1 text-sm ${ui.muted}`}>A few quick steps — nothing to calculate by hand.</p>
       </div>
 
       {/* ================= NUMBERED STEP INDICATOR ================= */}
@@ -309,23 +315,23 @@ const ExpenseForm = ({ mode = "create" }) => {
               disabled={i > step}
               className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 transition-colors ${
                 i < step
-                  ? "bg-blue-600 text-white cursor-pointer"
+                  ? "bg-[#3FA34D] dark:bg-[#43B75A] text-white cursor-pointer"
                   : i === step
-                  ? "bg-blue-600 text-white ring-4 ring-blue-100"
-                  : "bg-gray-100 text-gray-400"
+                  ? "bg-[#3FA34D] dark:bg-[#43B75A] text-white ring-4 ring-[#3FA34D]/20 dark:ring-[#43B75A]/25"
+                  : "bg-[#F3F5EE] dark:bg-[#1E241C] text-[#9CA3AF] dark:text-[#6B7280]"
               }`}
             >
               {i < step ? <FiCheck /> : s.icon}
             </button>
             <span
               className={`ml-2 text-sm font-medium hidden sm:block ${
-                i <= step ? "text-gray-700" : "text-gray-400"
+                i <= step ? ui.heading : ui.faint
               }`}
             >
               {s.label}
             </span>
             {i < STEPS.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-3 ${i < step ? "bg-blue-600" : "bg-gray-200"}`} />
+              <div className={`flex-1 h-0.5 mx-3 ${i < step ? "bg-[#3FA34D] dark:bg-[#43B75A]" : "bg-[#E7EAE1] dark:bg-[#262B24]"}`} />
             )}
           </div>
         ))}
@@ -333,10 +339,10 @@ const ExpenseForm = ({ mode = "create" }) => {
 
       {fieldErrors.load && <FieldError message={fieldErrors.load} />}
       {fieldErrors.submit && (
-        <div className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{fieldErrors.submit}</div>
+        <div className="mb-6 rounded-xl bg-[#EF5350]/10 px-4 py-3 text-sm text-[#EF5350]">{fieldErrors.submit}</div>
       )}
 
-      <div className="rounded-2xl border bg-white p-6 shadow-sm">
+      <div className={`${ui.card} p-6`}>
         {/* ================= STEP 0: BASICS ================= */}
         {step === 0 && (
           <div className="space-y-6">
@@ -356,12 +362,12 @@ const ExpenseForm = ({ mode = "create" }) => {
                       }}
                       className={`relative flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 py-4 px-2 text-xs font-medium transition-all ${
                         selected
-                          ? "border-blue-600 bg-blue-50 text-blue-700"
-                          : "border-gray-200 text-gray-600 hover:border-blue-200"
+                          ? "border-[#3FA34D] dark:border-[#43B75A] bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 text-[#3FA34D] dark:text-[#43B75A]"
+                          : `border-[#E7EAE1] dark:border-[#262B24] ${ui.muted} hover:border-[#3FA34D]/30 dark:hover:border-[#43B75A]/40`
                       }`}
                     >
                       {selected && (
-                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">
+                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] text-white flex items-center justify-center text-[10px]">
                           <FiCheck />
                         </span>
                       )}
@@ -382,9 +388,7 @@ const ExpenseForm = ({ mode = "create" }) => {
                 value={form.title}
                 onChange={handleChange}
                 placeholder="e.g. June Electricity Bill"
-                className={`w-full rounded-lg border px-4 py-2.5 outline-none focus:border-blue-600 ${
-                  fieldErrors.title ? "border-red-400" : ""
-                }`}
+                className={`${ui.input} ${fieldErrors.title ? "border-[#EF5350]" : ""}`}
               />
               <FieldError message={fieldErrors.title} />
             </div>
@@ -397,21 +401,14 @@ const ExpenseForm = ({ mode = "create" }) => {
                   name="expenseDate"
                   value={form.expenseDate}
                   onChange={handleChange}
-                  className={`w-full rounded-lg border px-4 py-2.5 outline-none focus:border-blue-600 ${
-                    fieldErrors.expenseDate ? "border-red-400" : ""
-                  }`}
+                  className={`${ui.input} ${fieldErrors.expenseDate ? "border-[#EF5350]" : ""}`}
                 />
                 <FieldError message={fieldErrors.expenseDate} />
               </div>
 
               <div>
                 <FieldLabel required>Store</FieldLabel>
-                <select
-                  name="store"
-                  value={form.store}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border px-4 py-2.5 outline-none focus:border-blue-600"
-                >
+                <select name="store" value={form.store} onChange={handleChange} className={ui.input}>
                   {stores.length === 0 && (
                     <option value={form.store}>{form.store || "Loading stores…"}</option>
                   )}
@@ -432,7 +429,7 @@ const ExpenseForm = ({ mode = "create" }) => {
                 value={form.description}
                 onChange={handleChange}
                 placeholder="Any extra detail worth noting"
-                className="w-full rounded-lg border px-4 py-2.5 outline-none focus:border-blue-600"
+                className={`${ui.input} resize-none`}
               />
             </div>
           </div>
@@ -444,16 +441,14 @@ const ExpenseForm = ({ mode = "create" }) => {
             <div>
               <FieldLabel required>Bill Amount</FieldLabel>
               <div className="relative">
-                <span className="absolute left-4 top-3 text-gray-400 text-lg">₹</span>
+                <span className={`absolute left-4 top-3 text-lg ${ui.faint}`}>₹</span>
                 <input
                   type="number"
                   name="amount"
                   value={form.amount}
                   onChange={handleChange}
                   placeholder="0"
-                  className={`w-full rounded-xl border py-3 pl-9 pr-4 text-xl font-bold ${
-                    fieldErrors.amount ? "border-red-400" : ""
-                  }`}
+                  className={`${ui.input} py-3 pl-9 pr-4 text-xl font-bold ${fieldErrors.amount ? "border-[#EF5350]" : ""}`}
                 />
               </div>
               <FieldError message={fieldErrors.amount} />
@@ -467,9 +462,7 @@ const ExpenseForm = ({ mode = "create" }) => {
                     type="button"
                     key={slab}
                     onClick={() => { setForm((prev) => ({ ...prev, gstPercent: slab })); setDirty(true); }}
-                    className={`rounded-full border-2 px-4 py-2 text-sm font-medium ${
-                      form.gstPercent === slab ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"
-                    }`}
+                    className={pillClass(form.gstPercent === slab)}
                   >
                     {slab}%
                   </button>
@@ -477,9 +470,7 @@ const ExpenseForm = ({ mode = "create" }) => {
                 <button
                   type="button"
                   onClick={() => { setForm((prev) => ({ ...prev, gstPercent: "custom" })); setDirty(true); }}
-                  className={`rounded-full border-2 px-4 py-2 text-sm font-medium ${
-                    form.gstPercent === "custom" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"
-                  }`}
+                  className={pillClass(form.gstPercent === "custom")}
                 >
                   Custom
                 </button>
@@ -488,20 +479,20 @@ const ExpenseForm = ({ mode = "create" }) => {
               {form.gstPercent === "custom" ? (
                 <div className="mt-3">
                   <div className="relative">
-                    <span className="absolute left-4 top-2.5 text-gray-400">₹</span>
+                    <span className={`absolute left-4 top-2.5 ${ui.faint}`}>₹</span>
                     <input
                       type="number"
                       name="gstCustom"
                       value={form.gstCustom}
                       onChange={handleChange}
                       placeholder="GST amount"
-                      className="w-full rounded-lg border py-2 pl-8 pr-4"
+                      className={`${ui.input} py-2 pl-8 pr-4`}
                     />
                   </div>
                   <FieldError message={fieldErrors.gstCustom} />
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-gray-500">
+                <p className={`mt-2 text-sm ${ui.muted}`}>
                   ≈ ₹{gstAmount.toLocaleString("en-IN")} calculated automatically
                 </p>
               )}
@@ -510,14 +501,14 @@ const ExpenseForm = ({ mode = "create" }) => {
             <div>
               <FieldLabel required={false}>Discount</FieldLabel>
               <div className="relative">
-                <span className="absolute left-4 top-2.5 text-gray-400">₹</span>
+                <span className={`absolute left-4 top-2.5 ${ui.faint}`}>₹</span>
                 <input
                   type="number"
                   name="discount"
                   value={form.discount}
                   onChange={handleChange}
                   placeholder="0"
-                  className={`w-full rounded-lg border py-2 pl-8 pr-4 ${fieldErrors.discount ? "border-red-400" : ""}`}
+                  className={`${ui.input} py-2 pl-8 pr-4 ${fieldErrors.discount ? "border-[#EF5350]" : ""}`}
                 />
               </div>
               <FieldError message={fieldErrors.discount} />
@@ -530,18 +521,18 @@ const ExpenseForm = ({ mode = "create" }) => {
                 name="invoiceNumber"
                 value={form.invoiceNumber}
                 onChange={handleChange}
-                className="w-full rounded-lg border px-4 py-2.5"
+                className={ui.input}
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white">
+            <div className="flex items-center justify-between rounded-2xl bg-[#3FA34D] dark:bg-[#43B75A] p-5 text-white">
               <span className="font-semibold">Total to Pay</span>
               <span className="text-2xl font-bold">₹{totalPaid.toLocaleString("en-IN")}</span>
             </div>
 
             <div>
               <FieldLabel required={false}>Bill / Receipt Photo</FieldLabel>
-              <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 py-8 hover:border-blue-400 hover:bg-blue-50/30 transition-colors">
+              <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#E7EAE1] dark:border-[#262B24] py-8 hover:border-[#3FA34D]/40 dark:hover:border-[#43B75A]/40 hover:bg-[#3FA34D]/5 dark:hover:bg-[#43B75A]/10 transition-colors">
                 <input
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
@@ -550,13 +541,13 @@ const ExpenseForm = ({ mode = "create" }) => {
                 />
                 {attachment ? (
                   <>
-                    <FiFileText className="text-2xl text-blue-600" />
-                    <span className="text-sm font-medium">{attachment.name}</span>
+                    <FiFileText className="text-2xl text-[#3FA34D] dark:text-[#43B75A]" />
+                    <span className={`text-sm font-medium ${ui.heading}`}>{attachment.name}</span>
                   </>
                 ) : (
                   <>
-                    <FiUpload className="text-2xl text-gray-400" />
-                    <span className="text-sm text-gray-500">Tap to upload PDF/JPG/PNG</span>
+                    <FiUpload className={`text-2xl ${ui.faint}`} />
+                    <span className={`text-sm ${ui.muted}`}>Tap to upload PDF/JPG/PNG</span>
                   </>
                 )}
               </label>
@@ -575,9 +566,7 @@ const ExpenseForm = ({ mode = "create" }) => {
                     type="button"
                     key={method}
                     onClick={() => { setForm((prev) => ({ ...prev, paymentMethod: method })); setDirty(true); }}
-                    className={`rounded-full border-2 px-4 py-2 text-sm font-medium ${
-                      form.paymentMethod === method ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"
-                    }`}
+                    className={pillClass(form.paymentMethod === method)}
                   >
                     {method.replaceAll("_", " ")}
                   </button>
@@ -594,21 +583,19 @@ const ExpenseForm = ({ mode = "create" }) => {
                     type="button"
                     key={status}
                     onClick={() => { setForm((prev) => ({ ...prev, paymentStatus: status })); setDirty(true); }}
-                    className={`rounded-full border-2 px-4 py-2 text-sm font-medium ${
-                      form.paymentStatus === status ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"
-                    }`}
+                    className={pillClass(form.paymentStatus === status)}
                   >
                     {status}
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-gray-400">
+              <p className={`mt-2 text-xs ${ui.faint}`}>
                 Payment Method is how it will be paid; Payment Status is whether the money has moved yet.
               </p>
             </div>
 
             {["PAID", "PARTIAL"].includes(form.paymentStatus) && (
-              <div className="rounded-2xl bg-gray-50 p-4 space-y-4">
+              <div className="rounded-2xl bg-[#F3F5EE] dark:bg-[#1E241C] p-4 space-y-4">
                 <div>
                   <FieldLabel required>Payment Date</FieldLabel>
                   <input
@@ -616,7 +603,7 @@ const ExpenseForm = ({ mode = "create" }) => {
                     name="paymentDate"
                     value={form.paymentDate}
                     onChange={handleChange}
-                    className={`w-full rounded-lg border px-4 py-2.5 bg-white ${fieldErrors.paymentDate ? "border-red-400" : ""}`}
+                    className={`${ui.input} bg-white dark:bg-[#0D110C] ${fieldErrors.paymentDate ? "border-[#EF5350]" : ""}`}
                   />
                   <FieldError message={fieldErrors.paymentDate} />
                 </div>
@@ -628,34 +615,34 @@ const ExpenseForm = ({ mode = "create" }) => {
                     value={form.transactionReference}
                     onChange={handleChange}
                     placeholder="UPI ref / cheque number"
-                    className="w-full rounded-lg border px-4 py-2.5 bg-white"
+                    className={`${ui.input} bg-white dark:bg-[#0D110C]`}
                   />
                 </div>
               </div>
             )}
 
-            <div className="rounded-xl border bg-gray-50 p-4">
+            <div className={`rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-[#1E241C] p-4`}>
               <FieldLabel required={false}>Expense Status</FieldLabel>
               {statusIsLocked ? (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className={`flex items-center gap-2 text-sm ${ui.muted}`}>
                   <FiLock />
-                  This expense is <strong className="mx-1">{originalStatus}</strong> — use Approve/Reject on the detail page to change it.
+                  This expense is <strong className={`mx-1 ${ui.heading}`}>{originalStatus}</strong> — use Approve/Reject on the detail page to change it.
                 </div>
               ) : canApprove ? (
                 <select
                   name="status"
                   value={form.status}
                   onChange={handleChange}
-                  className="w-full rounded-lg border px-4 py-2.5 bg-white"
+                  className={`${ui.input} bg-white dark:bg-[#0D110C]`}
                 >
                   {editableStatuses.map((status) => (
                     <option key={status} value={status}>{status.replaceAll("_", " ")}</option>
                   ))}
                 </select>
               ) : (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className={`flex items-center gap-2 text-sm ${ui.muted}`}>
                   <FiLock />
-                  Submitted as <strong className="mx-1">Pending Approval</strong> — only an Owner or Manager can approve.
+                  Submitted as <strong className={`mx-1 ${ui.heading}`}>Pending Approval</strong> — only an Owner or Manager can approve.
                 </div>
               )}
             </div>
@@ -665,13 +652,13 @@ const ExpenseForm = ({ mode = "create" }) => {
         {/* ================= STEP 3: REVIEW ================= */}
         {step === 3 && (
           <div>
-            <div className="flex items-center gap-3 mb-5 rounded-2xl bg-blue-50 p-4">
-              <div className="w-11 h-11 rounded-xl bg-white flex items-center justify-center text-xl text-blue-600 shadow-sm">
+            <div className="flex items-center gap-3 mb-5 rounded-2xl bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 p-4">
+              <div className="w-11 h-11 rounded-xl bg-white dark:bg-[#171C17] flex items-center justify-center text-xl text-[#3FA34D] dark:text-[#43B75A] shadow-sm">
                 {iconFor(selectedCategory?.name)}
               </div>
               <div>
-                <p className="font-bold text-gray-800">{form.title}</p>
-                <p className="text-sm text-gray-500">{selectedCategory?.name} · {form.store}</p>
+                <p className={`font-bold ${ui.heading}`}>{form.title}</p>
+                <p className={`text-sm ${ui.muted}`}>{selectedCategory?.name} · {form.store}</p>
               </div>
             </div>
 
@@ -685,7 +672,7 @@ const ExpenseForm = ({ mode = "create" }) => {
               <SummaryRow label="Expense Status" value={statusIsLocked ? originalStatus : form.status} />
             </div>
 
-            <div className="mt-5 flex items-center justify-between rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white">
+            <div className="mt-5 flex items-center justify-between rounded-2xl bg-[#3FA34D] dark:bg-[#43B75A] p-5 text-white">
               <span className="font-semibold">Total to Pay</span>
               <span className="text-2xl font-bold">₹{totalPaid.toLocaleString("en-IN")}</span>
             </div>
@@ -693,32 +680,23 @@ const ExpenseForm = ({ mode = "create" }) => {
         )}
 
         {/* ================= NAVIGATION ================= */}
-        <div className="mt-8 flex items-center justify-between border-t pt-6">
+        <div className="mt-8 flex items-center justify-between border-t border-[#E7EAE1] dark:border-[#262B24] pt-6">
           {step === 0 ? (
-            <button type="button" onClick={handleCancel} className="font-medium text-gray-500 hover:text-gray-700">
+            <button type="button" onClick={handleCancel} className={`font-medium ${ui.muted} hover:opacity-80`}>
               Cancel
             </button>
           ) : (
-            <button type="button" onClick={goBack} className="flex items-center gap-2 font-medium text-gray-500 hover:text-gray-700">
+            <button type="button" onClick={goBack} className={`flex items-center gap-2 font-medium ${ui.muted} hover:opacity-80`}>
               <FiArrowLeft /> Back
             </button>
           )}
 
           {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              onClick={goNext}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 font-semibold text-white hover:bg-blue-700 shadow-lg shadow-blue-600/20"
-            >
+            <button type="button" onClick={goNext} className={ui.btnPrimary}>
               Next <FiArrowRight />
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:bg-blue-400 shadow-lg shadow-blue-600/20"
-            >
+            <button type="button" onClick={handleSubmit} disabled={loading} className={ui.btnPrimary}>
               {loading ? "Saving..." : "Save Expense"} <FiCheck />
             </button>
           )}
@@ -729,9 +707,9 @@ const ExpenseForm = ({ mode = "create" }) => {
 };
 
 const SummaryRow = ({ label, value }) => (
-  <div className="flex justify-between border-b border-gray-50 py-2.5 last:border-0">
-    <span className="text-gray-500">{label}</span>
-    <span className="font-medium text-gray-800">{value || "—"}</span>
+  <div className="flex justify-between border-b border-[#E7EAE1] dark:border-[#262B24] py-2.5 last:border-0">
+    <span className="text-[#6B7280] dark:text-[#9CA8A0]">{label}</span>
+    <span className="font-medium text-[#1F2937] dark:text-white">{value || "—"}</span>
   </div>
 );
 

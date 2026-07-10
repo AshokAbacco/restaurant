@@ -2,19 +2,14 @@
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiCoffee } from "react-icons/fi";
 import { useAuth } from "../../auth/AuthContext";
-import MenuTabs from "../MenuTabs";
+import { ui, rowItem } from "../menuTheme";
+import { Spinner, ErrorBanner } from "../MenuUI";
 import {
   fetchKitchenSections,
   createKitchenSection,
   updateKitchenSection,
   deleteKitchenSection,
 } from "../menuApi";
-
-const Spinner = () => (
-  <div className="flex items-center justify-center py-20">
-    <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-  </div>
-);
 
 const KitchenSections = () => {
   const { canManageMenu, canDeleteMenuItems } = useAuth();
@@ -78,45 +73,37 @@ const KitchenSections = () => {
   };
 
   return (
-    <div>
-      <MenuTabs />
-
+    <div className="space-y-6">
       {canManage && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-6 flex gap-3">
+        <div className={`${ui.card} p-4 flex gap-3`}>
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
             placeholder="e.g. Main Kitchen, Bakery, Bar, Juice Counter"
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`flex-1 ${ui.input}`}
           />
-          <button
-            onClick={handleAdd}
-            disabled={saving}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-xl transition-colors disabled:opacity-60"
-          >
+          <button onClick={handleAdd} disabled={saving} className={ui.btnPrimary}>
             <FiPlus /> Add
           </button>
         </div>
       )}
 
-      {error && (
-        <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className={`${ui.card} overflow-hidden`}>
         {loading ? (
           <Spinner />
         ) : sections.length === 0 ? (
-          <div className="text-center py-16 text-gray-500">
-            <FiCoffee className="mx-auto text-4xl text-gray-300 mb-3" />
+          <div className={`text-center py-16 ${ui.muted}`}>
+            <FiCoffee className={`mx-auto text-4xl ${ui.faint} mb-3`} />
             No kitchen sections yet — add Main Kitchen, Bakery, Bar, etc.
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div>
             {sections.map((section) => (
-              <div key={section.id} className="flex items-center justify-between px-5 py-3.5">
+              <div key={section.id} className={rowItem}>
                 {editingId === section.id ? (
                   <input
                     type="text"
@@ -124,18 +111,18 @@ const KitchenSections = () => {
                     onChange={(e) => setEditingName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleUpdate(section.id)}
                     autoFocus
-                    className="flex-1 border border-blue-300 rounded-lg px-2 py-1 text-sm mr-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`flex-1 ${ui.inputSm} mr-3 ring-2 ring-[#3FA34D]/30 dark:ring-[#43B75A]/30`}
                   />
                 ) : (
-                  <span className="font-medium text-gray-800">{section.name}</span>
+                  <span className={`font-medium ${ui.heading}`}>{section.name}</span>
                 )}
                 <div className="flex gap-3 flex-shrink-0">
                   {editingId === section.id ? (
                     <>
-                      <button onClick={() => handleUpdate(section.id)} className="text-xs font-medium text-blue-600 hover:text-blue-700">
+                      <button onClick={() => handleUpdate(section.id)} className={`${ui.linkEdit} text-xs`}>
                         Save
                       </button>
-                      <button onClick={() => setEditingId(null)} className="text-xs font-medium text-gray-500 hover:text-gray-700">
+                      <button onClick={() => setEditingId(null)} className={`${ui.muted} text-xs font-medium hover:opacity-80`}>
                         Cancel
                       </button>
                     </>
@@ -144,13 +131,13 @@ const KitchenSections = () => {
                       {canManage && (
                         <button
                           onClick={() => { setEditingId(section.id); setEditingName(section.name); }}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                          className={ui.linkEdit}
                         >
                           Edit
                         </button>
                       )}
                       {canDelete && (
-                        <button onClick={() => handleDelete(section)} className="text-xs font-medium text-red-600 hover:text-red-700">
+                        <button onClick={() => handleDelete(section)} className={ui.linkDanger}>
                           Delete
                         </button>
                       )}

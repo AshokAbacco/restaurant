@@ -1,7 +1,4 @@
-// ==============================================
-// src/expenses/pages/ExpensesList.jsx
-// ==============================================
-
+// client/src/expenses/pages/ExpensesList.jsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import expenseService from "../services/expenseService";
@@ -9,6 +6,8 @@ import ExpenseFilters from "../components/ExpenseFilters";
 import ExpenseTable from "../components/ExpenseTable";
 import ImportModal from "../components/ImportModal";
 import { FiPlus, FiUpload, FiDownload } from "react-icons/fi";
+import { ui } from "../expenseTheme";
+import { ErrorBanner } from "../ExpenseUI";
 
 const ExpensesList = () => {
   const [expenses, setExpenses] = useState([]);
@@ -89,12 +88,12 @@ const ExpensesList = () => {
   };
 
   return (
-    <div className="p-2 max-w-6xl mx-auto">
+    <div>
       <div className="flex flex-wrap items-center justify-end gap-3 mb-6">
         <button
           onClick={() => handleExport("filtered")}
           disabled={exporting === "filtered"}
-          className="inline-flex items-center gap-2 border border-gray-300 text-gray-600 font-medium px-4 py-3 rounded-xl hover:border-blue-200 hover:text-blue-600 disabled:opacity-50"
+          className={ui.btnSecondary}
         >
           <FiDownload /> {exporting === "filtered" ? "Exporting..." : "Export Filtered"}
         </button>
@@ -102,22 +101,16 @@ const ExpensesList = () => {
         <button
           onClick={() => handleExport("all")}
           disabled={exporting === "all"}
-          className="inline-flex items-center gap-2 border border-gray-300 text-gray-600 font-medium px-4 py-3 rounded-xl hover:border-blue-200 hover:text-blue-600 disabled:opacity-50"
+          className={ui.btnSecondary}
         >
           <FiDownload /> {exporting === "all" ? "Exporting..." : "Export All"}
         </button>
 
-        <button
-          onClick={() => setImportOpen(true)}
-          className="inline-flex items-center gap-2 border border-gray-300 text-gray-600 font-medium px-4 py-3 rounded-xl hover:border-blue-200 hover:text-blue-600"
-        >
+        <button onClick={() => setImportOpen(true)} className={ui.btnSecondary}>
           <FiUpload /> Import
         </button>
 
-        <Link
-          to="/expenses/add"
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl shadow-lg shadow-blue-600/20"
-        >
+        <Link to="/expenses/add" className={ui.btnPrimary}>
           <FiPlus /> Add Expense
         </Link>
       </div>
@@ -135,19 +128,11 @@ const ExpensesList = () => {
         onRefresh={loadExpenses}
       />
 
-      {error && (
-        <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 text-red-600 px-5 py-4 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-6"><ErrorBanner>{error}</ErrorBanner></div>}
 
       <ExpenseTable expenses={expenses} loading={loading} onDelete={handleDelete} />
 
-      <ImportModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImported={loadExpenses}
-      />
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={loadExpenses} />
     </div>
   );
 };
