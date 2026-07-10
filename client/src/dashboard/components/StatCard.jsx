@@ -5,36 +5,37 @@
 import React from "react";
 import { FiArrowUp, FiArrowDown, FiTrendingUp } from "react-icons/fi";
 
+// Brand theme: Green / adapts to light (cream+white) or dark (charcoal) mode
 const colorClasses = {
-  blue: {
-    bg: "bg-blue-50",
-    icon: "bg-blue-100 text-blue-600",
-    border: "border-blue-200",
-    trend: "text-blue-600",
-  },
   green: {
-    bg: "bg-green-50",
-    icon: "bg-green-100 text-green-600",
-    border: "border-green-200",
-    trend: "text-green-600",
-  },
-  red: {
-    bg: "bg-red-50",
-    icon: "bg-red-100 text-red-600",
-    border: "border-red-200",
-    trend: "text-red-600",
+    icon: "bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 text-[#3FA34D] dark:text-[#43B75A]",
+    trend: "text-[#3FA34D] dark:text-[#43B75A]",
+    blob: "bg-[#3FA34D] dark:bg-[#43B75A]",
   },
   orange: {
-    bg: "bg-orange-50",
-    icon: "bg-orange-100 text-orange-600",
-    border: "border-orange-200",
-    trend: "text-orange-600",
+    icon: "bg-[#FFA94D]/15 text-[#E8873A] dark:text-[#FFA94D]",
+    trend: "text-[#E8873A] dark:text-[#FFA94D]",
+    blob: "bg-[#FFA94D]",
+  },
+  red: {
+    icon: "bg-[#EF5350]/10 text-[#EF5350]",
+    trend: "text-[#EF5350]",
+    blob: "bg-[#EF5350]",
+  },
+  blue: {
+    icon: "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400",
+    trend: "text-sky-600 dark:text-sky-400",
+    blob: "bg-sky-500",
   },
   purple: {
-    bg: "bg-purple-50",
-    icon: "bg-purple-100 text-purple-600",
-    border: "border-purple-200",
-    trend: "text-purple-600",
+    icon: "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400",
+    trend: "text-violet-600 dark:text-violet-400",
+    blob: "bg-violet-500",
+  },
+  black: {
+    icon: "bg-[#F3F5EE] dark:bg-[#232A22] text-[#1F2937] dark:text-white",
+    trend: "text-[#1F2937] dark:text-white",
+    blob: "bg-[#1F2937] dark:bg-white",
   },
 };
 
@@ -42,26 +43,26 @@ const StatCard = ({
   title,
   value,
   icon,
-  color = "blue",
+  color = "green",
   change = "",
   changeType = "up", // up | down
   subtitle = "",
   loading = false,
   onClick,
 }) => {
-  const theme = colorClasses[color] || colorClasses.blue;
+  const theme = colorClasses[color] || colorClasses.green;
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 animate-pulse">
+      <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm dark:shadow-none p-6 animate-pulse">
         <div className="flex justify-between">
           <div className="space-y-3">
-            <div className="h-4 w-32 bg-gray-200 rounded" />
-            <div className="h-8 w-24 bg-gray-200 rounded" />
-            <div className="h-3 w-20 bg-gray-200 rounded" />
+            <div className="h-4 w-32 bg-[#F3F5EE] dark:bg-[#232A22] rounded" />
+            <div className="h-8 w-24 bg-[#F3F5EE] dark:bg-[#232A22] rounded" />
+            <div className="h-3 w-20 bg-[#F3F5EE] dark:bg-[#232A22] rounded" />
           </div>
 
-          <div className="w-16 h-16 rounded-2xl bg-gray-200" />
+          <div className="w-16 h-16 rounded-2xl bg-[#F3F5EE] dark:bg-[#232A22]" />
         </div>
       </div>
     );
@@ -74,11 +75,20 @@ const StatCard = ({
         relative
         overflow-hidden
         bg-white
+        dark:bg-[#171C17]
         rounded-2xl
         border
-        ${theme.border}
+        border-[#E7EAE1]
+        dark:border-[#262B24]
         shadow-sm
-        hover:shadow-xl
+        shadow-black/[0.02]
+        dark:shadow-none
+        hover:shadow-lg
+        hover:shadow-black/5
+        dark:hover:shadow-black/30
+        hover:border-[#3FA34D]/30
+        dark:hover:border-[#43B75A]/40
+        hover:-translate-y-0.5
         transition-all
         duration-300
         p-6
@@ -96,8 +106,9 @@ const StatCard = ({
           w-28
           h-28
           rounded-full
-          opacity-10
-          ${theme.bg}
+          opacity-[0.08]
+          dark:opacity-10
+          ${theme.blob}
         `}
       />
 
@@ -105,17 +116,17 @@ const StatCard = ({
 
       <div className="relative z-10 flex justify-between items-start">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">{title}</p>
 
-          <h2 className="mt-3 text-3xl font-bold text-gray-800">{value}</h2>
+          <h2 className="mt-3 text-3xl font-bold text-[#1F2937] dark:text-white">{value}</h2>
 
-          {subtitle && <p className="mt-2 text-sm text-gray-500">{subtitle}</p>}
+          {subtitle && <p className="mt-2 text-sm text-[#9CA3AF] dark:text-[#6B7280]">{subtitle}</p>}
 
           {change && (
             <div className="mt-5 flex items-center gap-2">
               <div
                 className={`flex items-center gap-1 text-sm font-semibold ${
-                  changeType === "up" ? "text-green-600" : "text-red-600"
+                  changeType === "up" ? "text-[#3FA34D] dark:text-[#43B75A]" : "text-[#EF5350]"
                 }`}
               >
                 {changeType === "up" ? <FiArrowUp /> : <FiArrowDown />}
@@ -123,7 +134,7 @@ const StatCard = ({
                 {change}
               </div>
 
-              <span className="text-sm text-gray-400">vs yesterday</span>
+              <span className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">vs yesterday</span>
             </div>
           )}
         </div>
@@ -139,7 +150,6 @@ const StatCard = ({
             items-center
             justify-center
             text-3xl
-            shadow-sm
             transition-transform
             duration-300
             group-hover:scale-110
@@ -157,18 +167,19 @@ const StatCard = ({
           mt-6
           pt-4
           border-t
-          border-gray-100
+          border-[#E7EAE1]
+          dark:border-[#262B24]
           flex
           items-center
           justify-between
         `}
       >
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
           <FiTrendingUp className={theme.trend} />
           Live Statistics
         </div>
 
-        <span className="text-xs text-gray-400">Updated now</span>
+        <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">Updated now</span>
       </div>
     </div>
   );
