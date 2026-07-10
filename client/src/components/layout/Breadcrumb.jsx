@@ -49,7 +49,7 @@ const Breadcrumb = () => {
     >
       <Link
         to="/dashboard"
-        className="flex items-center gap-2 text-gray-500 hover:text-blue-600 transition-colors"
+        className="flex items-center gap-2 text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#3FA34D] dark:hover:text-[#43B75A] transition-colors"
       >
         <FiHome size={16} />
         <span>Home</span>
@@ -57,14 +57,14 @@ const Breadcrumb = () => {
 
       {breadcrumbs.map((item) => (
         <React.Fragment key={item.path}>
-          <FiChevronRight size={15} className="text-gray-400" />
+          <FiChevronRight size={15} className="text-[#3FA34D] dark:text-[#43B75A]" />
 
           {item.last ? (
-            <span className="font-semibold text-gray-800">{item.name}</span>
+            <span className="font-semibold text-[#1F2937] dark:text-white">{item.name}</span>
           ) : (
             <Link
               to={item.path}
-              className="text-gray-500 hover:text-blue-600 transition-colors"
+              className="text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#3FA34D] dark:hover:text-[#43B75A] transition-colors"
             >
               {item.name}
             </Link>

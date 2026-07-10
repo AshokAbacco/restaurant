@@ -14,6 +14,8 @@ import {
 } from "recharts";
 import { FiTrendingUp, FiCalendar } from "react-icons/fi";
 
+import { useTheme } from "../../context/ThemeContext";
+
 const dailyData = [
   { name: "Mon", sales: 12500 },
   { name: "Tue", sales: 18200 },
@@ -40,8 +42,38 @@ const monthlyData = [
   { name: "Jun", sales: 810000 },
 ];
 
+// ==========================================
+// THEME-AWARE CHART TOKENS
+// (Recharts needs real color strings, not Tailwind classes)
+// ==========================================
+
+const chartTokens = {
+  light: {
+    accent: "#3FA34D",
+    grid: "#EFF2E9",
+    axis: "#E7EAE1",
+    tick: "#6B7280",
+    tooltipBg: "#FFFFFF",
+    tooltipBorder: "#E7EAE1",
+    tooltipLabel: "#1F2937",
+  },
+  dark: {
+    accent: "#43B75A",
+    grid: "#262B24",
+    axis: "#262B24",
+    tick: "#9CA8A0",
+    tooltipBg: "#171C17",
+    tooltipBorder: "#262B24",
+    tooltipLabel: "#FFFFFF",
+  },
+};
+
 const SalesChart = () => {
   const [period, setPeriod] = useState("daily");
+
+  const { theme } = useTheme();
+
+  const tokens = chartTokens[theme] || chartTokens.light;
 
   const data = useMemo(() => {
     switch (period) {
@@ -63,14 +95,14 @@ const SalesChart = () => {
   const formatCurrency = (value) => `₹${value.toLocaleString("en-IN")}`;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+    <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm shadow-black/[0.02] dark:shadow-none transition-colors">
       {/* Header */}
 
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 border-b border-gray-100">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Sales Overview</h2>
+          <h2 className="text-2xl font-bold text-[#1F2937] dark:text-white">Sales Overview</h2>
 
-          <p className="text-gray-500 mt-1">
+          <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-1">
             Revenue analytics and sales performance
           </p>
         </div>
@@ -80,10 +112,10 @@ const SalesChart = () => {
             <button
               key={item}
               onClick={() => setPeriod(item)}
-              className={`px-4 py-2 rounded-xl capitalize transition-all ${
+              className={`px-4 py-2 rounded-full capitalize transition-all ${
                 period === item
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                  ? "bg-[#3FA34D] dark:bg-[#43B75A] text-white"
+                  : "bg-[#F3F5EE] dark:bg-[#232A22] hover:bg-[#E7EAE1] dark:hover:bg-[#2A322A] text-[#6B7280] dark:text-[#9CA8A0]"
               }`}
             >
               {item}
@@ -94,32 +126,32 @@ const SalesChart = () => {
 
       {/* Statistics */}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-6 py-5 border-b border-gray-100">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-6 py-5 border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div>
-          <p className="text-gray-500 text-sm">Total Sales</p>
+          <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Total Sales</p>
 
-          <h3 className="text-3xl font-bold mt-2 text-gray-800">
+          <h3 className="text-3xl font-bold mt-2 text-[#1F2937] dark:text-white">
             {formatCurrency(totalSales)}
           </h3>
         </div>
 
         <div>
-          <p className="text-gray-500 text-sm">Average</p>
+          <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Average</p>
 
-          <h3 className="text-3xl font-bold mt-2 text-gray-800">
+          <h3 className="text-3xl font-bold mt-2 text-[#1F2937] dark:text-white">
             {formatCurrency(averageSales)}
           </h3>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-green-100 flex items-center justify-center text-green-600">
+          <div className="w-14 h-14 rounded-2xl bg-[#3FA34D]/10 dark:bg-[#43B75A]/10 flex items-center justify-center text-[#3FA34D] dark:text-[#43B75A]">
             <FiTrendingUp size={26} />
           </div>
 
           <div>
-            <p className="text-gray-500 text-sm">Growth</p>
+            <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Growth</p>
 
-            <h3 className="text-2xl font-bold text-green-600">+18.6%</h3>
+            <h3 className="text-2xl font-bold text-[#3FA34D] dark:text-[#43B75A]">+18.6%</h3>
           </div>
         </div>
       </div>
@@ -131,32 +163,41 @@ const SalesChart = () => {
           <AreaChart data={data}>
             <defs>
               <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563EB" stopOpacity={0.35} />
+                <stop offset="5%" stopColor={tokens.accent} stopOpacity={0.35} />
 
-                <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
+                <stop offset="95%" stopColor={tokens.accent} stopOpacity={0} />
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+            <CartesianGrid strokeDasharray="3 3" stroke={tokens.grid} />
 
-            <XAxis dataKey="name" tick={{ fill: "#6B7280" }} />
+            <XAxis dataKey="name" tick={{ fill: tokens.tick }} axisLine={{ stroke: tokens.axis }} />
 
             <YAxis
               tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
-              tick={{ fill: "#6B7280" }}
+              tick={{ fill: tokens.tick }}
+              axisLine={{ stroke: tokens.axis }}
             />
 
             <Tooltip
+              contentStyle={{
+                backgroundColor: tokens.tooltipBg,
+                border: `1px solid ${tokens.tooltipBorder}`,
+                borderRadius: "0.75rem",
+              }}
               formatter={(value) => formatCurrency(value)}
               labelStyle={{
-                color: "#111827",
+                color: tokens.tooltipLabel,
+              }}
+              itemStyle={{
+                color: tokens.accent,
               }}
             />
 
             <Area
               type="monotone"
               dataKey="sales"
-              stroke="#2563EB"
+              stroke={tokens.accent}
               strokeWidth={3}
               fill="url(#salesGradient)"
             />
@@ -166,13 +207,13 @@ const SalesChart = () => {
 
       {/* Footer */}
 
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-t border-gray-100 px-6 py-5">
-        <div className="flex items-center gap-2 text-gray-500">
-          <FiCalendar />
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-t border-[#E7EAE1] dark:border-[#262B24] px-6 py-5">
+        <div className="flex items-center gap-2 text-[#6B7280] dark:text-[#9CA8A0]">
+          <FiCalendar className="text-[#3FA34D] dark:text-[#43B75A]" />
           Updated just now
         </div>
 
-        <div className="text-sm text-green-600 font-semibold">
+        <div className="text-sm text-[#3FA34D] dark:text-[#43B75A] font-semibold">
           Revenue is increasing compared to the previous period.
         </div>
       </div>

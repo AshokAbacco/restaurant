@@ -325,21 +325,21 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       {/* ===================== LOGO ===================== */}
 
       <div
-        className={`h-20 border-b border-gray-200 flex items-center ${
+        className={`h-20 border-b border-[#E7EAE1] dark:border-[#262B24] flex items-center ${
           collapsed ? "justify-center" : "justify-between px-6"
         }`}
       >
         {!collapsed && (
           <div>
-            <h1 className="text-2xl font-bold text-blue-600">Restaurant ERP</h1>
+            <h1 className="text-2xl font-bold text-[#3FA34D] dark:text-[#43B75A]">Restaurant ERP</h1>
 
-            <p className="text-xs text-gray-500 mt-1">Management System</p>
+            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280] mt-1">Management System</p>
           </div>
         )}
 
         <button
           onClick={onToggleCollapse}
-          className="hidden lg:flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 transition"
+          className="hidden lg:flex items-center justify-center w-10 h-10 rounded-xl hover:bg-[#3FA34D]/10 dark:hover:bg-[#43B75A]/10 transition text-[#1F2937] dark:text-white"
         >
           {collapsed ? <FiChevronRight /> : <FiChevronLeft />}
         </button>
@@ -347,23 +347,23 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
       {/* ===================== USER ===================== */}
 
-      <div className={`border-b border-gray-200 ${collapsed ? "p-3" : "p-5"}`}>
+      <div className={`border-b border-[#E7EAE1] dark:border-[#262B24] ${collapsed ? "p-3" : "p-5"}`}>
         <div
           className={`flex items-center ${
             collapsed ? "justify-center" : "gap-4"
           }`}
         >
-          <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg font-bold shadow-md">
+          <div className="w-12 h-12 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] flex items-center justify-center text-white text-lg font-bold">
             {user?.name?.charAt(0) || "R"}
           </div>
 
           {!collapsed && (
             <div className="overflow-hidden">
-              <h3 className="font-semibold text-gray-800 truncate">
+              <h3 className="font-semibold text-[#1F2937] dark:text-white truncate">
                 {user?.name}
               </h3>
 
-              <p className="text-sm text-gray-500 capitalize">
+              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] capitalize">
                 {user?.role?.toLowerCase()}
               </p>
             </div>
@@ -374,7 +374,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       {/* ===================== MENU ===================== */}
 
       <div className="flex-1 overflow-y-auto py-4 px-3">
-        <nav className="space-y-2">
+        <nav className="space-y-1">
           {menus.map((item) => {
             const active = location.pathname === item.path;
 
@@ -383,14 +383,18 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
-                className={`flex items-center rounded-xl transition-all duration-200 ${
+                className={`relative flex items-center rounded-xl transition-all duration-200 ${
                   collapsed ? "justify-center h-12" : "gap-4 px-4 py-3"
                 } ${
                   active
-                    ? "bg-blue-600 text-white shadow-lg"
-                    : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                    ? "bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 text-[#3FA34D] dark:text-[#43B75A] font-semibold"
+                    : "text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-[#1E241E] hover:text-[#1F2937] dark:hover:text-white"
                 }`}
               >
+                {active && !collapsed && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-[#3FA34D] dark:bg-[#43B75A]" />
+                )}
+
                 <span className="text-xl">{item.icon}</span>
 
                 {!collapsed && <span className="font-medium">{item.name}</span>}
@@ -402,10 +406,10 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
       {/* ===================== LOGOUT ===================== */}
 
-      <div className="border-t border-gray-200 p-3">
+      <div className="border-t border-[#E7EAE1] dark:border-[#262B24] p-3">
         <button
           onClick={handleLogout}
-          className={`w-full flex items-center rounded-xl text-red-600 hover:bg-red-50 transition ${
+          className={`w-full flex items-center rounded-xl text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#EF5350]/10 hover:text-[#EF5350] transition ${
             collapsed ? "justify-center h-12" : "gap-4 px-4 py-3"
           }`}
         >
@@ -428,21 +432,21 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       {mobileOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/40 dark:bg-black/60 z-40 lg:hidden"
         />
       )}
 
       {/* ================= MOBILE SIDEBAR ================= */}
 
       <aside
-        className={`fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-50 transform transition-transform duration-300 lg:hidden ${
+        className={`fixed top-0 left-0 h-full w-72 bg-white dark:bg-[#10140F] shadow-2xl z-50 transform transition-transform duration-300 lg:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="absolute top-5 right-5">
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+            className="w-10 h-10 rounded-lg hover:bg-[#3FA34D]/10 dark:hover:bg-[#43B75A]/10 flex items-center justify-center text-[#1F2937] dark:text-white"
           >
             <FiX />
           </button>
@@ -453,7 +457,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       {/* ================= DESKTOP SIDEBAR ================= */}
 
       <aside
-        className={`hidden lg:flex fixed top-0 left-0 h-screen bg-white border-r border-gray-200 shadow-sm flex-col transition-all duration-300 z-30 ${
+        className={`hidden lg:flex fixed top-0 left-0 h-screen bg-white dark:bg-[#10140F] border-r border-[#E7EAE1] dark:border-[#262B24] flex-col transition-all duration-300 z-30 ${
           collapsed ? "w-24" : "w-72"
         }`}
       >

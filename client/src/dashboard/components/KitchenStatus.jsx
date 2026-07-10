@@ -24,23 +24,20 @@ const progress = [
   {
     label: "Waiting",
     value: kitchenData.waiting,
-    color: "bg-yellow-500",
-    bg: "bg-yellow-50",
-    text: "text-yellow-700",
+    color: "bg-[#FFA94D]",
+    text: "text-[#E8873A] dark:text-[#FFA94D]",
   },
   {
     label: "Preparing",
     value: kitchenData.preparing,
-    color: "bg-blue-500",
-    bg: "bg-blue-50",
-    text: "text-blue-700",
+    color: "bg-[#3FA34D] dark:bg-[#43B75A]",
+    text: "text-[#3FA34D] dark:text-[#43B75A]",
   },
   {
     label: "Ready",
     value: kitchenData.ready,
-    color: "bg-green-500",
-    bg: "bg-green-50",
-    text: "text-green-700",
+    color: "bg-emerald-500 dark:bg-emerald-400",
+    text: "text-emerald-600 dark:text-emerald-400",
   },
 ];
 
@@ -49,17 +46,17 @@ const KitchenStatus = () => {
     kitchenData.waiting + kitchenData.preparing + kitchenData.ready;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+    <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm shadow-black/[0.02] dark:shadow-none transition-colors">
       {/* Header */}
 
-      <div className="flex items-center justify-between p-6 border-b border-gray-100">
+      <div className="flex items-center justify-between p-6 border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Kitchen Status</h2>
+          <h2 className="text-2xl font-bold text-[#1F2937] dark:text-white">Kitchen Status</h2>
 
-          <p className="text-gray-500 mt-1">Live kitchen activity</p>
+          <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-1">Live kitchen activity</p>
         </div>
 
-        <div className="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center">
+        <div className="w-14 h-14 rounded-2xl bg-[#3FA34D]/10 dark:bg-[#43B75A]/10 text-[#3FA34D] dark:text-[#43B75A] flex items-center justify-center">
           <FiCoffee size={28} />
         </div>
       </div>
@@ -67,35 +64,35 @@ const KitchenStatus = () => {
       {/* Main Stats */}
 
       <div className="grid grid-cols-2 gap-4 p-6">
-        <div className="rounded-xl bg-yellow-50 p-4">
-          <p className="text-sm text-yellow-700">Waiting</p>
+        <div className="rounded-xl bg-[#FFA94D]/10 p-4">
+          <p className="text-sm text-[#E8873A] dark:text-[#FFA94D]">Waiting</p>
 
-          <h3 className="text-3xl font-bold mt-2">{kitchenData.waiting}</h3>
+          <h3 className="text-3xl font-bold mt-2 text-[#1F2937] dark:text-white">{kitchenData.waiting}</h3>
         </div>
 
-        <div className="rounded-xl bg-blue-50 p-4">
-          <p className="text-sm text-blue-700">Preparing</p>
+        <div className="rounded-xl bg-[#3FA34D]/10 dark:bg-[#43B75A]/10 p-4">
+          <p className="text-sm text-[#3FA34D] dark:text-[#43B75A]">Preparing</p>
 
-          <h3 className="text-3xl font-bold mt-2">{kitchenData.preparing}</h3>
+          <h3 className="text-3xl font-bold mt-2 text-[#1F2937] dark:text-white">{kitchenData.preparing}</h3>
         </div>
 
-        <div className="rounded-xl bg-green-50 p-4">
-          <p className="text-sm text-green-700">Ready</p>
+        <div className="rounded-xl bg-emerald-500/10 dark:bg-emerald-400/10 p-4">
+          <p className="text-sm text-emerald-600 dark:text-emerald-400">Ready</p>
 
-          <h3 className="text-3xl font-bold mt-2">{kitchenData.ready}</h3>
+          <h3 className="text-3xl font-bold mt-2 text-[#1F2937] dark:text-white">{kitchenData.ready}</h3>
         </div>
 
-        <div className="rounded-xl bg-purple-50 p-4">
-          <p className="text-sm text-purple-700">Completed</p>
+        <div className="rounded-xl bg-[#F3F5EE] dark:bg-[#232A22] p-4">
+          <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">Completed</p>
 
-          <h3 className="text-3xl font-bold mt-2">{kitchenData.completed}</h3>
+          <h3 className="text-3xl font-bold mt-2 text-[#1F2937] dark:text-white">{kitchenData.completed}</h3>
         </div>
       </div>
 
       {/* Progress */}
 
       <div className="px-6 pb-6">
-        <h4 className="font-semibold text-gray-700 mb-4">
+        <h4 className="font-semibold text-[#1F2937] dark:text-white mb-4">
           Active Kitchen Load
         </h4>
 
@@ -106,7 +103,7 @@ const KitchenStatus = () => {
           return (
             <div key={item.label} className="mb-5">
               <div className="flex justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">
                   {item.label}
                 </span>
 
@@ -115,7 +112,7 @@ const KitchenStatus = () => {
                 </span>
               </div>
 
-              <div className="h-3 rounded-full bg-gray-200 overflow-hidden">
+              <div className="h-3 rounded-full bg-[#F3F5EE] dark:bg-[#232A22] overflow-hidden">
                 <div
                   className={`${item.color} h-full rounded-full transition-all duration-500`}
                   style={{
@@ -130,43 +127,43 @@ const KitchenStatus = () => {
 
       {/* Bottom Statistics */}
 
-      <div className="border-t border-gray-100 p-6">
+      <div className="border-t border-[#E7EAE1] dark:border-[#262B24] p-6">
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
-            <FiClock className="mx-auto text-blue-600 text-xl mb-2" />
+            <FiClock className="mx-auto text-[#3FA34D] dark:text-[#43B75A] text-xl mb-2" />
 
-            <p className="text-gray-500 text-sm">Avg Time</p>
+            <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Avg Time</p>
 
-            <h4 className="font-bold text-lg mt-1">{kitchenData.avgTime}</h4>
+            <h4 className="font-bold text-lg mt-1 text-[#1F2937] dark:text-white">{kitchenData.avgTime}</h4>
           </div>
 
           <div className="text-center">
-            <FiActivity className="mx-auto text-green-600 text-xl mb-2" />
+            <FiActivity className="mx-auto text-[#1F2937] dark:text-white text-xl mb-2" />
 
-            <p className="text-gray-500 text-sm">Active Orders</p>
+            <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Active Orders</p>
 
-            <h4 className="font-bold text-lg mt-1">{totalActive}</h4>
+            <h4 className="font-bold text-lg mt-1 text-[#1F2937] dark:text-white">{totalActive}</h4>
           </div>
 
           <div className="text-center">
-            <FiTrendingUp className="mx-auto text-orange-600 text-xl mb-2" />
+            <FiTrendingUp className="mx-auto text-[#3FA34D] dark:text-[#43B75A] text-xl mb-2" />
 
-            <p className="text-gray-500 text-sm">Chefs</p>
+            <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Chefs</p>
 
-            <h4 className="font-bold text-lg mt-1">{kitchenData.chefs}</h4>
+            <h4 className="font-bold text-lg mt-1 text-[#1F2937] dark:text-white">{kitchenData.chefs}</h4>
           </div>
         </div>
       </div>
 
       {/* Footer */}
 
-      <div className="border-t border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <FiCheckCircle className="text-green-600" />
+      <div className="border-t border-[#E7EAE1] dark:border-[#262B24] px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+          <FiCheckCircle className="text-[#3FA34D] dark:text-[#43B75A]" />
           Kitchen operating normally
         </div>
 
-        <span className="text-xs text-gray-400">Updated just now</span>
+        <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">Updated just now</span>
       </div>
     </div>
   );

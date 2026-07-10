@@ -24,7 +24,7 @@ import RecentActivities from "./components/RecentActivities";
 
 const Dashboard = () => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-[#F3F5EE] dark:bg-[#0D110C] min-h-screen -m-6 p-6 transition-colors">
       <PageHeader
         title="Restaurant Dashboard"
         subtitle="Welcome back! Here's what's happening in your restaurant today."
@@ -50,7 +50,7 @@ const Dashboard = () => {
           title="Orders Today"
           value="148"
           icon={<FiShoppingCart />}
-          color="blue"
+          color="orange"
           change="+18"
           changeType="up"
           subtitle="Orders received today"
@@ -70,7 +70,7 @@ const Dashboard = () => {
           title="Low Stock Items"
           value="12"
           icon={<FiBox />}
-          color="orange"
+          color="red"
           change="-3"
           changeType="down"
           subtitle="Need immediate attention"
@@ -117,16 +117,16 @@ const Dashboard = () => {
           DASHBOARD SUMMARY
       ====================================== */}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+      <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm shadow-black/[0.02] dark:shadow-none transition-colors">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 p-6">
           {/* Left */}
 
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">
+            <h2 className="text-2xl font-bold text-[#1F2937] dark:text-white">
               Today's Restaurant Summary
             </h2>
 
-            <p className="text-gray-500 mt-2">
+            <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-2">
               Overall business performance for today.
             </p>
           </div>
@@ -135,29 +135,29 @@ const Dashboard = () => {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <p className="text-gray-500 text-sm">Revenue</p>
+              <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Revenue</p>
 
-              <h3 className="text-2xl font-bold text-green-600 mt-2">
+              <h3 className="text-2xl font-bold text-[#3FA34D] dark:text-[#43B75A] mt-2">
                 ₹24,560
               </h3>
             </div>
 
             <div className="text-center">
-              <p className="text-gray-500 text-sm">Orders</p>
+              <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Orders</p>
 
-              <h3 className="text-2xl font-bold text-blue-600 mt-2">148</h3>
+              <h3 className="text-2xl font-bold text-[#E8873A] dark:text-[#FFA94D] mt-2">148</h3>
             </div>
 
             <div className="text-center">
-              <p className="text-gray-500 text-sm">Customers</p>
+              <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Customers</p>
 
-              <h3 className="text-2xl font-bold text-purple-600 mt-2">96</h3>
+              <h3 className="text-2xl font-bold text-violet-600 dark:text-violet-400 mt-2">96</h3>
             </div>
 
             <div className="text-center">
-              <p className="text-gray-500 text-sm">Avg. Order</p>
+              <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">Avg. Order</p>
 
-              <h3 className="text-2xl font-bold text-orange-600 mt-2">₹825</h3>
+              <h3 className="text-2xl font-bold text-[#EF5350] mt-2">₹825</h3>
             </div>
           </div>
         </div>
@@ -167,33 +167,33 @@ const Dashboard = () => {
           FOOTER
       ====================================== */}
 
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white border border-gray-200 rounded-2xl px-6 py-5">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-2xl px-6 py-5 transition-colors">
         <div>
-          <h4 className="font-semibold text-gray-800">
+          <h4 className="font-semibold text-[#1F2937] dark:text-white">
             Restaurant ERP Dashboard
           </h4>
 
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-1">
             Live dashboard connected to your restaurant operations.
           </p>
         </div>
 
         <div className="flex items-center gap-6">
           <div className="text-center">
-            <p className="text-xs text-gray-500">Last Updated</p>
+            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">Last Updated</p>
 
-            <p className="font-semibold">Just Now</p>
+            <p className="font-semibold text-[#1F2937] dark:text-white">Just Now</p>
           </div>
 
-          <div className="h-10 w-px bg-gray-200" />
+          <div className="h-10 w-px bg-[#E7EAE1] dark:bg-[#262B24]" />
 
           <div className="text-center">
-            <p className="text-xs text-gray-500">Status</p>
+            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">Status</p>
 
             <div className="flex items-center gap-2 justify-center">
-              <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] animate-pulse"></span>
 
-              <span className="font-semibold text-green-600">Online</span>
+              <span className="font-semibold text-[#3FA34D] dark:text-[#43B75A]">Online</span>
             </div>
           </div>
         </div>
