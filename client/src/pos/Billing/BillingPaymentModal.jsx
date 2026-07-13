@@ -7,7 +7,7 @@
 // the table is never freed before payment actually succeeds.
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import InvoiceView from "./InvoiceView";
+import InvoiceView from "../../billing/InvoiceView";
 import { getBillingSummary, completeBilling } from "../api/posApi";
 
 const PAYMENT_METHODS = [

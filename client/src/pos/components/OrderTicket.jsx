@@ -172,7 +172,13 @@ export default function OrderTicket({
           disabled={!canPlace}
           className="mt-3 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {placing ? "Placing order…" : "Send to Kitchen"}
+          {orderType === "TAKEAWAY"
+            ? placing
+              ? "Proceeding to billing…"
+              : "Proceed to Billing"
+            : placing
+            ? "Placing order…"
+            : "Send to Kitchen"}
         </button>
       </div>
 

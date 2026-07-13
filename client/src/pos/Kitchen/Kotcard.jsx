@@ -35,6 +35,15 @@ const PRIORITY_LABEL = {
   SPECIAL_REQUEST: "Special",
 };
 
+// Order type gets its own badge (separate from the Pending/Ready/Served
+// status badge) so kitchen staff can tell dine-in and takeaway tickets apart
+// at a glance — both flow through the exact same Pending -> Ready -> Served
+// stages, this is purely a visual identifier.
+const ORDER_TYPE_BADGE = {
+  DINE_IN: { label: "🍽️ Dine In", className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  TAKEAWAY: { label: "🥡 Takeaway", className: "bg-orange-50 text-orange-700 border-orange-200" },
+};
+
 // Ticks live while the ticket is active. Once the kitchen order has a
 // servedAt/completedAt timestamp, the timer freezes at that exact moment
 // instead of continuing to count — no interval even gets set up, so it's
@@ -81,7 +90,6 @@ export default function KotCard({ kot, onAdvance, updating }) {
           <p className="mt-0.5 text-xs text-slate-400">
             {kot.order?.orderNumber}
             {kot.order?.table?.name ? ` · ${kot.order.table.name}` : ""}
-            {kot.order?.orderType ? ` · ${kot.order.orderType.replace("_", " ")}` : ""}
           </p>
         </div>
         <span className={`font-mono text-lg font-bold tabular-nums ${timerColor}`}>
@@ -90,6 +98,16 @@ export default function KotCard({ kot, onAdvance, updating }) {
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {kot.order?.orderType && (
+          <span
+            className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
+              (ORDER_TYPE_BADGE[kot.order.orderType] || {}).className ||
+              "bg-slate-50 text-slate-600 border-slate-200"
+            }`}
+          >
+            {(ORDER_TYPE_BADGE[kot.order.orderType] || {}).label || kot.order.orderType.replace("_", " ")}
+          </span>
+        )}
         <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[kot.status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
           {STATUS_LABEL[kot.status] || kot.status}
         </span>

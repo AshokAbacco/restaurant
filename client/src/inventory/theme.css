@@ -1,39 +1,59 @@
 /* client/src/inventory/theme.css
-   Design direction: a restaurant back-office, not a generic SaaS dashboard.
-   Palette draws from stainless kitchen equipment + printed order tickets.
-   Signature element: status badges styled like small ticket stubs
-   (see .ticket-pill) instead of generic rounded chips. */
+   ==============================================
+   Redesigned to match the app-wide cream/charcoal + green design system
+   (same palette as Dashboard, Menu Management, and Expenses) instead of
+   the module's own bespoke "kitchen ticket" identity.
 
-@import url("https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap");
+   Because every Inventory page/component only ever reads colors through
+   these CSS custom properties (var(--inv-*)) rather than hardcoded
+   Tailwind classes, changing the values here re-themes the ENTIRE
+   inventory module — every page, every modal, every badge — with no
+   changes needed to any individual page file.
+
+   Dark mode: assumes the app toggles a `.dark` class on an ancestor
+   (e.g. <html>), same as the rest of the app's `dark:` Tailwind variants.
+   ============================================== */
 
 .inv-scope {
-  --inv-ink: #1c2321;
-  --inv-paper: #f6f6f4;
+  --inv-ink: #1F2937;
+  --inv-paper: #F3F5EE;
   --inv-paper-raised: #ffffff;
-  --inv-steel: #5b6470;
-  --inv-steel-light: #e4e6e8;
-  --inv-line: #dcdfe0;
-  --inv-pine: #1f6f5c;
-  --inv-pine-dark: #15503f;
-  --inv-pine-tint: #e6f0ec;
-  --inv-amber: #b5790a;
-  --inv-amber-tint: #faf1de;
-  --inv-rust: #b23a1f;
-  --inv-rust-tint: #fbe9e4;
+  --inv-steel: #6B7280;
+  --inv-steel-light: #F3F5EE;
+  --inv-line: #E7EAE1;
 
-  --inv-font-display: "Zilla Slab", ui-serif, Georgia, serif;
-  --inv-font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --inv-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --inv-pine: #3FA34D;
+  --inv-pine-dark: #358F42;
+  --inv-pine-tint: rgba(63, 163, 77, 0.1);
+
+  --inv-amber: #E8873A;
+  --inv-amber-tint: rgba(232, 135, 58, 0.15);
+
+  --inv-rust: #EF5350;
+  --inv-rust-tint: rgba(239, 83, 80, 0.1);
+
+  --inv-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
   color: var(--inv-ink);
-  font-family: var(--inv-font-body);
 }
 
-.inv-scope h1,
-.inv-scope h2,
-.inv-scope h3 {
-  font-family: var(--inv-font-display);
-  letter-spacing: -0.01em;
+.dark .inv-scope {
+  --inv-ink: #ffffff;
+  --inv-paper: #0D110C;
+  --inv-paper-raised: #171C17;
+  --inv-steel: #9CA8A0;
+  --inv-steel-light: #232A22;
+  --inv-line: #262B24;
+
+  --inv-pine: #43B75A;
+  --inv-pine-dark: #39A34E;
+  --inv-pine-tint: rgba(67, 183, 90, 0.15);
+
+  --inv-amber: #FFA94D;
+  --inv-amber-tint: rgba(255, 169, 77, 0.15);
+
+  --inv-rust: #EF5350;
+  --inv-rust-tint: rgba(239, 83, 80, 0.12);
 }
 
 .inv-scope .inv-mono {
@@ -41,22 +61,19 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Signature element: a small torn-ticket-stub badge for statuses/alerts.
-   The dashed left edge + slight tilt nods to a printed order ticket without
-   tipping into decoration-for-its-own-sake. */
+/* Status/alert badge — plain rounded pill, matching the Badge style used
+   everywhere else in the app (Menu Management, Expenses) instead of the
+   old dashed "ticket stub" shape. */
 .inv-scope .ticket-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.15rem 0.6rem 0.15rem 0.5rem;
-  font-family: var(--inv-font-mono);
+  padding: 0.2rem 0.7rem;
   font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  border-left: 2px dashed currentColor;
-  border-radius: 0 3px 3px 0;
-  line-height: 1.6;
+  letter-spacing: 0.01em;
+  border-radius: 9999px;
+  line-height: 1.5;
   white-space: nowrap;
 }
 
@@ -67,6 +84,9 @@
 .inv-scope .ticket-pill--good {
   color: var(--inv-pine-dark);
   background: var(--inv-pine-tint);
+}
+.dark .inv-scope .ticket-pill--good {
+  color: var(--inv-pine);
 }
 .inv-scope .ticket-pill--warn {
   color: var(--inv-amber);

@@ -90,7 +90,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
     // },
 
     {
-      name: "Billing",
+      name: "Billing & Payments",
       path: "/billing",
       icon: <FiFileText />,
     },
@@ -162,7 +162,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
     {
       name: "Orders",
-      path: "/orders",
+      path: "/pos/orders",
       icon: <FiClipboard />,
     },
 
@@ -234,7 +234,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
     {
       name: "Orders",
-      path: "/orders",
+      path: "/pos/orders",
       icon: <FiClipboard />,
     },
 
@@ -267,37 +267,19 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
   // KITCHEN MENU
   // =====================================================
 
-  const kitchenMenu = [
-    {
-      name: "Kitchen Dashboard",
-      path: "/kitchen",
-      icon: <FiCoffee />,
-    },
+ const kitchenMenu = [
+  {
+    name: "Kitchen Orders",
+    path: "/kitchen",
+    icon: <FiCoffee />,
+  },
 
-    {
-      name: "Preparing",
-      path: "/kitchen/preparing",
-      icon: <FiClipboard />,
-    },
-
-    {
-      name: "Ready Orders",
-      path: "/kitchen/ready",
-      icon: <FiShoppingCart />,
-    },
-
-    {
-      name: "Completed",
-      path: "/kitchen/completed",
-      icon: <FiCheckCircle />,
-    },
-
-    {
-      name: "Menu",
-      path: "/menu",
-      icon: <FiGrid />,
-    },
-  ];
+  {
+    name: "Menu",
+    path: "/menu",
+    icon: <FiGrid />,
+  },
+];
   // =====================================================
   // MENU BY ROLE
   // =====================================================

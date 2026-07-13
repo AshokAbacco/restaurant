@@ -1,11 +1,10 @@
-// ==============================================
-// src/expenses/pages/Categories.jsx
-// ==============================================
-
+// client/src/expenses/pages/Categories.jsx
 import { useEffect, useState } from "react";
 import expenseService from "../services/expenseService";
 import CategoryModal from "../components/CategoryModal";
 import { FiPlus, FiEdit2, FiTrash2, FiTag, FiInbox } from "react-icons/fi";
+import { ui } from "../expenseTheme";
+import { ErrorBanner, SkeletonGrid, EmptyState } from "../ExpenseUI";
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
@@ -67,9 +66,9 @@ const Categories = () => {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div>
       <div className="flex items-center justify-between mb-6">
-        <p className="text-gray-500 text-sm">
+        <p className={`text-sm ${ui.muted}`}>
           Categories help you see where money is going — Rent, Electricity, Staff Salary, etc.
         </p>
 
@@ -78,68 +77,51 @@ const Categories = () => {
             setSelectedCategory(null);
             setModalOpen(true);
           }}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl shadow-lg shadow-blue-600/20 shrink-0"
+          className={`${ui.btnPrimary} shrink-0`}
         >
           <FiPlus /> Add Category
         </button>
       </div>
 
-      {error && (
-        <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 text-red-600 px-5 py-4 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-6"><ErrorBanner>{error}</ErrorBanner></div>}
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-28 rounded-2xl bg-gray-100 animate-pulse" />
-          ))}
-        </div>
+        <SkeletonGrid count={6} />
       ) : categories.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-16 text-center">
-          <FiInbox className="mx-auto text-4xl text-gray-300 mb-4" />
-          <p className="text-gray-500 font-medium">No categories yet</p>
-          <p className="text-gray-400 text-sm mt-1">Add your first one, like "Rent" or "Utilities."</p>
-        </div>
+        <EmptyState
+          icon={<FiInbox className="mx-auto" />}
+          title="No categories yet"
+          subtitle='Add your first one, like "Rent" or "Utilities."'
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {categories.map((category) => (
-            <div
-              key={category.id}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col justify-between"
-            >
+            <div key={category.id} className={`${ui.card} p-5 flex flex-col justify-between`}>
               <div>
                 <div className="flex items-start justify-between">
-                  <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <div className="w-11 h-11 rounded-xl bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 flex items-center justify-center text-[#3FA34D] dark:text-[#43B75A]">
                     <FiTag />
                   </div>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      category.isEnabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                      category.isEnabled ? ui.badgeGreen : ui.badgeGray
                     }`}
                   >
                     {category.isEnabled ? "Active" : "Disabled"}
                   </span>
                 </div>
 
-                <h3 className="mt-4 font-bold text-gray-800">{category.name}</h3>
-                <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                <h3 className={`mt-4 font-bold ${ui.heading}`}>{category.name}</h3>
+                <p className={`text-sm mt-1 line-clamp-2 ${ui.muted}`}>
                   {category.description || "No description added."}
                 </p>
               </div>
 
-              <div className="flex items-center gap-4 mt-5 pt-4 border-t border-gray-50">
-                <button
-                  onClick={() => handleEdit(category)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
-                >
+              <div className="flex items-center gap-4 mt-5 pt-4 border-t border-[#E7EAE1] dark:border-[#262B24]">
+                <button onClick={() => handleEdit(category)} className={ui.linkEdit}>
                   <FiEdit2 size={14} /> Edit
                 </button>
-                <button
-                  onClick={() => handleDelete(category)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-600"
-                >
+                <button onClick={() => handleDelete(category)} className={ui.linkDanger}>
                   <FiTrash2 size={14} /> Remove
                 </button>
               </div>

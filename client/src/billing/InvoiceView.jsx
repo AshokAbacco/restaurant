@@ -1,4 +1,4 @@
-// src/pos/components/InvoiceView.jsx
+// src/billing/InvoiceView.jsx
 //
 // Renders a printable invoice once billing has been completed successfully.
 // "Download PDF" reuses the browser's native print dialog (choose "Save as

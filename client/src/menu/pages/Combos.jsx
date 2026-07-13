@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiPackage, FiX } from "react-icons/fi";
 import { useAuth } from "../../auth/AuthContext";
-import MenuTabs from "../MenuTabs";
+import { ui } from "../menuTheme";
+import { Spinner, ErrorBanner, EmptyState } from "../MenuUI";
 import {
   fetchCombos,
   createCombo,
@@ -11,12 +12,6 @@ import {
   addComboItem,
   removeComboItem,
 } from "../menuApi";
-
-const Spinner = () => (
-  <div className="flex items-center justify-center py-20">
-    <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-  </div>
-);
 
 const ComboFormModal = ({ menuItems, onClose, onSaved }) => {
   const [name, setName] = useState("");
@@ -63,75 +58,73 @@ const ComboFormModal = ({ menuItems, onClose, onSaved }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
-          <h2 className="text-lg font-semibold text-gray-900">Add Combo Meal</h2>
+    <div className={ui.modalOverlay}>
+      <div className={`${ui.modalCard} max-w-lg max-h-[85vh]`}>
+        <div className={ui.modalHeader}>
+          <h2 className={`text-lg font-semibold ${ui.heading}`}>Add Combo Meal</h2>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          {error && (
-            <div className="bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">{error}</div>
-          )}
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+          {error && <ErrorBanner>{error}</ErrorBanner>}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Name *</label>
+            <label className={ui.label}>Name *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Combo 1"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={ui.input}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Combo Price *</label>
+            <label className={ui.label}>Combo Price *</label>
             <input
               type="number"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="e.g. 299"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={ui.input}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+            <label className={ui.label}>Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className={`${ui.input} resize-none`}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className={ui.label}>
               Select Items * ({selectedItems.length} selected)
             </label>
-            <div className="border border-gray-200 rounded-lg max-h-56 overflow-y-auto divide-y divide-gray-100">
+            <div className="border border-[#E7EAE1] dark:border-[#262B24] rounded-xl max-h-56 overflow-y-auto divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {menuItems.map((item) => {
                 const checked = selectedItems.some((i) => i.menuItemId === item.id);
                 return (
                   <label
                     key={item.id}
-                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 cursor-pointer text-sm"
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#F3F5EE] dark:hover:bg-[#1E241C] cursor-pointer text-sm transition-colors"
                   >
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleItem(item.id)}
-                      className="rounded"
+                      className="rounded accent-[#3FA34D]"
                     />
-                    <span className="flex-1 text-gray-800">{item.name}</span>
-                    <span className="text-gray-400">₹{Number(item.sellingPrice).toFixed(2)}</span>
+                    <span className={`flex-1 ${ui.heading}`}>{item.name}</span>
+                    <span className={ui.faint}>₹{Number(item.sellingPrice).toFixed(2)}</span>
                   </label>
                 );
               })}
             </div>
           </div>
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white">
-          <button onClick={onClose} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+        <div className={ui.modalFooter}>
+          <button onClick={onClose} disabled={saving} className={ui.btnCancel}>
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60">
+          <button onClick={handleSave} disabled={saving} className={ui.btnPrimary}>
             {saving ? "Saving..." : "Create Combo"}
           </button>
         </div>
@@ -182,55 +175,51 @@ const Combos = () => {
   };
 
   return (
-    <div>
-      <MenuTabs />
-
-      <div className="flex items-center justify-end mb-4">
+    <div className="space-y-6">
+      <div className="flex items-center justify-end">
         {canManage && (
-          <button
-            onClick={() => setFormOpen(true)}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-xl transition-colors"
-          >
+          <button onClick={() => setFormOpen(true)} className={ui.btnPrimary}>
             <FiPlus /> Add Combo
           </button>
         )}
       </div>
 
-      {error && (
-        <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {loading ? (
-        <Spinner />
+        <div className={ui.card}><Spinner /></div>
       ) : combos.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center text-gray-500">
-          <FiPackage className="mx-auto text-4xl text-gray-300 mb-3" />
-          No combo meals yet — bundle items like Burger + Fries + Coke at a fixed price.
+        <div className={ui.card}>
+          <EmptyState
+            icon="📦"
+            title="No combo meals yet"
+            subtitle="Bundle items like Burger + Fries + Coke at a fixed price."
+          />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {combos.map((combo) => (
-            <div key={combo.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div key={combo.id} className={`${ui.card} ${ui.cardHover} p-5`}>
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-semibold text-gray-900">{combo.name}</h3>
+                  <h3 className={`font-semibold ${ui.heading}`}>{combo.name}</h3>
                   {combo.description && (
-                    <p className="text-sm text-gray-500 mt-0.5">{combo.description}</p>
+                    <p className={`text-sm ${ui.muted} mt-0.5`}>{combo.description}</p>
                   )}
                 </div>
-                <span className="font-bold text-blue-600">₹{Number(combo.price).toFixed(2)}</span>
+                <span className="font-bold text-[#3FA34D] dark:text-[#43B75A]">₹{Number(combo.price).toFixed(2)}</span>
               </div>
 
               <div className="mt-3 space-y-1.5">
                 {(combo.items || []).map((ci) => (
                   <div key={ci.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">
+                    <span className={ui.muted}>
                       {ci.quantity}× {ci.menuItem?.name}
                     </span>
                     {canManage && (
                       <button
                         onClick={() => handleRemoveItem(ci.id)}
-                        className="text-gray-400 hover:text-red-600"
+                        className={`${ui.faint} hover:text-[#EF5350] transition-colors`}
                       >
                         <FiX size={14} />
                       </button>
@@ -240,10 +229,7 @@ const Combos = () => {
               </div>
 
               {canDelete && (
-                <button
-                  onClick={() => handleDeleteCombo(combo)}
-                  className="mt-4 text-xs font-medium text-red-600 hover:text-red-700"
-                >
+                <button onClick={() => handleDeleteCombo(combo)} className={`mt-4 ${ui.linkDanger}`}>
                   Delete Combo
                 </button>
               )}

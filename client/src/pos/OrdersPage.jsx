@@ -1,21 +1,17 @@
 // src/pos/OrdersPage.jsx
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TableOrderCard, { deriveTableCategory, CATEGORY_RANK } from "./components/TableOrderCard";
-import BillingPaymentModal from "./Billing/BillingPaymentModal";
 import { getTablesBoard } from "./api/posApi";
 
 const POLL_INTERVAL_MS = 8000;
 
 export default function OrdersPage() {
+  const navigate = useNavigate();
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("ALL");
-
-  // Clicking "Complete Service" no longer frees the table directly — it
-  // opens the Billing & Payment modal instead. The table is only freed once
-  // that modal reports back a successful, fully-paid completion.
-  const [billingOrderId, setBillingOrderId] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -35,13 +31,12 @@ export default function OrdersPage() {
     return () => clearInterval(id);
   }, [load]);
 
+  // Clicking "Complete Service" now navigates to the dedicated Billing page
+  // instead of opening a modal. The table is only freed once billing is
+  // completed there (server-side, on full payment) — this page just polls
+  // and picks up the change on its next refresh.
   function handleCompleteService(orderId) {
-    setBillingOrderId(orderId);
-  }
-
-  async function handleBillingCompleted() {
-    setBillingOrderId(null);
-    await load(); // pick up the now-COMPLETED order / freed table from the server
+    navigate(`/billing?orderId=${orderId}`);
   }
 
   const occupiedCount = tables.filter((t) => t.order).length;
@@ -116,19 +111,12 @@ export default function OrdersPage() {
                 key={table.id}
                 table={table}
                 onCompleteService={handleCompleteService}
-                completing={billingOrderId === table.order?.id}
+                completing={false}
               />
             ))}
           </div>
         )}
       </div>
-
-      <BillingPaymentModal
-        orderId={billingOrderId}
-        isOpen={!!billingOrderId}
-        onClose={() => setBillingOrderId(null)}
-        onCompleted={handleBillingCompleted}
-      />
     </div>
   );
 }

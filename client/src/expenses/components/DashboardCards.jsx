@@ -1,27 +1,14 @@
-// ==============================================
-// src/expenses/components/DashboardCards.jsx
-// ==============================================
-
-import {
-  FiCalendar,
-  FiTrendingUp,
-  FiClock,
-  FiCheckCircle,
-  FiAlertCircle,
-} from "react-icons/fi";
-
-const formatMoney = (value = 0) =>
-  `₹${Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+// client/src/expenses/components/DashboardCards.jsx
+import { FiCalendar, FiTrendingUp, FiClock, FiCheckCircle, FiAlertCircle } from "react-icons/fi";
+import { ui, formatMoney } from "../expenseTheme";
 
 const Card = ({ icon, tone, title, value, sub }) => (
-  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-4">
-    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 ${tone}`}>
-      {icon}
-    </div>
+  <div className={`${ui.card} p-5 flex items-start gap-4`}>
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 ${tone}`}>{icon}</div>
     <div className="min-w-0">
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="text-2xl font-bold text-gray-800 mt-1 truncate">{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <p className={`text-sm ${ui.muted}`}>{title}</p>
+      <p className={`text-2xl font-bold mt-1 truncate ${ui.heading}`}>{value}</p>
+      {sub && <p className={`text-xs mt-0.5 ${ui.faint}`}>{sub}</p>}
     </div>
   </div>
 );
@@ -30,36 +17,36 @@ const DashboardCards = ({ dashboard }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
       <Card
-        icon={<FiCalendar className="text-blue-600" />}
-        tone="bg-blue-50"
+        icon={<FiCalendar className="text-[#3FA34D] dark:text-[#43B75A]" />}
+        tone="bg-[#3FA34D]/10 dark:bg-[#43B75A]/15"
         title="Today"
         value={formatMoney(dashboard.todaysExpense)}
         sub="Spent so far today"
       />
       <Card
-        icon={<FiTrendingUp className="text-indigo-600" />}
-        tone="bg-indigo-50"
+        icon={<FiTrendingUp className="text-[#3FA34D] dark:text-[#43B75A]" />}
+        tone="bg-[#3FA34D]/10 dark:bg-[#43B75A]/15"
         title="This Month"
         value={formatMoney(dashboard.monthlyExpense)}
         sub="Total this month"
       />
       <Card
-        icon={<FiClock className="text-amber-600" />}
-        tone="bg-amber-50"
+        icon={<FiClock className="text-[#E8873A] dark:text-[#FFA94D]" />}
+        tone="bg-[#FFA94D]/15"
         title="Waiting for Approval"
         value={formatMoney(dashboard.pendingApproval)}
         sub="Needs sign-off"
       />
       <Card
-        icon={<FiCheckCircle className="text-emerald-600" />}
-        tone="bg-emerald-50"
+        icon={<FiCheckCircle className="text-[#3FA34D] dark:text-[#43B75A]" />}
+        tone="bg-[#3FA34D]/10 dark:bg-[#43B75A]/15"
         title="Paid"
         value={formatMoney(dashboard.paidExpenses)}
         sub="Already settled"
       />
       <Card
-        icon={<FiAlertCircle className="text-rose-600" />}
-        tone="bg-rose-50"
+        icon={<FiAlertCircle className="text-[#EF5350]" />}
+        tone="bg-[#EF5350]/10"
         title="Unpaid"
         value={formatMoney(dashboard.unpaidExpenses)}
         sub="Still owed"

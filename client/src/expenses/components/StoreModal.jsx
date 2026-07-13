@@ -1,9 +1,7 @@
-// ==============================================
-// src/expenses/components/StoreModal.jsx
-// ==============================================
-
+// client/src/expenses/components/StoreModal.jsx
 import { useEffect, useState } from "react";
 import { FiX, FiAlertCircle, FiHome } from "react-icons/fi";
+import { ui } from "../expenseTheme";
 
 const initialState = { name: "", address: "", phone: "" };
 
@@ -14,11 +12,7 @@ const StoreModal = ({ open, onClose, onSave, store = null, loading = false }) =>
   useEffect(() => {
     setForm(
       store
-        ? {
-            name: store.name || "",
-            address: store.address || "",
-            phone: store.phone || "",
-          }
+        ? { name: store.name || "", address: store.address || "", phone: store.phone || "" }
         : initialState,
     );
     setError("");
@@ -36,39 +30,37 @@ const StoreModal = ({ open, onClose, onSave, store = null, loading = false }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-5">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="text-lg font-bold text-gray-800">
-            {store ? "Edit Store" : "Add Store"}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+    <div className={ui.modalOverlay}>
+      <div className={`${ui.modalCard} max-w-md max-h-[90vh]`}>
+        <div className={ui.modalHeader}>
+          <h2 className={`text-lg font-bold ${ui.heading}`}>{store ? "Edit Store" : "Add Store"}</h2>
+          <button onClick={onClose} className={`${ui.faint} hover:text-[#1F2937] dark:hover:text-white`}>
             <FiX size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-5 p-6">
+        <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden flex-1">
+          <div className="space-y-5 p-6 overflow-y-auto flex-1">
             {error && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-50 text-red-600 text-sm px-4 py-3">
+              <div className="flex items-center gap-2 rounded-lg bg-[#EF5350]/10 text-[#EF5350] text-sm px-4 py-3">
                 <FiAlertCircle /> {error}
               </div>
             )}
 
             {/* Live preview */}
-            <div className="flex items-center gap-3 rounded-2xl border border-dashed border-gray-200 p-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl bg-blue-50 text-blue-600">
+            <div className={`flex items-center gap-3 rounded-2xl border border-dashed ${ui.card} p-4`}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 text-[#3FA34D] dark:text-[#43B75A]">
                 <FiHome />
               </div>
               <div>
-                <p className="font-semibold text-gray-800">{form.name || "Store name"}</p>
-                <p className="text-xs text-gray-400">This is how it'll appear in the store picker</p>
+                <p className={`font-semibold ${ui.heading}`}>{form.name || "Store name"}</p>
+                <p className={`text-xs ${ui.faint}`}>This is how it'll appear in the store picker</p>
               </div>
             </div>
 
             <div>
-              <label className="mb-2 flex items-center gap-1 font-medium text-gray-700">
-                Store Name <span className="text-red-500">*</span>
+              <label className={ui.label}>
+                Store Name <span className="text-[#EF5350]">*</span>
               </label>
               <input
                 type="text"
@@ -78,50 +70,42 @@ const StoreModal = ({ open, onClose, onSave, store = null, loading = false }) =>
                   setForm((prev) => ({ ...prev, name: e.target.value }));
                   setError("");
                 }}
-                className="w-full rounded-lg border px-4 py-2.5 outline-none focus:border-blue-600"
+                className={ui.input}
               />
             </div>
 
             <div>
-              <label className="mb-2 flex items-center gap-1 font-medium text-gray-700">
-                Address <span className="text-xs font-normal text-gray-400">(optional)</span>
+              <label className={ui.label}>
+                Address <span className={`text-xs font-normal ${ui.faint}`}>(optional)</span>
               </label>
               <textarea
                 rows={2}
                 placeholder="Street, area, city"
                 value={form.address}
                 onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))}
-                className="w-full rounded-lg border px-4 py-2.5 outline-none focus:border-blue-600"
+                className={`${ui.input} resize-none`}
               />
             </div>
 
             <div>
-              <label className="mb-2 flex items-center gap-1 font-medium text-gray-700">
-                Phone <span className="text-xs font-normal text-gray-400">(optional)</span>
+              <label className={ui.label}>
+                Phone <span className={`text-xs font-normal ${ui.faint}`}>(optional)</span>
               </label>
               <input
                 type="text"
                 placeholder="e.g. +91 98765 43210"
                 value={form.phone}
                 onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-                className="w-full rounded-lg border px-4 py-2.5 outline-none focus:border-blue-600"
+                className={ui.input}
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t px-6 py-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border px-5 py-2.5 font-medium text-gray-600 hover:bg-gray-50"
-            >
+          <div className={ui.modalFooter}>
+            <button type="button" onClick={onClose} className={ui.btnCancel}>
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-lg bg-blue-600 px-6 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:bg-blue-400"
-            >
+            <button type="submit" disabled={loading} className={ui.btnPrimary}>
               {loading ? "Saving..." : store ? "Save Changes" : "Add Store"}
             </button>
           </div>

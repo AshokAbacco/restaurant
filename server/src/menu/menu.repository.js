@@ -15,7 +15,10 @@ export const findCategoryById = (id) =>
     include: { subCategories: true },
   });
 
-export const createCategory = (data) => prisma.category.create({ data });
+export const createCategory = (data) =>
+    prisma.category.create({
+        data,
+    });
 
 export const updateCategory = (id, data) =>
   prisma.category.update({ where: { id }, data });
@@ -62,8 +65,12 @@ export const findMenuItemBySku = (sku) =>
 
 export const createMenuItem = (data) => prisma.menuItem.create({ data });
 
-export const updateMenuItem = (id, data) =>
-  prisma.menuItem.update({ where: { id }, data });
+export const updateMenuItem = (id, data) => {
+  return prisma.menuItem.update({
+    where: { id },
+    data,
+  });
+};
 
 export const softDeleteMenuItem = (id) =>
   prisma.menuItem.update({ where: { id }, data: { status: "DELETED" } });

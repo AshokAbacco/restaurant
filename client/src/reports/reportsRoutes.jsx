@@ -1,9 +1,23 @@
-import React from 'react'
+// ==============================================
+// src/reports/reportsRoutes.jsx
+// ==============================================
 
-const reportsRoutes = () => {
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+
+import ReportsDashboard from "./ReportsDashboard";
+
+const ReportsRoutes = () => {
   return (
-    <div>reportsRoutes</div>
-  )
-}
+    <Routes>
+      <Route index element={<ReportsDashboard />} />
 
-export default reportsRoutes
+      <Route
+        path="*"
+        element={<Navigate to="/reports" replace />}
+      />
+    </Routes>
+  );
+};
+
+export default ReportsRoutes;

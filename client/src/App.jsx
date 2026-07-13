@@ -40,7 +40,8 @@ import SettingsRoutes from "./settings/settingsRoutes";
 import KitchenRoutes from "./pos/Kitchen/KitchenDisplayScreen";
 import KioskRoutes from "./kiosk/kioskRoutes";
 import ExpenseRoutes from "./expenses/expensesRoutes";
-
+import BillingRoutes from "./billing/billingRoutes";
+import PaymentRoutes from "./payment/PaymentRoutes";
 // ==============================================
 // APP
 // ==============================================
@@ -85,7 +86,9 @@ function App() {
 
           <Route path="/pos/*" element={<PosRoutes />} />
           <Route path="/kitchen/*" element={<KitchenRoutes />} />
-
+          <Route path="/billing/*" element={<BillingRoutes />} />
+          <Route path="/payments/*" element={<PaymentRoutes />} />
+          
           {/* Reports */}
           <Route path="/reports/*" element={<ReportsRoutes />} />
 

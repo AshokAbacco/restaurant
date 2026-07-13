@@ -1,50 +1,17 @@
-// ==============================================
-// src/expenses/pages/ExpenseDetails.jsx
-// ==============================================
-
+// client/src/expenses/pages/ExpenseDetails.jsx
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import expenseService from "../services/expenseService";
 import { FiArrowLeft, FiEdit2, FiFileText } from "react-icons/fi";
-
-const STATUS_STYLES = {
-  DRAFT: "bg-gray-100 text-gray-600",
-  PENDING_APPROVAL: "bg-amber-100 text-amber-700",
-  APPROVED: "bg-blue-100 text-blue-700",
-  REJECTED: "bg-red-100 text-red-700",
-  PAID: "bg-green-100 text-green-700",
-};
-
-const STATUS_LABELS = {
-  DRAFT: "Draft",
-  PENDING_APPROVAL: "Waiting for Approval",
-  APPROVED: "Approved",
-  REJECTED: "Rejected",
-  PAID: "Paid",
-};
-
-const PAYMENT_STYLES = {
-  PAID: "bg-green-100 text-green-700",
-  PARTIAL: "bg-amber-100 text-amber-700",
-  OVERDUE: "bg-red-100 text-red-700",
-  UNPAID: "bg-gray-100 text-gray-600",
-};
-
-const Badge = ({ styles, label }) => (
-  <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${styles}`}>
-    {label}
-  </span>
-);
+import { ui, STATUS_STYLES, STATUS_LABELS, PAYMENT_STYLES, formatMoney } from "../expenseTheme";
+import { Badge } from "../ExpenseUI";
 
 const Row = ({ label, value }) => (
-  <div className="flex justify-between py-2.5 border-b border-gray-50 last:border-0">
-    <span className="text-gray-500">{label}</span>
-    <span className="text-right font-medium text-gray-800">{value ?? "—"}</span>
+  <div className="flex justify-between py-2.5 border-b border-[#E7EAE1] dark:border-[#262B24] last:border-0">
+    <span className={ui.muted}>{label}</span>
+    <span className={`text-right font-medium ${ui.heading}`}>{value ?? "—"}</span>
   </div>
 );
-
-const formatMoney = (value = 0) =>
-  `₹${Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 const ExpenseDetails = () => {
   const { id } = useParams();
@@ -73,14 +40,14 @@ const ExpenseDetails = () => {
   };
 
   if (loading) {
-    return <div className="p-10 text-center text-gray-400">Loading expense…</div>;
+    return <div className={`p-10 text-center ${ui.faint}`}>Loading expense…</div>;
   }
 
   if (error || !expense) {
     return (
       <div className="p-10 text-center">
-        <p className="text-red-600 font-medium">{error || "Expense not found."}</p>
-        <Link to="/expenses/list" className="text-blue-600 text-sm mt-2 inline-block">
+        <p className="text-[#EF5350] font-medium">{error || "Expense not found."}</p>
+        <Link to="/expenses/list" className="text-[#3FA34D] dark:text-[#43B75A] text-sm mt-2 inline-block hover:opacity-80">
           Back to expenses
         </Link>
       </div>
@@ -88,21 +55,21 @@ const ExpenseDetails = () => {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div>
       <button
         onClick={() => navigate("/expenses/list")}
-        className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6"
+        className={`flex items-center gap-2 mb-6 ${ui.muted} hover:opacity-80`}
       >
         <FiArrowLeft /> Back to expenses
       </button>
 
       {/* Header */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+      <div className={`${ui.card} p-6 mb-6`}>
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <p className="text-xs text-gray-400 font-medium">{expense.expenseNumber}</p>
-            <h1 className="text-2xl font-bold text-gray-800 mt-1">{expense.title}</h1>
-            <p className="text-gray-500 mt-1">{expense.category?.name}</p>
+            <p className={`text-xs font-medium ${ui.faint}`}>{expense.expenseNumber}</p>
+            <h1 className={`text-2xl font-bold mt-1 ${ui.heading}`}>{expense.title}</h1>
+            <p className={`mt-1 ${ui.muted}`}>{expense.category?.name}</p>
 
             <div className="flex gap-2 mt-4">
               <Badge styles={STATUS_STYLES[expense.status]} label={STATUS_LABELS[expense.status] || expense.status} />
@@ -112,14 +79,11 @@ const ExpenseDetails = () => {
 
           <div className="flex flex-col items-end gap-3">
             <div className="text-right">
-              <p className="text-xs text-gray-400">Total Paid</p>
-              <p className="text-3xl font-bold text-blue-700">{formatMoney(expense.totalPaid)}</p>
+              <p className={`text-xs ${ui.faint}`}>Total Paid</p>
+              <p className="text-3xl font-bold text-[#3FA34D] dark:text-[#43B75A]">{formatMoney(expense.totalPaid)}</p>
             </div>
 
-            <Link
-              to={`/expenses/edit/${expense.id}`}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm"
-            >
+            <Link to={`/expenses/edit/${expense.id}`} className={`${ui.btnPrimary} text-sm px-5 py-2.5`}>
               <FiEdit2 size={14} /> Edit
             </Link>
           </div>
@@ -128,16 +92,16 @@ const ExpenseDetails = () => {
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Basic */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="font-bold text-gray-800 mb-3">Details</h2>
+        <div className={`${ui.card} p-6`}>
+          <h2 className={`font-bold mb-3 ${ui.heading}`}>Details</h2>
           <Row label="Expense Date" value={new Date(expense.expenseDate).toLocaleDateString()} />
           <Row label="Store" value={expense.store} />
           <Row label="Description" value={expense.description || "—"} />
         </div>
 
         {/* Financial */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="font-bold text-gray-800 mb-3">Amount Breakdown</h2>
+        <div className={`${ui.card} p-6`}>
+          <h2 className={`font-bold mb-3 ${ui.heading}`}>Amount Breakdown</h2>
           <Row label="Bill Amount" value={formatMoney(expense.amount)} />
           <Row label="GST" value={formatMoney(expense.gstAmount)} />
           <Row label="Discount" value={formatMoney(expense.discount)} />
@@ -145,8 +109,8 @@ const ExpenseDetails = () => {
         </div>
 
         {/* Payment */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="font-bold text-gray-800 mb-3">Payment</h2>
+        <div className={`${ui.card} p-6`}>
+          <h2 className={`font-bold mb-3 ${ui.heading}`}>Payment</h2>
           <Row label="Method" value={expense.paymentMethod} />
           <Row
             label="Payment Date"
@@ -156,16 +120,16 @@ const ExpenseDetails = () => {
         </div>
 
         {/* Record info */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="font-bold text-gray-800 mb-3">Record</h2>
+        <div className={`${ui.card} p-6`}>
+          <h2 className={`font-bold mb-3 ${ui.heading}`}>Record</h2>
           <Row label="Created" value={new Date(expense.createdAt).toLocaleString()} />
           <Row label="Last Updated" value={new Date(expense.updatedAt).toLocaleString()} />
         </div>
 
         {/* Attachments */}
         {expense.attachments?.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 lg:col-span-2">
-            <h2 className="font-bold text-gray-800 mb-3">Bill / Receipt</h2>
+          <div className={`${ui.card} p-6 lg:col-span-2`}>
+            <h2 className={`font-bold mb-3 ${ui.heading}`}>Bill / Receipt</h2>
             <div className="flex flex-wrap gap-3">
               {expense.attachments.map((file) => (
                 <a
@@ -173,7 +137,7 @@ const ExpenseDetails = () => {
                   href={file.fileUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-2 border rounded-xl px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50"
+                  className="flex items-center gap-2 border border-[#E7EAE1] dark:border-[#262B24] rounded-xl px-4 py-2.5 text-sm text-[#3FA34D] dark:text-[#43B75A] hover:bg-[#3FA34D]/5 dark:hover:bg-[#43B75A]/10 transition-colors"
                 >
                   <FiFileText /> {file.fileType?.toUpperCase()}
                 </a>

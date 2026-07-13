@@ -1,5 +1,6 @@
 // src/pos/PosOrderScreen.jsx
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TableStrip from "./components/TableStrip";
 import MenuBrowser from "./components/MenuBrowser";
 import OrderTicket from "./components/OrderTicket";
@@ -7,6 +8,7 @@ import SuccessToast from "./components/SuccessToast";
 import { createOrder, sendToKitchen } from "./api/posApi";
 
 export default function PosOrderScreen() {
+  const navigate = useNavigate();
   const [orderType, setOrderType] = useState("DINE_IN");
   // TableStrip's onSelect now hands back the FULL table object (id, status,
   // and its active order if occupied) — not just an id string. Keep the
@@ -104,7 +106,16 @@ export default function PosOrderScreen() {
         })),
       });
 
-      // Fire every item straight to the kitchen on placement.
+      if (orderType === "TAKEAWAY") {
+        // Takeaway orders bill before they cook: hand off to the Billing
+        // page now, and the order only gets fired to the kitchen there,
+        // once payment has actually gone through.
+        setCart([]);
+        navigate(`/billing?orderId=${order.id}`);
+        return;
+      }
+
+      // Dine-in: fire every item straight to the kitchen on placement, as before.
       const orderItemIds = order.items.map((i) => i.id);
       if (orderItemIds.length) {
         await sendToKitchen(order.id, orderItemIds);

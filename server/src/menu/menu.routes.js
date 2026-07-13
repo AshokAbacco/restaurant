@@ -1,5 +1,6 @@
 // server/src/menu/menu.routes.js
 import { Router } from "express";
+import multer from "multer";
 import * as controller from "./menu.controller.js";
 import upload from "../config/upload.js";
 import { requireAuth, requireRole } from "../auth/auth.middleware.js";
@@ -23,6 +24,46 @@ const VIEW_ROLES = ["OWNER", "MANAGER", "CASHIER", "KITCHEN"];
 const EDIT_ROLES = ["OWNER", "MANAGER"];
 
 const router = Router();
+
+// ==============================================
+// CSV upload for bulk import.
+// This is intentionally a SEPARATE multer instance from `upload`
+// (../config/upload.js), because that one's fileFilter only allows
+// JPG/PNG/WebP images — it's meant for menu item / category photos, not
+// CSV files. Reusing it here made every bulk import request fail with
+// "Only JPG, PNG, and WebP images are allowed" before it ever reached
+// the controller. This instance accepts .csv only, and keeps the file
+// in memory (req.file.buffer) since bulkImportMenuItems() in
+// menu.service.js reads it as fileBuffer.toString("utf-8").
+// ==============================================
+const uploadCsv = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = [
+      "text/csv",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ];
+
+    const allowedExtensions = /\.(csv|xls|xlsx)$/i.test(
+      file.originalname
+    );
+
+    if (
+      allowedMimeTypes.includes(file.mimetype) ||
+      allowedExtensions
+    ) {
+      return cb(null, true);
+    }
+
+    return cb(
+      new Error("Only CSV, XLS, and XLSX files are allowed")
+    );
+  },
+});
 
 // ---------- Category ----------
 router.get("/categories", requireAuth, requireRole(...VIEW_ROLES), controller.getCategories);
@@ -50,7 +91,7 @@ router.post(
   "/menu/import",
   requireAuth,
   requireRole("OWNER"),
-  upload.single("file"),
+  uploadCsv.single("file"),
   controller.importMenuItems
 );
 

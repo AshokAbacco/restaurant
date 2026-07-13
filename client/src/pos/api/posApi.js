@@ -121,3 +121,8 @@ export const completeBilling = (orderId, payload) =>
     method: "POST",
     body: JSON.stringify(payload),
   });
+
+export const getOrders = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/pos/orders${qs ? `?${qs}` : ""}`);
+};

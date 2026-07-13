@@ -10,10 +10,12 @@ import menuRoutes from "./menu/menu.routes.js";
 import inventoryRoutes from "./inventory/inventory.routes.js";
 import expensesRoutes from "./expenses/expenses.routes.js";
 import employeeRoutes from "./employees/employees.routes.js";
+import kotRoutes from "./pos/kot/kot.routes.js";
 import posRoutes from "./pos/pos.routes.js";
 import kdsRoutes from "./kds/kds.routes.js";
 import storesRoutes from "./stores/stores.routes.js";
 import kioskRoutes from "./kiosk/kiosk.routes.js";
+
 
 const app = express();
 console.log("🚀 USING UPDATED INDEX.JS - KIOSK WITHOUT STAFF AUTH");
@@ -62,6 +64,12 @@ app.use(
   requireAuth,
   requireRole("OWNER", "MANAGER"),
   employeeRoutes,
+);
+app.use(
+  "/api/pos/kot",
+  requireAuth,
+  requireRole("OWNER", "MANAGER", "CASHIER", "KITCHEN"),
+  kotRoutes,
 );
 app.use(
   "/api/pos",
