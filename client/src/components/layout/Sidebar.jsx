@@ -21,6 +21,8 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiCheckCircle,
+  FiMonitor,
+  FiExternalLink,
 } from "react-icons/fi";
 
 import { useAuth } from "../../auth/AuthContext";
@@ -126,6 +128,17 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       name: "Profit & Loss",
       path: "/profit-loss",
       icon: <FiTrendingUp />,
+    },
+
+    // Opens the self-ordering kiosk screen in a new tab/window. It's a
+    // fullscreen customer-facing app (attract screen -> order -> payment
+    // -> success loop) with no admin chrome, so it deliberately does NOT
+    // navigate away inside this SPA — see the `external` flag below.
+    {
+      name: "Open Kiosk",
+      path: "/kiosk",
+      icon: <FiMonitor />,
+      external: true,
     },
 
     {
@@ -324,9 +337,13 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       >
         {!collapsed && (
           <div>
-            <h1 className="text-2xl font-bold text-[#3FA34D] dark:text-[#43B75A]">Restaurant ERP</h1>
+            <h1 className="text-2xl font-bold text-[#3FA34D] dark:text-[#43B75A]">
+              Restaurant ERP
+            </h1>
 
-            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280] mt-1">Management System</p>
+            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280] mt-1">
+              Management System
+            </p>
           </div>
         )}
 
@@ -340,7 +357,9 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
       {/* ===================== USER ===================== */}
 
-      <div className={`border-b border-[#E7EAE1] dark:border-[#262B24] ${collapsed ? "p-3" : "p-5"}`}>
+      <div
+        className={`border-b border-[#E7EAE1] dark:border-[#262B24] ${collapsed ? "p-3" : "p-5"}`}
+      >
         <div
           className={`flex items-center ${
             collapsed ? "justify-center" : "gap-4"
@@ -370,6 +389,33 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
         <nav className="space-y-1">
           {menus.map((item) => {
             const active = location.pathname === item.path;
+
+            // External items (currently just "Open Kiosk") open in a new
+            // tab instead of navigating the admin SPA away from itself —
+            // the kiosk is a separate fullscreen customer-facing app.
+            if (item.external) {
+              return (
+                <a
+                  key={item.path}
+                  href={item.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`relative flex items-center rounded-xl transition-all duration-200 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-[#1E241E] hover:text-[#1F2937] dark:hover:text-white ${
+                    collapsed ? "justify-center h-12" : "gap-4 px-4 py-3"
+                  }`}
+                  title="Opens in a new tab"
+                >
+                  <span className="text-xl">{item.icon}</span>
+
+                  {!collapsed && (
+                    <span className="font-medium flex items-center gap-2 flex-1">
+                      {item.name}
+                      <FiExternalLink className="text-sm opacity-60" />
+                    </span>
+                  )}
+                </a>
+              );
+            }
 
             return (
               <NavLink

@@ -3,34 +3,30 @@
 // ==============================================
 
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
 import IdleScreen from "./components/IdleScreen";
 import KioskHome from "./KioskHome";
-import KioskCheckout from "./KioskCheckout";
-import KioskPayment from "./KioskPayment";
-import KioskSuccess from "./KioskSuccess";
+
+const IdleEntry = () => {
+  const navigate = useNavigate();
+  return <IdleScreen onStart={() => navigate("home")} />;
+};
 
 const KioskRoutes = () => {
   return (
     <Routes>
-      {/* Default */}
-      <Route index element={<Navigate to="home" replace />} />
+      {/* Attract screen — tapping anywhere starts a new order */}
+      <Route index element={<IdleEntry />} />
 
-      {/* Main Kiosk */}
+      {/* Full ordering flow: menu -> cart -> checkout -> payment -> success
+          all live inside KioskHome, which resets itself and the kiosk
+          returns here automatically once the countdown on the success
+          screen finishes (see KioskHome's resetKiosk + onFinish). */}
       <Route path="home" element={<KioskHome />} />
 
-      {/* Optional Direct Routes (Mainly for Development & Testing) */}
-      <Route path="idle" element={<IdleScreen />} />
-
-      <Route path="checkout" element={<KioskCheckout open={true} />} />
-
-      <Route path="payment" element={<KioskPayment open={true} />} />
-
-      <Route path="success" element={<KioskSuccess open={true} />} />
-
       {/* 404 */}
-      <Route path="*" element={<Navigate to="home" replace />} />
+      <Route path="*" element={<Navigate to="." replace />} />
     </Routes>
   );
 };

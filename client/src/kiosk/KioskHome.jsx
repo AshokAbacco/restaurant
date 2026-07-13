@@ -2,502 +2,386 @@
 // src/kiosk/KioskHome.jsx
 // ==============================================
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import TopBar from "./components/TopBar";
-import CategorySidebar from "./components/CategorySidebar";
-import FoodGrid from "./components/FoodGrid";
-import CartSidebar from "./components/CartSidebar";
-import FoodDetailsModal from "./components/FoodDetailsModal";
+import KioskWelcome from "./KioskWelcome";
+import KioskMenuExplore from "./KioskMenuExplore";
+import KioskCategoryView from "./KioskCategoryView";
+import KioskPaymentType from "./KioskPaymentType";
+import KioskQrScan from "./KioskQrScan";
+import KioskOrderSuccess from "./KioskOrderSuccess";
 
-import KioskCheckout from "./KioskCheckout";
-import KioskPayment from "./KioskPayment";
-import KioskSuccess from "./KioskSuccess";
+import OrderBottomBar from "./components/OrderBottomBar";
+import MyOrderPanel from "./components/MyOrderPanel";
+import ItemCustomizeModal from "./components/ItemCustomizeModal";
 
-// ==============================================
-// DEMO DATA
-// Replace with API later
-// ==============================================
+import {
+  fetchKioskMenu,
+  createOrder,
+  KioskApiError,
+} from "./services/kioskApi";
 
-const categories = [
-  {
-    id: 1,
-    name: "All",
-    icon: "🍽️",
-  },
-  {
-    id: 2,
-    name: "Pizza",
-    icon: "🍕",
-  },
-  {
-    id: 3,
-    name: "Burger",
-    icon: "🍔",
-  },
-  {
-    id: 4,
-    name: "Biryani",
-    icon: "🍛",
-  },
-  {
-    id: 5,
-    name: "Chinese",
-    icon: "🥡",
-  },
-  {
-    id: 6,
-    name: "Drinks",
-    icon: "🥤",
-  },
-  {
-    id: 7,
-    name: "Dessert",
-    icon: "🍰",
-  },
-];
-
-const foods = [
-  {
-    id: 1,
-    name: "Veg Pizza",
-    category: "Pizza",
-    price: 299,
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600",
-    rating: 4.8,
-    veg: true,
-    bestseller: true,
-    description: "Fresh mozzarella cheese with vegetables.",
-  },
-  {
-    id: 2,
-    name: "Chicken Burger",
-    category: "Burger",
-    price: 249,
-    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600",
-    rating: 4.7,
-    veg: false,
-    bestseller: false,
-    description: "Grilled chicken with fresh lettuce.",
-  },
-  {
-    id: 3,
-    name: "Chicken Biryani",
-    category: "Biryani",
-    price: 349,
-    image: "https://images.unsplash.com/photo-1633945274405-b6c8069047b0?w=600",
-    rating: 4.9,
-    veg: false,
-    bestseller: true,
-    description: "Authentic Hyderabadi Dum Biryani.",
-  },
-  {
-    id: 4,
-    name: "Cold Coffee",
-    category: "Drinks",
-    price: 149,
-    image: "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=600",
-    rating: 4.6,
-    veg: true,
-    bestseller: false,
-    description: "Fresh chilled coffee with ice cream.",
-  },
-  {
-    id: 5,
-    name: "Brownie",
-    category: "Dessert",
-    price: 179,
-    image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600",
-    rating: 4.8,
-    veg: true,
-    bestseller: true,
-    description: "Chocolate brownie served hot.",
-  },
-];
-
-// ==============================================
-// COMPONENT
-// ==============================================
+const STAGE = {
+  WELCOME: "welcome",
+  EXPLORE: "explore",
+  CATEGORY: "category",
+  PAYMENT: "payment",
+  QR: "qr",
+  SUCCESS: "success",
+};
 
 const KioskHome = () => {
+  const navigate = useNavigate();
+
   // ==========================================
-  // STATES
+  // MENU DATA
   // ==========================================
+  const [categories, setCategories] = useState([]);
+  const [foods, setFoods] = useState([]);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [menuError, setMenuError] = useState("");
 
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const loadMenu = async () => {
+    setMenuLoading(true);
+    setMenuError("");
+    try {
+      const menu = await fetchKioskMenu();
 
-  const [searchText, setSearchText] = useState("");
+      const rawCategories = (
+        menu?.categories ||
+        menu?.data?.categories ||
+        []
+      ).map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        description: cat.description || "",
+        image: cat.image,
+        displayOrder: cat.displayOrder ?? 0,
+      }));
 
-  const [selectedFood, setSelectedFood] = useState(null);
+      const rawItems = (menu?.items || menu?.data?.items || []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || "",
+        price: item.price,
+        image: item.image,
+        foodType: item.foodType,
+        categoryId: item.categoryId,
+        category: item.category,
+        subCategory: item.subCategory || null,
+        prepTimeMinutes: item.prepTimeMinutes || 10,
+        variants: item.variants || [],
+      }));
 
+      setCategories(rawCategories);
+      setFoods(rawItems);
+    } catch (err) {
+      setMenuError(
+        err instanceof KioskApiError
+          ? err.message
+          : "Could not load the menu. Please check your connection.",
+      );
+    } finally {
+      setMenuLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMenu();
+  }, []);
+
+  // ==========================================
+  // FLOW STATE
+  // ==========================================
+  const [stage, setStage] = useState(STAGE.WELCOME);
+  const [orderType, setOrderType] = useState("DINE_IN");
+  const [activeCategory, setActiveCategory] = useState(null);
+
+  // ==========================================
+  // CART
+  // ==========================================
   const [cart, setCart] = useState([]);
+  const [panelExpanded, setPanelExpanded] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [showItemModal, setShowItemModal] = useState(false);
 
-  const [showFoodModal, setShowFoodModal] = useState(false);
-
-  // ==========================================
-  // CHECKOUT FLOW
-  // ==========================================
-
-  const [showCheckout, setShowCheckout] = useState(false);
-
-  const [showPayment, setShowPayment] = useState(false);
-
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  const [checkoutData, setCheckoutData] = useState({});
-
-  // ==========================================
-  // FILTERED FOOD
-  // ==========================================
-
-  const filteredFoods = useMemo(() => {
-    return foods.filter((food) => {
-      const categoryMatch =
-        selectedCategory === "All" || food.category === selectedCategory;
-
-      const searchMatch = food.name
-        .toLowerCase()
-        .includes(searchText.toLowerCase());
-
-      return categoryMatch && searchMatch;
-    });
-  }, [selectedCategory, searchText]);
-
-  // ==========================================
-  // OPEN FOOD
-  // ==========================================
-
-  const openFood = (food) => {
-    setSelectedFood(food);
-
-    setShowFoodModal(true);
+  const addLineToCart = (item, quantity) => {
+    setCart((prev) => [
+      ...prev,
+      {
+        ...item,
+        cartLineId: `${item.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        quantity,
+      },
+    ]);
   };
 
-  // ==========================================
-  // CLOSE FOOD
-  // ==========================================
-
-  const closeFood = () => {
-    setSelectedFood(null);
-
-    setShowFoodModal(false);
+  const handleAddToCart = (mainItem, quantity, extraLines = []) => {
+    addLineToCart(mainItem, quantity);
+    extraLines.forEach(({ item, quantity: qty }) => addLineToCart(item, qty));
+    setShowItemModal(false);
+    setSelectedItem(null);
   };
 
-  // ==========================================
-  // ADD TO CART
-  // ==========================================
-
-  const addToCart = (food, qty = 1) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === food.id);
-
-      if (existing) {
-        return prev.map((item) =>
-          item.id === food.id
-            ? {
-                ...item,
-                quantity: item.quantity + qty,
-              }
-            : item,
-        );
-      }
-
-      return [
-        ...prev,
-        {
-          ...food,
-          quantity: qty,
-        },
-      ];
-    });
-
-    closeFood();
-  };
-
-  // ==========================================
-  // REMOVE ITEM
-  // ==========================================
-
-  const removeFromCart = (id) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  // ==========================================
-  // UPDATE QUANTITY
-  // ==========================================
-
-  const updateQuantity = (id, quantity) => {
+  const updateQuantity = (cartLineId, quantity) => {
     if (quantity <= 0) {
-      removeFromCart(id);
-
+      setCart((prev) => prev.filter((l) => l.cartLineId !== cartLineId));
       return;
     }
-
     setCart((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              quantity,
-            }
-          : item,
-      ),
+      prev.map((l) => (l.cartLineId === cartLineId ? { ...l, quantity } : l)),
     );
   };
 
-  // ==========================================
-  // TOTALS
-  // ==========================================
+  const removeLine = (cartLineId) => {
+    setCart((prev) => prev.filter((l) => l.cartLineId !== cartLineId));
+  };
 
-  const cartTotal = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
+  const cartTotal = cart.reduce((sum, l) => sum + l.price * l.quantity, 0);
+  const cartItemCount = cart.reduce((sum, l) => sum + l.quantity, 0);
 
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   // ==========================================
-  // CHECKOUT
+  // ORDER CREATION
   // ==========================================
+  const [order, setOrder] = useState(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [orderError, setOrderError] = useState("");
 
-  const handleCheckout = () => {
+  const handleOrderNow = async () => {
     if (cart.length === 0) return;
+    setPlacingOrder(true);
+    setOrderError("");
 
-    setShowCheckout(true);
+    try {
+      const created = await createOrder({
+        orderType,
+        items: cart.map((line) => ({
+          menuItemId: line.id,
+          quantity: line.quantity,
+          addOnIds: line.addOnIds || [],
+          notes: line.notes || undefined,
+        })),
+      });
+      setOrder(created);
+      setPanelExpanded(false);
+      setStage(STAGE.PAYMENT);
+    } catch (err) {
+      setOrderError(
+        err instanceof KioskApiError
+          ? [err.message, ...(err.errors || [])].join(" — ")
+          : "Could not place your order. Please try again.",
+      );
+    } finally {
+      setPlacingOrder(false);
+    }
   };
 
   // ==========================================
-  // RESET KIOSK
+  // RESET & SESSION FLUSH
   // ==========================================
-
   const resetKiosk = () => {
-    // Cart
-
     setCart([]);
-
-    // Food
-
-    setSelectedFood(null);
-
-    setShowFoodModal(false);
-
-    // Search
-
-    setSearchText("");
-
-    // Category
-
-    setSelectedCategory("All");
-
-    // Checkout Flow
-
-    setShowCheckout(false);
-
-    setShowPayment(false);
-
-    setShowSuccess(false);
-
-    setCheckoutData({});
-
-    // Future
-
-    // navigate("/kiosk/home");
+    setPanelExpanded(false);
+    setSelectedItem(null);
+    setShowItemModal(false);
+    setOrder(null);
+    setOrderError("");
+    setActiveCategory(null);
+    setOrderType("DINE_IN");
+    setStage(STAGE.WELCOME);
+    navigate("/kiosk", { replace: true });
   };
+
   // ==========================================
-  // PAYMENT SUCCESS
+  // ANTI-IDLE SESSION GUARDIAN
   // ==========================================
 
-  const handlePaymentSuccess = (paymentInfo = {}) => {
-    const successOrder = {
-      ...checkoutData,
+  const idleTimer = useRef(null);
 
-      ...paymentInfo,
+  useEffect(() => {
+    const IDLE_TIMEOUT = 60000; // 1 minute
 
-      paymentMethod: paymentInfo.paymentMethod || "UPI",
+    const resetTimer = () => {
+      clearTimeout(idleTimer.current);
 
-      paymentStatus: "SUCCESS",
-
-      orderNumber: "ORD" + Math.floor(100000 + Math.random() * 900000),
-
-      estimatedTime: Math.floor(Math.random() * 10) + 15,
-
-      orderedAt: new Date(),
+      idleTimer.current = setTimeout(() => {
+        resetKiosk();
+      }, IDLE_TIMEOUT);
     };
 
-    setCheckoutData(successOrder);
+    const events = [
+      "mousemove",
+      "mousedown",
+      "click",
+      "keydown",
+      "scroll",
+      "touchstart",
+      "touchmove",
+    ];
 
-    setShowPayment(false);
+    events.forEach((event) => window.addEventListener(event, resetTimer));
 
-    setShowSuccess(true);
+    resetTimer();
+
+    return () => {
+      clearTimeout(idleTimer.current);
+
+      events.forEach((event) => window.removeEventListener(event, resetTimer));
+    };
+  }, []);
+
+  // ==========================================
+  // NAVIGATION HELPERS
+  // ==========================================
+  const handleWelcomeSelect = (type) => {
+    setOrderType(type);
+    setStage(STAGE.EXPLORE);
   };
 
-  // ==========================================
-  // RENDER
-  // ==========================================
+  const handleSelectCategory = (categoryName) => {
+    setActiveCategory(categoryName);
+    setStage(STAGE.CATEGORY);
+  };
+
+  const handleSelectItem = (item) => {
+    setSelectedItem(item);
+    setShowItemModal(true);
+  };
+
+  const showOrderChrome = stage === STAGE.EXPLORE || stage === STAGE.CATEGORY;
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-slate-100">
-      {/* ======================================
-          TOP BAR
-      ====================================== */}
-
-      <TopBar
-        search={searchText}
-        setSearch={setSearchText}
-        cartCount={totalItems}
-      />
-
-      {/* ======================================
-          MAIN LAYOUT
-      ====================================== */}
-
-      <div className="h-[calc(100vh-90px)] flex">
-        {/* ======================================
-            LEFT SIDEBAR
-        ====================================== */}
-
-        <div className="w-72 bg-white border-r border-gray-200">
-          <CategorySidebar
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onCategoryChange={setSelectedCategory}
-          />
-        </div>
-
-        {/* ======================================
-            CENTER
-        ====================================== */}
-
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Page Header */}
-
-          <div className="bg-white border-b border-gray-200 px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800">
-                  {selectedCategory}
-                </h1>
-
-                <p className="text-gray-500 mt-2">
-                  Browse delicious freshly prepared meals.
-                </p>
-              </div>
-
-              <div className="text-right">
-                <h2 className="text-4xl font-bold text-blue-600">
-                  {filteredFoods.length}
-                </h2>
-
-                <p className="text-gray-500">Items Available</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Food Grid */}
-
-          <div className="flex-1 overflow-y-auto p-8">
-            <FoodGrid
-              foods={filteredFoods}
-              onFoodClick={openFood}
-              onAddToCart={addToCart}
-            />
-          </div>
-        </div>
-
-        {/* ======================================
-            CART
-        ====================================== */}
-
-        <div className="w-[420px] bg-white border-l border-gray-200">
-          <CartSidebar
-            cart={cart}
-            total={cartTotal}
-            totalItems={totalItems}
-            onRemove={removeFromCart}
-            onUpdateQuantity={updateQuantity}
-            onCheckout={handleCheckout}
-          />
-        </div>
-      </div>
-      {/* ======================================
-          FOOD DETAILS MODAL
-      ====================================== */}
-
-      <FoodDetailsModal
-        open={showFoodModal}
-        food={selectedFood}
-        onClose={closeFood}
-        onAddToCart={addToCart}
-      />
-
-      {/* ======================================
-    CHECKOUT
-====================================== */}
-
-      <KioskCheckout
-        open={showCheckout}
-        cart={cart}
-        onClose={() => setShowCheckout(false)}
-        onContinue={(checkout) => {
-          setCheckoutData(checkout);
-
-          setShowCheckout(false);
-
-          setShowPayment(true);
-        }}
-      />
-
-      {/* ======================================
-    PAYMENT
-====================================== */}
-
-      <KioskPayment
-        open={showPayment}
-        order={checkoutData}
-        onBack={() => {
-          setShowPayment(false);
-
-          setShowCheckout(true);
-        }}
-        onSuccess={(paymentData) => {
-          handlePaymentSuccess(paymentData);
-        }}
-      />
-
-      {/* ======================================
-    SUCCESS
-====================================== */}
-
-      <KioskSuccess
-        open={showSuccess}
-        order={checkoutData}
-        onFinish={() => {
-          resetKiosk();
-        }}
-      />
-
-      {/* ======================================
-          EMPTY CART PLACEHOLDER
-      ====================================== */}
-
-      {cart.length === 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-3 animate-pulse pointer-events-none">
-          <span className="text-2xl">🛒</span>
-
-          <span className="font-semibold text-lg">
-            Select your favorite food to begin your order
-          </span>
+    <div className="h-screen w-screen max-h-screen bg-[#FAFAFX] overflow-hidden relative font-sans antialiased text-[#1C1C1E]">
+      {menuLoading && stage !== STAGE.WELCOME && (
+        <div className="h-full w-full flex items-center justify-center bg-white/80 backdrop-blur-md z-50">
+          <div className="w-12 h-12 border-4 border-[#EE6C2E] border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {/* ======================================
-          DECORATION
-      ====================================== */}
+      {!menuLoading && menuError && stage !== STAGE.WELCOME && (
+        <div className="h-full w-full flex items-center justify-center px-6 z-50 bg-[#FAFAFX]">
+          <div className="bg-white p-8 rounded-[32px] shadow-xl border border-black/[0.02] max-w-md text-center">
+            <h2 className="text-xl font-black text-red-500">
+              System Integration Error
+            </h2>
+            <p className="mt-2 text-sm text-[#8E8E93] font-medium leading-relaxed">
+              {menuError}
+            </p>
+            <button
+              onClick={loadMenu}
+              className="mt-6 w-full py-3.5 rounded-2xl bg-[#EE6C2E] text-white font-bold shadow-md hover:bg-[#d65922] transition-colors active:scale-95"
+            >
+              Sync Connection
+            </button>
+          </div>
+        </div>
+      )}
 
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-blue-500/10 blur-3xl" />
+      {(!menuLoading || stage === STAGE.WELCOME) && !menuError && (
+        <div className="w-full h-full flex flex-col">
+          {stage === STAGE.WELCOME && (
+            <KioskWelcome onSelect={handleWelcomeSelect} />
+          )}
 
-        <div className="absolute -bottom-40 -left-40 w-[450px] h-[450px] rounded-full bg-orange-400/10 blur-3xl" />
-      </div>
+          {stage === STAGE.EXPLORE && (
+            <KioskMenuExplore
+              categories={categories}
+              items={foods}
+              onBack={() => setStage(STAGE.WELCOME)}
+              onSelectCategory={handleSelectCategory}
+            />
+          )}
+
+          {stage === STAGE.CATEGORY && (
+            <KioskCategoryView
+              categories={categories}
+              items={foods}
+              activeCategoryName={activeCategory}
+              onChangeCategory={setActiveCategory}
+              onBack={() => setStage(STAGE.EXPLORE)}
+              onSelectItem={handleSelectItem}
+            />
+          )}
+
+          {stage === STAGE.PAYMENT && order && (
+            <KioskPaymentType
+              order={order}
+              onBack={() => setStage(STAGE.CATEGORY)}
+              onChooseQr={() => setStage(STAGE.QR)}
+              onPaid={(updated) => {
+                setOrder(updated);
+                setStage(STAGE.SUCCESS);
+              }}
+            />
+          )}
+
+          {stage === STAGE.QR && order && (
+            <KioskQrScan
+              order={order}
+              onBack={() => setStage(STAGE.PAYMENT)}
+              onPaid={(updated) => {
+                setOrder(updated);
+                setStage(STAGE.SUCCESS);
+              }}
+            />
+          )}
+
+          {stage === STAGE.SUCCESS && order && (
+            <KioskOrderSuccess order={order} onNextOrder={resetKiosk} />
+          )}
+        </div>
+      )}
+
+      {/* Dynamic Overlay Navigation Systems */}
+      {showOrderChrome && (
+        <div className="absolute bottom-0 left-0 right-0 z-40 pointer-events-none">
+          {panelExpanded && (
+            <div className="pointer-events-auto">
+              <MyOrderPanel
+                cart={cart}
+                orderType={orderType}
+                onChangeOrderType={setOrderType}
+                onUpdateQuantity={updateQuantity}
+                onRemove={removeLine}
+              />
+            </div>
+          )}
+
+          {orderError && (
+            <div className="absolute bottom-32 left-6 right-6 rounded-2xl bg-red-50 border border-red-200 p-4 text-red-700 text-xs font-bold text-center shadow-lg animate-fade-in pointer-events-auto">
+              {orderError}
+            </div>
+          )}
+
+          <div className="pointer-events-auto">
+            <OrderBottomBar
+              expanded={panelExpanded}
+              onToggleExpand={() => setPanelExpanded((v) => !v)}
+              itemCount={cartItemCount}
+              total={cartTotal}
+              onOrderNow={handleOrderNow}
+              onRestart={() => {
+                setCart([]);
+                setPanelExpanded(false);
+              }}
+              placingOrder={placingOrder}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Item Customization Modal Tier */}
+      <ItemCustomizeModal
+        open={showItemModal}
+        item={selectedItem}
+        allItems={foods}
+        onClose={() => {
+          setShowItemModal(false);
+          setSelectedItem(null);
+        }}
+        onAddToCart={handleAddToCart}
+      />
     </div>
   );
 };

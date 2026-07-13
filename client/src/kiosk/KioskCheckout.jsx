@@ -11,31 +11,25 @@ import {
   FiUser,
   FiPhone,
   FiFileText,
+  FiAlertCircle,
 } from "react-icons/fi";
+import { fetchTables, createOrder, KioskApiError } from "./services/kioskApi";
 
-const TABLES = [
-  "T1",
-  "T2",
-  "T3",
-  "T4",
-  "T5",
-  "T6",
-  "T7",
-  "T8",
-  "T9",
-  "T10",
-  "T11",
-  "T12",
-];
-
-const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
+const KioskCheckout = ({
+  open = false,
+  cart = [],
+  onClose,
+  onOrderCreated,
+}) => {
   // ==========================================
   // STATES
   // ==========================================
 
   const [orderType, setOrderType] = useState("DINE_IN");
 
-  const [selectedTable, setSelectedTable] = useState("");
+  const [tables, setTables] = useState([]);
+  const [tablesLoading, setTablesLoading] = useState(false);
+  const [selectedTable, setSelectedTable] = useState(null); // full table object
 
   const [customerName, setCustomerName] = useState("");
 
@@ -43,26 +37,34 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
 
   const [notes, setNotes] = useState("");
 
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
   // ==========================================
-  // RESET
+  // RESET + LOAD TABLES WHEN OPENED
   // ==========================================
 
   useEffect(() => {
     if (open) {
       setOrderType("DINE_IN");
-
-      setSelectedTable("");
-
+      setSelectedTable(null);
       setCustomerName("");
-
       setPhone("");
-
       setNotes("");
+      setErrorMsg("");
+      setSubmitting(false);
+
+      setTablesLoading(true);
+      fetchTables()
+        .then(setTables)
+        .catch(() => setTables([]))
+        .finally(() => setTablesLoading(false));
     }
   }, [open]);
 
   // ==========================================
-  // TOTALS
+  // TOTALS (client-side estimate only — the backend recomputes the
+  // authoritative total from live menu prices when the order is created)
   // ==========================================
 
   const subtotal = useMemo(() => {
@@ -74,25 +76,49 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
   const grandTotal = subtotal + gst;
 
   // ==========================================
-  // CONTINUE
+  // CONTINUE -> CREATE REAL ORDER
   // ==========================================
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    setErrorMsg("");
+
     if (orderType === "DINE_IN" && !selectedTable) {
-      alert("Please select a table.");
+      setErrorMsg("Please select a table.");
       return;
     }
 
-    onContinue?.({
-      orderType,
-      table: selectedTable,
-      customerName,
-      phone,
-      notes,
-      subtotal,
-      gst,
-      grandTotal,
-    });
+    if (cart.length === 0) {
+      setErrorMsg("Your cart is empty.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const order = await createOrder({
+        orderType,
+        tableId: orderType === "DINE_IN" ? selectedTable.id : undefined,
+        customerName,
+        phone: phone || undefined,
+        notes,
+        items: cart.map((item) => ({
+          menuItemId: item.id,
+          quantity: item.quantity,
+          addOnIds: item.addOnIds || [],
+          notes: item.notes || undefined,
+        })),
+      });
+
+      onOrderCreated?.(order);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof KioskApiError
+          ? [err.message, ...(err.errors || [])].join(" — ")
+          : "Could not place your order. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!open) return null;
@@ -123,7 +149,7 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
           </div>
 
           <div className="text-right">
-            <p className="text-gray-500">Grand Total</p>
+            <p className="text-gray-500">Estimated Total</p>
 
             <h2 className="text-4xl font-bold text-orange-600">
               ₹{grandTotal}
@@ -162,9 +188,9 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
               {/* Take Away */}
 
               <button
-                onClick={() => setOrderType("TAKE_AWAY")}
+                onClick={() => setOrderType("TAKEAWAY")}
                 className={`rounded-3xl border-2 p-8 transition ${
-                  orderType === "TAKE_AWAY"
+                  orderType === "TAKEAWAY"
                     ? "border-orange-500 bg-orange-50"
                     : "border-gray-200"
                 }`}
@@ -177,28 +203,37 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
               </button>
             </div>
             {/* ======================================
-                TABLE SELECTION
+                TABLE SELECTION (real tables from backend)
             ====================================== */}
 
             {orderType === "DINE_IN" && (
               <div className="mt-12">
                 <h2 className="text-2xl font-bold mb-6">Select Your Table</h2>
 
-                <div className="grid grid-cols-4 gap-5">
-                  {TABLES.map((table) => (
-                    <button
-                      key={table}
-                      onClick={() => setSelectedTable(table)}
-                      className={`h-24 rounded-2xl border-2 text-2xl font-bold transition-all ${
-                        selectedTable === table
-                          ? "bg-orange-500 text-white border-orange-500 scale-105"
-                          : "bg-white border-gray-200 hover:border-orange-300 hover:bg-orange-50"
-                      }`}
-                    >
-                      {table}
-                    </button>
-                  ))}
-                </div>
+                {tablesLoading ? (
+                  <p className="text-gray-400">Loading tables...</p>
+                ) : tables.length === 0 ? (
+                  <p className="text-gray-400">
+                    No free tables right now — please choose Take Away or ask
+                    staff for help.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-5">
+                    {tables.map((table) => (
+                      <button
+                        key={table.id}
+                        onClick={() => setSelectedTable(table)}
+                        className={`h-24 rounded-2xl border-2 text-2xl font-bold transition-all ${
+                          selectedTable?.id === table.id
+                            ? "bg-orange-500 text-white border-orange-500 scale-105"
+                            : "bg-white border-gray-200 hover:border-orange-300 hover:bg-orange-50"
+                        }`}
+                      >
+                        {table.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -312,7 +347,7 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
               ) : (
                 cart.map((item) => (
                   <div
-                    key={item.id}
+                    key={item.cartLineId || item.id}
                     className="bg-white rounded-2xl p-5 border border-gray-200"
                   >
                     <div className="flex gap-4">
@@ -328,6 +363,12 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
                         <p className="text-gray-500 mt-2">
                           Qty : {item.quantity}
                         </p>
+
+                        {item.notes && (
+                          <p className="text-gray-400 text-sm mt-1 italic">
+                            {item.notes}
+                          </p>
+                        )}
                       </div>
 
                       <div className="text-right">
@@ -345,6 +386,13 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
             {/* Bill */}
 
             <div className="border-t border-gray-200 bg-white p-8">
+              {errorMsg && (
+                <div className="mb-5 rounded-2xl bg-red-50 border border-red-200 p-4 flex items-start gap-3">
+                  <FiAlertCircle className="text-red-600 mt-0.5" size={20} />
+                  <p className="text-red-700 text-sm">{errorMsg}</p>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div className="flex justify-between text-lg">
                   <span className="text-gray-600">Subtotal</span>
@@ -355,7 +403,7 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
                 </div>
 
                 <div className="flex justify-between text-lg">
-                  <span className="text-gray-600">GST (5%)</span>
+                  <span className="text-gray-600">GST (approx.)</span>
 
                   <span className="font-semibold">
                     ₹{gst.toLocaleString("en-IN")}
@@ -363,22 +411,26 @@ const KioskCheckout = ({ open = false, cart = [], onClose, onContinue }) => {
                 </div>
 
                 <div className="border-t pt-5 flex justify-between">
-                  <span className="text-2xl font-bold">Grand Total</span>
+                  <span className="text-2xl font-bold">Estimated Total</span>
 
                   <span className="text-3xl font-bold text-orange-600">
                     ₹{grandTotal.toLocaleString("en-IN")}
                   </span>
                 </div>
+                <p className="text-xs text-gray-400">
+                  Final total is confirmed by the kitchen on the next screen.
+                </p>
               </div>
 
               {/* Continue */}
 
               <button
                 onClick={handleContinue}
-                className="mt-8 w-full h-16 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xl font-bold flex items-center justify-center gap-3 transition-all duration-300"
+                disabled={submitting}
+                className="mt-8 w-full h-16 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xl font-bold flex items-center justify-center gap-3 transition-all duration-300 disabled:opacity-60"
               >
-                Continue To Payment
-                <FiArrowRight size={24} />
+                {submitting ? "Placing Order..." : "Continue To Payment"}
+                {!submitting && <FiArrowRight size={24} />}
               </button>
             </div>
           </div>

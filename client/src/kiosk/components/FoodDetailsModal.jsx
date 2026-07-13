@@ -4,42 +4,69 @@
 
 import React, { useEffect, useState } from "react";
 import { FiX, FiPlus, FiMinus, FiClock, FiStar } from "react-icons/fi";
+import { fetchAddOnsForItem, KioskApiError } from "../services/kioskApi";
+
+const SPICE_LEVELS = ["Mild", "Medium", "Hot"];
 
 const FoodDetailsModal = ({ open, food, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
 
-  const [extraCheese, setExtraCheese] = useState(false);
-  const [extraSauce, setExtraSauce] = useState(false);
+  const [addOns, setAddOns] = useState([]);
+  const [addOnsLoading, setAddOnsLoading] = useState(false);
+  const [selectedAddOnIds, setSelectedAddOnIds] = useState([]);
+
   const [spice, setSpice] = useState("Medium");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (open) {
+    if (open && food?.id) {
       setQuantity(1);
-      setExtraCheese(false);
-      setExtraSauce(false);
+      setSelectedAddOnIds([]);
       setSpice("Medium");
       setNotes("");
+
+      setAddOnsLoading(true);
+      fetchAddOnsForItem(food.id)
+        .then(setAddOns)
+        .catch((err) => {
+          // Non-fatal — item can still be added without add-ons.
+          if (!(err instanceof KioskApiError)) console.error(err);
+          setAddOns([]);
+        })
+        .finally(() => setAddOnsLoading(false));
     }
-  }, [open]);
+  }, [open, food?.id]);
 
   if (!open || !food) return null;
 
-  const extras = (extraCheese ? 40 : 0) + (extraSauce ? 20 : 0);
+  const toggleAddOn = (id) => {
+    setSelectedAddOnIds((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id],
+    );
+  };
 
-  const total = (food.price + extras) * quantity;
+  const addOnsTotal = addOns
+    .filter((a) => selectedAddOnIds.includes(a.id))
+    .reduce((sum, a) => sum + a.price, 0);
+
+  const unitPrice = food.price + addOnsTotal;
+  const total = unitPrice * quantity;
 
   const handleAdd = () => {
+    const composedNotes = [
+      `Spice: ${spice}`,
+      notes.trim() ? notes.trim() : null,
+    ]
+      .filter(Boolean)
+      .join(". ");
+
     onAddToCart(
       {
         ...food,
-        extras: {
-          extraCheese,
-          extraSauce,
-          spice,
-          notes,
-        },
-        price: food.price + extras,
+        price: unitPrice,
+        addOnIds: selectedAddOnIds,
+        selectedAddOns: addOns.filter((a) => selectedAddOnIds.includes(a.id)),
+        notes: composedNotes,
       },
       quantity,
     );
@@ -111,38 +138,38 @@ const FoodDetailsModal = ({ open, food, onClose, onAddToCart }) => {
           <div className="bg-gray-50 p-8 overflow-y-auto">
             <h3 className="text-2xl font-bold mb-6">Customize</h3>
 
-            {/* Addons */}
+            {/* Real add-ons from the backend */}
 
             <div className="space-y-5">
-              <label className="flex justify-between items-center bg-white p-5 rounded-2xl">
-                <span className="text-lg font-medium">Extra Cheese</span>
+              {addOnsLoading && (
+                <p className="text-gray-400">Loading add-ons...</p>
+              )}
 
-                <div className="flex items-center gap-5">
-                  <span>+ ₹40</span>
+              {!addOnsLoading && addOns.length === 0 && (
+                <p className="text-gray-400">
+                  No add-ons available for this item.
+                </p>
+              )}
 
-                  <input
-                    type="checkbox"
-                    checked={extraCheese}
-                    onChange={() => setExtraCheese(!extraCheese)}
-                    className="w-6 h-6"
-                  />
-                </div>
-              </label>
+              {addOns.map((addOn) => (
+                <label
+                  key={addOn.id}
+                  className="flex justify-between items-center bg-white p-5 rounded-2xl"
+                >
+                  <span className="text-lg font-medium">{addOn.name}</span>
 
-              <label className="flex justify-between items-center bg-white p-5 rounded-2xl">
-                <span className="text-lg font-medium">Extra Sauce</span>
+                  <div className="flex items-center gap-5">
+                    <span>+ ₹{addOn.price}</span>
 
-                <div className="flex items-center gap-5">
-                  <span>+ ₹20</span>
-
-                  <input
-                    type="checkbox"
-                    checked={extraSauce}
-                    onChange={() => setExtraSauce(!extraSauce)}
-                    className="w-6 h-6"
-                  />
-                </div>
-              </label>
+                    <input
+                      type="checkbox"
+                      checked={selectedAddOnIds.includes(addOn.id)}
+                      onChange={() => toggleAddOn(addOn.id)}
+                      className="w-6 h-6"
+                    />
+                  </div>
+                </label>
+              ))}
             </div>
 
             {/* Spice */}
@@ -151,7 +178,7 @@ const FoodDetailsModal = ({ open, food, onClose, onAddToCart }) => {
               <h4 className="font-bold text-xl mb-4">Spice Level</h4>
 
               <div className="grid grid-cols-3 gap-4">
-                {["Mild", "Medium", "Hot"].map((level) => (
+                {SPICE_LEVELS.map((level) => (
                   <button
                     key={level}
                     onClick={() => setSpice(level)}
@@ -204,7 +231,6 @@ const FoodDetailsModal = ({ open, food, onClose, onAddToCart }) => {
 
               <div className="text-right">
                 <p className="text-gray-500">Total</p>
-
                 <h2 className="text-4xl font-bold text-orange-600">₹{total}</h2>
               </div>
             </div>

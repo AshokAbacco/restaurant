@@ -9,7 +9,9 @@ import {
   FiCreditCard,
   FiDollarSign,
   FiCheckCircle,
+  FiAlertCircle,
 } from "react-icons/fi";
+import { fetchUpiQr, payOrder, KioskApiError } from "./services/kioskApi";
 
 const PAYMENT_METHODS = [
   {
@@ -37,37 +39,55 @@ const PAYMENT_METHODS = [
 
 const KioskPayment = ({ open = false, order = {}, onBack, onSuccess }) => {
   const [selectedMethod, setSelectedMethod] = useState("UPI");
-
   const [processing, setProcessing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [qr, setQr] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
       setSelectedMethod("UPI");
-
       setProcessing(false);
+      setErrorMsg("");
+      setQr(null);
     }
   }, [open]);
 
-  const total = useMemo(() => {
-    return order?.grandTotal || 0;
-  }, [order]);
+  // Fetch the real UPI QR whenever UPI is selected on an active order.
+  useEffect(() => {
+    if (open && selectedMethod === "UPI" && order?.id) {
+      setQrLoading(true);
+      fetchUpiQr(order.id)
+        .then(setQr)
+        .catch(() => setQr(null))
+        .finally(() => setQrLoading(false));
+    }
+  }, [open, selectedMethod, order?.id]);
 
-  const handlePayment = () => {
+  const total = useMemo(() => order?.grandTotal || 0, [order]);
+
+  const handlePayment = async () => {
+    if (!order?.id) return;
+
+    setErrorMsg("");
     setProcessing(true);
 
-    setTimeout(() => {
-      setProcessing(false);
-
-      onSuccess?.({
-        paymentMethod: selectedMethod,
-
-        paymentStatus: "SUCCESS",
-
-        transactionId: "TXN" + Date.now(),
-
-        paymentDate: new Date(),
+    try {
+      const updatedOrder = await payOrder(order.id, {
+        method: selectedMethod,
+        transactionReference: qr?.transactionReference,
       });
-    }, 2500);
+      onSuccess?.(updatedOrder);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof KioskApiError
+          ? err.message
+          : "Payment could not be confirmed. Please try again.",
+      );
+    } finally {
+      setProcessing(false);
+    }
   };
 
   if (!open) return null;
@@ -90,8 +110,9 @@ const KioskPayment = ({ open = false, order = {}, onBack, onSuccess }) => {
 
             <div>
               <h1 className="text-3xl font-bold">Payment</h1>
-
-              <p className="text-gray-500 mt-1">Select your payment method</p>
+              <p className="text-gray-500 mt-1">
+                Order #{order?.orderNumber} · Select your payment method
+              </p>
             </div>
           </div>
 
@@ -155,16 +176,23 @@ const KioskPayment = ({ open = false, order = {}, onBack, onSuccess }) => {
                   </p>
 
                   <div className="mt-10 flex justify-center">
-                    <div className="w-80 h-80 rounded-3xl bg-white border-4 border-dashed border-gray-300 flex flex-col items-center justify-center">
-                      <FiSmartphone size={80} className="text-blue-500" />
-
-                      <p className="mt-6 text-gray-600 text-lg">
-                        Dynamic QR Code
-                      </p>
-
-                      <p className="text-sm text-gray-400 mt-2">
-                        Backend will generate QR
-                      </p>
+                    <div className="w-80 h-80 rounded-3xl bg-white border-4 border-dashed border-gray-300 flex flex-col items-center justify-center overflow-hidden">
+                      {qrLoading ? (
+                        <div className="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      ) : qr?.qrDataUrl ? (
+                        <img
+                          src={qr.qrDataUrl}
+                          alt="UPI QR Code"
+                          className="w-full h-full object-contain p-4"
+                        />
+                      ) : (
+                        <>
+                          <FiSmartphone size={80} className="text-blue-500" />
+                          <p className="mt-6 text-gray-600 text-lg">
+                            QR unavailable
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -248,7 +276,7 @@ const KioskPayment = ({ open = false, order = {}, onBack, onSuccess }) => {
                   <span className="text-gray-600">Order Type</span>
 
                   <span className="font-semibold">
-                    {order?.orderType === "TAKE_AWAY" ? "Take Away" : "Dine In"}
+                    {order?.orderType === "TAKEAWAY" ? "Take Away" : "Dine In"}
                   </span>
                 </div>
 
@@ -256,7 +284,7 @@ const KioskPayment = ({ open = false, order = {}, onBack, onSuccess }) => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Table</span>
 
-                    <span className="font-semibold">{order.table}</span>
+                    <span className="font-semibold">{order.table.name}</span>
                   </div>
                 )}
 
@@ -270,13 +298,13 @@ const KioskPayment = ({ open = false, order = {}, onBack, onSuccess }) => {
                   <div className="flex justify-between text-lg">
                     <span>Subtotal</span>
 
-                    <span>₹{order?.subtotal || 0}</span>
+                    <span>₹{order?.subtotal ?? 0}</span>
                   </div>
 
                   <div className="flex justify-between text-lg mt-3">
                     <span>GST</span>
 
-                    <span>₹{order?.gst || 0}</span>
+                    <span>₹{order?.gstAmount ?? 0}</span>
                   </div>
 
                   <div className="flex justify-between text-2xl font-bold mt-6">
@@ -294,6 +322,15 @@ const KioskPayment = ({ open = false, order = {}, onBack, onSuccess }) => {
           ====================================== */}
 
           <div className="border-t border-gray-200 bg-white p-8 col-span-3">
+            {/* Error */}
+
+            {errorMsg && (
+              <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 flex items-center gap-4">
+                <FiAlertCircle size={28} className="text-red-600" />
+                <p className="text-red-700">{errorMsg}</p>
+              </div>
+            )}
+
             {/* Processing */}
 
             {processing && (
@@ -345,7 +382,7 @@ const KioskPayment = ({ open = false, order = {}, onBack, onSuccess }) => {
 
               <button
                 onClick={handlePayment}
-                disabled={processing}
+                disabled={processing || !order?.id}
                 className="h-16 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {processing

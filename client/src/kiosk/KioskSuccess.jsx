@@ -42,6 +42,9 @@ const KioskSuccess = ({ open = false, order = {}, onFinish }) => {
 
   if (!open) return null;
 
+  const isTakeaway =
+    order?.orderType === "TAKEAWAY" || order?.orderType === "TAKE_AWAY";
+
   return (
     <div className="fixed inset-0 z-[120] bg-gradient-to-br from-green-500 via-emerald-500 to-green-700 flex items-center justify-center overflow-hidden">
       {/* Decorative Circles */}
@@ -83,8 +86,8 @@ const KioskSuccess = ({ open = false, order = {}, onFinish }) => {
 
             <p className="mt-6 text-gray-500">Order Number</p>
 
-            <h2 className="mt-3 text-4xl font-bold text-orange-600">
-              #{order?.orderNumber || "A1056"}
+            <h2 className="mt-3 text-3xl font-bold text-orange-600 break-all">
+              {order?.orderNumber || "—"}
             </h2>
           </div>
 
@@ -98,7 +101,7 @@ const KioskSuccess = ({ open = false, order = {}, onFinish }) => {
             <p className="mt-6 text-gray-500">Preparation Time</p>
 
             <h2 className="mt-3 text-4xl font-bold text-blue-600">
-              {order?.estimatedTime || 15} Min
+              {order?.estimatedTimeMinutes || 15} Min
             </h2>
           </div>
 
@@ -106,7 +109,7 @@ const KioskSuccess = ({ open = false, order = {}, onFinish }) => {
 
           <div className="rounded-3xl border border-gray-200 p-8 text-center">
             <div className="w-16 h-16 rounded-2xl bg-purple-100 mx-auto flex items-center justify-center">
-              {order?.orderType === "TAKE_AWAY" ? (
+              {isTakeaway ? (
                 <FiShoppingBag className="text-purple-600" size={32} />
               ) : (
                 <FiHome className="text-purple-600" size={32} />
@@ -116,7 +119,7 @@ const KioskSuccess = ({ open = false, order = {}, onFinish }) => {
             <p className="mt-6 text-gray-500">Order Type</p>
 
             <h2 className="mt-3 text-3xl font-bold text-purple-600">
-              {order?.orderType === "TAKE_AWAY" ? "Take Away" : "Dine In"}
+              {isTakeaway ? "Take Away" : "Dine In"}
             </h2>
           </div>
         </div>
@@ -139,15 +142,7 @@ const KioskSuccess = ({ open = false, order = {}, onFinish }) => {
                   <span className="text-gray-500">Customer</span>
 
                   <span className="font-semibold text-lg">
-                    {order?.customerName || "Guest"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Mobile</span>
-
-                  <span className="font-semibold text-lg">
-                    {order?.phone || "-"}
+                    {order?.customer?.name || "Guest"}
                   </span>
                 </div>
 
@@ -155,7 +150,12 @@ const KioskSuccess = ({ open = false, order = {}, onFinish }) => {
                   <span className="text-gray-500">Payment</span>
 
                   <span className="font-semibold text-lg">
-                    {order?.paymentMethod || "UPI"}
+                    {order?.payment?.method || "—"}
+                    {order?.payment?.status === "UNPAID" && (
+                      <span className="ml-2 text-sm text-orange-600 font-normal">
+                        (Pay at counter)
+                      </span>
+                    )}
                   </span>
                 </div>
 
@@ -164,7 +164,7 @@ const KioskSuccess = ({ open = false, order = {}, onFinish }) => {
                     <span className="text-gray-500">Table</span>
 
                     <span className="font-bold text-xl text-orange-600">
-                      {order.table}
+                      {order.table.name}
                     </span>
                   </div>
                 )}
