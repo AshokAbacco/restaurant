@@ -101,6 +101,10 @@ export async function listKotsForOrder(orderId) {
       kitchenSection: true,
       chef: { select: { fullName: true, employeeCode: true } },
       items: { include: { orderItem: { include: { menuItem: true } } } },
+      notes: {
+        include: { chef: { select: { fullName: true } } },
+        orderBy: { createdAt: "asc" },
+      },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -119,6 +123,10 @@ export async function getActiveKitchenDisplay(kitchenSectionId) {
       kitchenSection: true,
       chef: { select: { fullName: true } },
       items: { include: { orderItem: { include: { menuItem: true } } } },
+      notes: {
+        include: { chef: { select: { fullName: true } } },
+        orderBy: { createdAt: "asc" },
+      },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -172,4 +180,55 @@ export async function updateKotStatus(id, status, { changedById, reason } = {}) 
   }
 
   return kot;
+}
+
+// Adds a note to a ticket (e.g. "ran out of paneer, used tofu instead").
+// chefId comes from the logged-in kitchen user's employeeId — optional
+// because req.user.employeeId may not be set for every role that can reach
+// this endpoint (falls back to an anonymous note rather than failing).
+export async function addKitchenNote(kitchenOrderId, chefId, note) {
+  const trimmed = (note || "").trim();
+  if (!trimmed) throw new Error("Note text is required");
+
+  const kitchenOrder = await prisma.kitchenOrder.findUnique({ where: { id: kitchenOrderId } });
+  if (!kitchenOrder) throw new Error("Kitchen order not found");
+
+  return prisma.kitchenNote.create({
+    data: {
+      kitchenOrder: { connect: { id: kitchenOrderId } },
+      ...(chefId ? { chef: { connect: { id: chefId } } } : {}),
+      note: trimmed,
+    },
+    include: { chef: { select: { fullName: true, employeeCode: true } } },
+  });
+}
+
+export async function listKitchenNotes(kitchenOrderId) {
+  return prisma.kitchenNote.findMany({
+    where: { kitchenOrderId },
+    include: { chef: { select: { fullName: true, employeeCode: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+// Feed of every note across recent tickets, newest first — powers a
+// dedicated "Kitchen Notes" log page so owner/manager can review kitchen
+// communication without opening each ticket individually.
+export async function listRecentKitchenNotes(limit = 50) {
+  return prisma.kitchenNote.findMany({
+    take: limit,
+    orderBy: { createdAt: "desc" },
+    include: {
+      chef: { select: { fullName: true, employeeCode: true } },
+      kitchenOrder: {
+        select: {
+          kotNumber: true,
+          kitchenSection: { select: { name: true } },
+          order: {
+            select: { orderNumber: true, table: { select: { name: true } } },
+          },
+        },
+      },
+    },
+  });
 }

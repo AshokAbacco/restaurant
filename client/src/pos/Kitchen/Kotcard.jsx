@@ -67,7 +67,10 @@ function useElapsedMinutes(since, frozenAt) {
   return minutes;
 }
 
-export default function KotCard({ kot, onAdvance, updating }) {
+// onAddNote is optional — when the parent screen doesn't pass it (i.e. the
+// logged-in user isn't KITCHEN), the whole add-note form is simply not
+// rendered. Existing notes still show for everyone, read-only.
+export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
   const elapsedMinutes = useElapsedMinutes(kot.createdAt, kot.completedAt || kot.servedAt);
   const elapsedSeconds = Math.floor(elapsedMinutes * 60);
   const mm = String(Math.floor(elapsedSeconds / 60)).padStart(2, "0");
@@ -77,6 +80,26 @@ export default function KotCard({ kot, onAdvance, updating }) {
   const timerColor = isOverdue ? "text-red-600" : elapsedMinutes > 8 ? "text-amber-600" : "text-emerald-600";
 
   const action = NEXT_STATUS[kot.status];
+
+  const [noteText, setNoteText] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  const [noteError, setNoteError] = useState(null);
+
+  async function handleAddNote(e) {
+    e.preventDefault();
+    const text = noteText.trim();
+    if (!text || !onAddNote) return;
+    setAddingNote(true);
+    setNoteError(null);
+    try {
+      await onAddNote(kot.id, text);
+      setNoteText("");
+    } catch (err) {
+      setNoteError(err.message);
+    } finally {
+      setAddingNote(false);
+    }
+  }
 
   return (
     <div
@@ -137,6 +160,36 @@ export default function KotCard({ kot, onAdvance, updating }) {
           </li>
         ))}
       </ul>
+
+      {kot.notes && kot.notes.length > 0 && (
+        <ul className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
+          {kot.notes.map((n) => (
+            <li key={n.id} className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+              <span className="font-semibold">{n.chef?.fullName || "Kitchen"}:</span> {n.note}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {onAddNote && (
+        <form onSubmit={handleAddNote} className="mt-3 flex gap-1.5">
+          <input
+            type="text"
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder="Add a note…"
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={addingNote || !noteText.trim()}
+            className="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {addingNote ? "…" : "Add"}
+          </button>
+        </form>
+      )}
+      {noteError && <p className="mt-1 text-xs text-red-600">{noteError}</p>}
 
       {action && (
         <button

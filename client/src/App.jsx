@@ -37,7 +37,7 @@ import Dashboard from "./dashboard/Dashboard";
 import MenuRoutes from "./menu/menuRoutes";
 import PosRoutes from "./pos/posRoutes";
 import SettingsRoutes from "./settings/settingsRoutes";
-import KitchenRoutes from "./pos/Kitchen/KitchenDisplayScreen";
+import KitchenRoutes from "./pos/Kitchen/KitchenRoutes";
 import KioskRoutes from "./kiosk/kioskRoutes";
 import ExpenseRoutes from "./expenses/expensesRoutes";
 import BillingRoutes from "./billing/billingRoutes";

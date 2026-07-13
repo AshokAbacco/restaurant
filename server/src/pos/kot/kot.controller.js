@@ -38,3 +38,29 @@ export async function updateKotStatus(req, res) {
     res.status(400).json({ message: "Failed to update KOT status", error: err.message });
   }
 }
+
+export async function addKitchenNote(req, res) {
+  try {
+    const note = await kotService.addKitchenNote(req.params.id, req.user?.employeeId, req.body.note);
+    res.status(201).json(note);
+  } catch (err) {
+    res.status(400).json({ message: "Failed to add kitchen note", error: err.message });
+  }
+}
+
+export async function getKitchenNotes(req, res) {
+  try {
+    res.json(await kotService.listKitchenNotes(req.params.id));
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch kitchen notes", error: err.message });
+  }
+}
+
+export async function getRecentKitchenNotes(req, res) {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    res.json(await kotService.listRecentKitchenNotes(limit));
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch kitchen notes", error: err.message });
+  }
+}

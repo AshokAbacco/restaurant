@@ -126,3 +126,19 @@ export const getOrders = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return request(`/pos/orders${qs ? `?${qs}` : ""}`);
 };
+
+// Notes left by kitchen staff on a specific ticket (e.g. "ran out of paneer,
+// used tofu instead"). Adding one returns just the new note; the ticket's
+// full note list comes back inline as part of getKitchenDisplay/getKotsForOrder.
+export const addKitchenNote = (kotId, note) =>
+  request(`/pos/kot/${kotId}/notes`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
+
+export const getKitchenNotes = (kotId) => request(`/pos/kot/${kotId}/notes`);
+
+// Feed of every note across recent tickets, newest first — powers the
+// standalone Kitchen Notes log page.
+export const getRecentKitchenNotes = (limit) =>
+  request(`/pos/kot/notes${limit ? `?limit=${limit}` : ""}`);

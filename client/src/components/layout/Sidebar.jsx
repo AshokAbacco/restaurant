@@ -56,6 +56,11 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       path: "/kitchen",
       icon: <FiCoffee />,
     },
+    {
+    name: "Kitchen Notes",
+    path: "/kitchen/notes",
+    icon: <FiFileText />,
+  },
 
     {
       name: "Orders",
@@ -254,19 +259,25 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
   // KITCHEN MENU
   // =====================================================
 
- const kitchenMenu = [
-  {
-    name: "Kitchen Orders",
-    path: "/kitchen",
-    icon: <FiCoffee />,
-  },
+  const kitchenMenu = [
+    {
+      name: "Kitchen Orders",
+      path: "/kitchen",
+      icon: <FiCoffee />,
+    },
 
-  {
-    name: "Menu",
-    path: "/menu",
-    icon: <FiGrid />,
-  },
-];
+    {
+      name: "Kitchen Notes",
+      path: "/kitchen/notes",
+      icon: <FiFileText />,
+    },
+
+    {
+      name: "Menu",
+      path: "/menu",
+      icon: <FiGrid />,
+    },
+  ];
   // =====================================================
   // MENU BY ROLE
   // =====================================================

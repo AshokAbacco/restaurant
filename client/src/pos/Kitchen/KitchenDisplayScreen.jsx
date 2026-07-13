@@ -1,7 +1,8 @@
 //client\src\pos\Kitchen\KitchenDisplayScreen.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 import KotCard from "./KotCard";
-import { getKitchenDisplay, updateKotStatus } from "../api/posApi";
+import { getKitchenDisplay, updateKotStatus, addKitchenNote } from "../api/posApi";
+import { useAuth } from "../../auth/AuthContext";
 
 const POLL_INTERVAL_MS = 8000;
 
@@ -12,6 +13,13 @@ const POLL_INTERVAL_MS = 8000;
 const DISPLAY_RANK = { NEW: 0, ACCEPTED: 0, PREPARING: 0, READY: 1, SERVED: 2 };
 
 export default function KitchenDisplayScreen() {
+  const { isKitchen } = useAuth();
+  // Only kitchen staff can write notes — owner/manager/cashier land on this
+  // same screen but see notes read-only. The backend enforces this too
+  // (POST /pos/kot/:id/notes is locked to KITCHEN), this just keeps the form
+  // from being shown to someone who'd get a 403 for using it.
+  const canAddNotes = isKitchen();
+
   const [kots, setKots] = useState([]);
   const [activeSectionId, setActiveSectionId] = useState("ALL");
   const [loading, setLoading] = useState(true);
@@ -46,32 +54,32 @@ export default function KitchenDisplayScreen() {
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [kots]);
 
-const visibleKots = useMemo(() => {
-  const filtered =
-    activeSectionId === "ALL"
-      ? kots
-      : kots.filter((k) => k.kitchenSectionId === activeSectionId);
+  const visibleKots = useMemo(() => {
+    const filtered =
+      activeSectionId === "ALL"
+        ? kots
+        : kots.filter((k) => k.kitchenSectionId === activeSectionId);
 
-  return filtered.slice().sort((a, b) => {
-    // Pending -> Ready -> Served
-    const rankDiff =
-      (DISPLAY_RANK[a.status] ?? 0) -
-      (DISPLAY_RANK[b.status] ?? 0);
+    return filtered.slice().sort((a, b) => {
+      // Pending -> Ready -> Served
+      const rankDiff =
+        (DISPLAY_RANK[a.status] ?? 0) -
+        (DISPLAY_RANK[b.status] ?? 0);
 
-    if (rankDiff !== 0) return rankDiff;
+      if (rankDiff !== 0) return rankDiff;
 
-    // SERVED: newest completed first
-    if (a.status === "SERVED" && b.status === "SERVED") {
-      const aTime = new Date(a.completedAt || a.servedAt || a.updatedAt || a.createdAt).getTime();
-      const bTime = new Date(b.completedAt || b.servedAt || b.updatedAt || b.createdAt).getTime();
+      // SERVED: newest completed first
+      if (a.status === "SERVED" && b.status === "SERVED") {
+        const aTime = new Date(a.completedAt || a.servedAt || a.updatedAt || a.createdAt).getTime();
+        const bTime = new Date(b.completedAt || b.servedAt || b.updatedAt || b.createdAt).getTime();
 
-      return bTime - aTime;
-    }
+        return bTime - aTime;
+      }
 
-    // Pending & Ready: oldest first
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
-}, [kots, activeSectionId]);
+      // Pending & Ready: oldest first
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+  }, [kots, activeSectionId]);
 
   async function handleAdvance(id, nextStatus) {
     setUpdatingId(id);
@@ -83,6 +91,14 @@ const visibleKots = useMemo(() => {
     } finally {
       setUpdatingId(null);
     }
+  }
+
+  // Adding a note doesn't touch `updating`/the button-disabled state — it's a
+  // side conversation on the ticket, not a status change, so the Ready/Served
+  // button stays clickable while a note is being typed elsewhere on the card.
+  async function handleAddNote(id, note) {
+    await addKitchenNote(id, note);
+    await load();
   }
 
   return (
@@ -145,6 +161,7 @@ const visibleKots = useMemo(() => {
                 key={kot.id}
                 kot={kot}
                 onAdvance={handleAdvance}
+                onAddNote={canAddNotes ? handleAddNote : undefined}
                 updating={updatingId === kot.id}
               />
             ))}
