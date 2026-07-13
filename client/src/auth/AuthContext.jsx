@@ -22,6 +22,7 @@ export const ROLES = {
   MANAGER: "MANAGER",
   CASHIER: "CASHIER",
   KITCHEN: "KITCHEN",
+   WAITER: "WAITER",
 };
 
 // ==========================================
@@ -132,6 +133,8 @@ export const AuthProvider = ({ children }) => {
 
   const isKitchen = () => user?.role === ROLES.KITCHEN;
 
+  const isWaiter = () => user?.role === ROLES.WAITER;
+
   // ==========================================
   // PERMISSION HELPERS
   // ==========================================
@@ -142,7 +145,7 @@ export const AuthProvider = ({ children }) => {
 
   const canViewReports = () => isOwner() || isManager();
 
-  const canAccessPOS = () => isOwner() || isManager() || isCashier();
+  const canAccessPOS = () => isOwner() || isManager() || isCashier() || isWaiter();
 
   const canAccessKitchen = () => isOwner() || isManager() || isKitchen();
 

@@ -68,13 +68,13 @@ app.use(
 app.use(
   "/api/pos/kot",
   requireAuth,
-  requireRole("OWNER", "MANAGER", "CASHIER", "KITCHEN"),
+  requireRole("OWNER", "MANAGER", "CASHIER", "KITCHEN", "WAITER"),
   kotRoutes,
 );
 app.use(
   "/api/pos",
   requireAuth,
-  requireRole("OWNER", "MANAGER", "CASHIER"),
+  requireRole("OWNER", "MANAGER", "CASHIER","WAITER"),
   posRoutes,
 );
 app.use(

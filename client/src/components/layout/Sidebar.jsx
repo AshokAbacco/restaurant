@@ -269,6 +269,48 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
   ];
 
   // =====================================================
+// WAITER MENU
+// =====================================================
+
+const waiterMenu = [
+  {
+    name: "Dashboard",
+    path: "/dashboard",
+    icon: <FiHome />,
+  },
+  {
+    name: "POS",
+    path: "/pos",
+    icon: <FiShoppingCart />,
+  },
+  {
+    name: "Orders",
+    path: "/pos/orders",
+    icon: <FiClipboard />,
+  },
+  {
+    name: "Menu",
+    path: "/menu",
+    icon: <FiCoffee />,
+  },
+  {
+    name: "Customers",
+    path: "/customers",
+    icon: <FiUsers />,
+  },
+  {
+    name: "Billing",
+    path: "/billing",
+    icon: <FiFileText />,
+  },
+  {
+    name: "Payments",
+    path: "/payments",
+    icon: <FiCreditCard />,
+  },
+];
+
+  // =====================================================
   // KITCHEN MENU
   // =====================================================
 
@@ -305,6 +347,9 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
       case "CASHIER":
         return cashierMenu;
+
+      case "WAITER":
+        return waiterMenu;
 
       case "KITCHEN":
         return kitchenMenu;

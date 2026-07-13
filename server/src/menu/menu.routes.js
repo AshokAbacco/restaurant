@@ -20,7 +20,7 @@ import { requireAuth, requireRole } from "../auth/auth.middleware.js";
 // intended handler.
 // ==============================================
 
-const VIEW_ROLES = ["OWNER", "MANAGER", "CASHIER", "KITCHEN"];
+const VIEW_ROLES = ["OWNER", "MANAGER", "CASHIER", "KITCHEN", "WAITER"];
 const EDIT_ROLES = ["OWNER", "MANAGER"];
 
 const router = Router();
