@@ -73,8 +73,12 @@ function useElapsedMinutes(since, frozenAt) {
 export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
   const elapsedMinutes = useElapsedMinutes(kot.createdAt, kot.completedAt || kot.servedAt);
   const elapsedSeconds = Math.floor(elapsedMinutes * 60);
-  const mm = String(Math.floor(elapsedSeconds / 60)).padStart(2, "0");
+  const hh = Math.floor(elapsedSeconds / 3600);
+  const mm = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, "0");
   const ss = String(elapsedSeconds % 60).padStart(2, "0");
+  // Under an hour: MM:SS (e.g. "23:32"). An hour or more: H:MM:SS (e.g.
+  // "6:11:47") instead of letting the minutes column run past 60.
+  const timerLabel = hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
 
   const isOverdue = kot.targetPrepMinutes && elapsedMinutes > kot.targetPrepMinutes;
   const timerColor = isOverdue ? "text-red-600" : elapsedMinutes > 8 ? "text-amber-600" : "text-emerald-600";
@@ -116,7 +120,7 @@ export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
           </p>
         </div>
         <span className={`font-mono text-lg font-bold tabular-nums ${timerColor}`}>
-          {mm}:{ss}
+          {timerLabel}
         </span>
       </div>
 
