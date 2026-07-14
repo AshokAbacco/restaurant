@@ -41,7 +41,7 @@ import KitchenRoutes from "./pos/Kitchen/KitchenRoutes";
 import KioskRoutes from "./kiosk/kioskRoutes";
 import ExpenseRoutes from "./expenses/expensesRoutes";
 import BillingRoutes from "./billing/billingRoutes";
-import PaymentRoutes from "./payment/PaymentRoutes";
+import PaymentRoutes from "./payment/paymentRoutes";
 // ==============================================
 // APP
 // ==============================================
