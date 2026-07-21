@@ -35,9 +35,25 @@ export const getTables = (params = {}) => {
   return request(`/pos/tables${qs ? `?${qs}` : ""}`);
 };
 
-// Table-wise board for the Orders page — each table with its active order's
-// customer, item count, total, and kitchen status in one call.
-export const getTablesBoard = () => request("/pos/tables/board");
+// Floors that tables are grouped under (Ground Floor, Rooftop, etc.) —
+// powers the floor step in the "Select a table" flow and Table Manager.
+export const getFloors = () => request("/pos/tables/floors");
+
+export const createFloor = (payload) =>
+  request("/pos/tables/floors", { method: "POST", body: JSON.stringify(payload) });
+
+export const updateFloor = (id, payload) =>
+  request(`/pos/tables/floors/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+
+export const deleteFloor = (id) => request(`/pos/tables/floors/${id}`, { method: "DELETE" });
+
+// Table-wise board for the Orders page and the POS "select a table" strip —
+// each table with its active order's customer, item count, total, and
+// kitchen status in one call. Pass { floorId } to scope it to one floor.
+export const getTablesBoard = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/pos/tables/board${qs ? `?${qs}` : ""}`);
+};
 
 export const createTable = (payload) =>
   request("/pos/tables", { method: "POST", body: JSON.stringify(payload) });

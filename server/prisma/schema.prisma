@@ -1077,13 +1077,32 @@ enum SplitType {
   CUSTOM
 }
 
+// A floor/section of the restaurant, e.g. "Ground Floor", "Rooftop".
+// Tables are grouped under a floor for the Tables Management page (floor
+// tabs + per-floor table grid).
+model Floor {
+  id    String  @id @default(uuid())
+  name  String
+  store String? @default("Main Store")
+
+  tables RestaurantTable[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("floors")
+}
+
 model RestaurantTable {
   id       String      @id @default(uuid())
   name     String // e.g. "T-12"
   capacity Int?
-  section  String? // e.g. "Indoor", "Rooftop"
+  section  String? // legacy free-text grouping, kept for back-compat with existing filters
   status   TableStatus @default(FREE)
   store    String?     @default("Main Store")
+
+  floorId String?
+  floor   Floor?  @relation(fields: [floorId], references: [id])
 
   orders Order[]
 
@@ -1091,6 +1110,7 @@ model RestaurantTable {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+  @@index([floorId])
   @@map("restaurant_tables")
 }
 

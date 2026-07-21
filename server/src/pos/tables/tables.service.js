@@ -1,12 +1,44 @@
 // server/src/pos/tables/tables.service.js
 import prisma from "../../config/prisma.js";
 
-export async function listTables({ status, section, store }) {
+// ---------------------------------------------------------------------------
+// Floors — power the floor tabs on the Tables Management page. A floor is
+// just a named grouping that tables belong to (floorId on RestaurantTable).
+// ---------------------------------------------------------------------------
+
+export async function listFloors({ store } = {}) {
+  return prisma.floor.findMany({
+    where: store ? { store } : {},
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function getFloorById(id) {
+  return prisma.floor.findUnique({ where: { id } });
+}
+
+export async function createFloor(payload) {
+  return prisma.floor.create({ data: payload });
+}
+
+export async function updateFloor(id, payload) {
+  return prisma.floor.update({ where: { id }, data: payload });
+}
+
+// Tables on a deleted floor are not deleted with it — they're just
+// unassigned (floorId set to null) so no order/table data is ever lost.
+export async function deleteFloor(id) {
+  await prisma.restaurantTable.updateMany({ where: { floorId: id }, data: { floorId: null } });
+  return prisma.floor.delete({ where: { id } });
+}
+
+export async function listTables({ status, section, store, floorId }) {
   return prisma.restaurantTable.findMany({
     where: {
       ...(status ? { status } : {}),
       ...(section ? { section } : {}),
       ...(store ? { store } : {}),
+      ...(floorId ? { floorId } : {}),
     },
     include: { orders: { where: { status: { notIn: ["COMPLETED", "CANCELLED", "REFUNDED"] } } } },
     orderBy: { name: "asc" },
@@ -39,9 +71,12 @@ function deriveKitchenStatus(kitchenOrders) {
 // updated code doesn't get deployed), the two pages silently drift apart.
 // Reading the same underlying rows both pages already share removes the
 // possibility of drift entirely — there's nothing to keep in sync.
-export async function getTablesBoard({ store } = {}) {
+export async function getTablesBoard({ store, floorId } = {}) {
   const tables = await prisma.restaurantTable.findMany({
-    where: store ? { store } : {},
+    where: {
+      ...(store ? { store } : {}),
+      ...(floorId ? { floorId } : {}),
+    },
     include: {
       orders: {
         where: { status: { notIn: ["COMPLETED", "CANCELLED", "REFUNDED"] } },

@@ -4,10 +4,6 @@
 
 import { Routes, Route, Navigate } from "react-router-dom";
 
-// ==============================================
-// Authentication
-// ==============================================
-
 import AuthLayout from "./auth/AuthLayout";
 import Login from "./auth/Login";
 import ForgotPassword from "./auth/ForgotPassword";
@@ -36,6 +32,7 @@ import Dashboard from "./dashboard/Dashboard";
 
 import MenuRoutes from "./menu/menuRoutes";
 import PosRoutes from "./pos/posRoutes";
+import Tables from "./tables/tablesRoutes"
 import SettingsRoutes from "./settings/settingsRoutes";
 import KitchenRoutes from "./pos/Kitchen/KitchenRoutes";
 import KioskRoutes from "./kiosk/kioskRoutes";
@@ -85,6 +82,7 @@ function App() {
           {/* POS */}
 
           <Route path="/pos/*" element={<PosRoutes />} />
+          <Route path="/tables/*" element={<Tables />} />
           <Route path="/kitchen/*" element={<KitchenRoutes />} />
           <Route path="/billing/*" element={<BillingRoutes />} />
           <Route path="/payments/*" element={<PaymentRoutes />} />
