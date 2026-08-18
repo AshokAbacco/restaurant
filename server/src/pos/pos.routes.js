@@ -12,7 +12,7 @@ import invoicesRoutes from "./invoices/invoices.routes.js";
 import deliveryPartnersRoutes from "./delivery-partners/deliveryPartners.routes.js";
 import loyaltyRoutes from "./loyalty/loyalty.routes.js";
 import billingRoutes from "./billing/billing.routes.js";
-
+import reservationsRoutes from "../reservations/reservations.routes.js";
 const router = Router();
 
 // Mounted with no auth for now — role guards get added here later
@@ -44,5 +44,5 @@ router.use("/delivery-partners", deliveryPartnersRoutes);
 router.use("/loyalty", loyaltyRoutes);
 // Complete Service -> Billing & Payment -> Invoice -> Free Table flow
 router.use("/billing", billingRoutes);
-
+router.use("/reservations", reservationsRoutes);
 export default router;

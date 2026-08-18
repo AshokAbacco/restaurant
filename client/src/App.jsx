@@ -53,6 +53,8 @@ import KioskRoutes from "./kiosk/kioskRoutes";
 import ExpenseRoutes from "./expenses/expensesRoutes";
 import BillingRoutes from "./billing/billingRoutes";
 import PaymentRoutes from "./payment/paymentRoutes";
+import TableReservation from "./tableReservation/TableReservation";
+
 // ==============================================
 // APP
 // ==============================================
@@ -123,6 +125,7 @@ function App() {
           {/* Settings */}
 
           <Route path="/settings/*" element={<SettingsRoutes />} />
+          <Route path="/table-reservations" element={<TableReservation />} />
         </Route>
       </Route>
 
