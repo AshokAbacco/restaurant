@@ -1,9 +1,15 @@
 // server/src/pos/pos.controller.js
 import * as posService from "./pos.service.js";
 
+// Every handler below reads req.tenant.outletId (set by requireOutletContext
+// — see src/middleware/tenantContext.js, wired in ahead of this router in
+// src/index.js) and passes it into the service layer. Never trust an
+// outletId from req.body/req.query for these routes — the session's own
+// outlet is the only one a request is allowed to act on.
+
 export async function getOrders(req, res) {
   try {
-    res.json(await posService.listOrders(req.query));
+    res.json(await posService.listOrders(req.query, req.tenant.outletId));
   } catch (err) {
     res
       .status(500)
@@ -13,7 +19,10 @@ export async function getOrders(req, res) {
 
 export async function getOrder(req, res) {
   try {
-    const order = await posService.getOrderById(req.params.id);
+    const order = await posService.getOrderById(
+      req.params.id,
+      req.tenant.outletId,
+    );
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.json(order);
   } catch (err) {
@@ -25,7 +34,7 @@ export async function getOrder(req, res) {
 
 export async function createOrder(req, res) {
   try {
-    const order = await posService.createOrder(req.body);
+    const order = await posService.createOrder(req.body, req.tenant.outletId);
     res.status(201).json(order);
   } catch (err) {
     res
@@ -40,7 +49,10 @@ export async function createOrder(req, res) {
 // instead of createOrder + sendToKitchen as two separate requests.
 export async function placeOrderAndSendToKitchen(req, res) {
   try {
-    const order = await posService.createOrderAndSendToKitchen(req.body);
+    const order = await posService.createOrderAndSendToKitchen(
+      req.body,
+      req.tenant.outletId,
+    );
     res.status(201).json(order);
   } catch (err) {
     res
@@ -54,6 +66,7 @@ export async function updateOrderStatus(req, res) {
     const order = await posService.updateOrderStatus(
       req.params.id,
       req.body.status,
+      req.tenant.outletId,
     );
     res.json(order);
   } catch (err) {
@@ -65,7 +78,11 @@ export async function updateOrderStatus(req, res) {
 
 export async function cancelOrder(req, res) {
   try {
-    const order = await posService.cancelOrder(req.params.id, req.body.reason);
+    const order = await posService.cancelOrder(
+      req.params.id,
+      req.body.reason,
+      req.tenant.outletId,
+    );
     res.json(order);
   } catch (err) {
     res
@@ -76,7 +93,10 @@ export async function cancelOrder(req, res) {
 
 export async function holdOrder(req, res) {
   try {
-    const order = await posService.holdOrder(req.params.id);
+    const order = await posService.holdOrder(
+      req.params.id,
+      req.tenant.outletId,
+    );
     res.json(order);
   } catch (err) {
     res
@@ -87,7 +107,10 @@ export async function holdOrder(req, res) {
 
 export async function resumeOrder(req, res) {
   try {
-    const order = await posService.resumeOrder(req.params.id);
+    const order = await posService.resumeOrder(
+      req.params.id,
+      req.tenant.outletId,
+    );
     res.json(order);
   } catch (err) {
     res
@@ -101,6 +124,7 @@ export async function transferTable(req, res) {
     const order = await posService.transferTable(
       req.params.id,
       req.body.tableId,
+      req.tenant.outletId,
     );
     res.json(order);
   } catch (err) {
@@ -115,6 +139,7 @@ export async function addItems(req, res) {
     const result = await posService.addItemsToOrder(
       req.params.id,
       req.body.items,
+      req.tenant.outletId,
     );
     res.json(result);
   } catch (err) {
@@ -128,7 +153,11 @@ export async function addItems(req, res) {
 // and its payments/invoice, used by the Payments page's Delete action.
 export async function deleteOrder(req, res) {
   try {
-    const result = await posService.deleteOrder(req.params.id);
+    const result = await posService.deleteOrder(
+      req.params.id,
+      req.user,
+      req.tenant.outletId,
+    );
     res.json(result);
   } catch (err) {
     res

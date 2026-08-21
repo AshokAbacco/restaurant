@@ -14,6 +14,13 @@ const KITCHEN_LIKE = ["KITCHEN", "CHEF"];
 const WAITER_LIKE = ["WAITER"];
 const STORE_KEEPER_LIKE = ["STORE_KEEPER"];
 
+// FIX: this codebase isn't fully consistent about which field on req.user
+// carries the Employee id — same inconsistency already fixed in
+// tables.controller.js's waiterEmployeeId() helper. Reusing the same
+// fallback here so a waiter's dashboard summary can't come back empty for
+// the same reason their table list could have.
+const waiterEmployeeId = (req) => req.user?.employeeId ?? req.user?.id;
+
 // ==============================================
 // GET /api/dashboard/summary
 // ==============================================
@@ -21,7 +28,7 @@ const STORE_KEEPER_LIKE = ["STORE_KEEPER"];
 export const getDashboardSummary = async (req, res) => {
   try {
     const role = req.user?.role;
-    const store = req.user?.store || "Main Store";
+    const outletId = req.tenant.outletId;
     const period = ["daily", "weekly", "monthly"].includes(req.query.period)
       ? req.query.period
       : "daily";
@@ -42,14 +49,14 @@ export const getDashboardSummary = async (req, res) => {
         topSellingItems,
         recentActivities,
       ] = await Promise.all([
-        dashboardService.getTodayStats(store),
-        dashboardService.getSalesChart(period, store),
-        dashboardService.getKitchenStatus(store),
-        dashboardService.getRecentOrders({ store, limit: 5 }),
-        dashboardService.getLowStockAlerts(),
-        dashboardService.getPaymentSummary(store),
-        dashboardService.getTopSellingItems({ store, limit: 5 }),
-        dashboardService.getRecentActivities({ limit: 6 }),
+        dashboardService.getTodayStats(outletId),
+        dashboardService.getSalesChart(period, outletId),
+        dashboardService.getKitchenStatus(outletId),
+        dashboardService.getRecentOrders({ outletId, limit: 5 }),
+        dashboardService.getLowStockAlerts(outletId),
+        dashboardService.getPaymentSummary(outletId),
+        dashboardService.getTopSellingItems({ outletId, limit: 5 }),
+        dashboardService.getRecentActivities({ limit: 6, outletId }),
       ]);
 
       Object.assign(response, {
@@ -67,9 +74,9 @@ export const getDashboardSummary = async (req, res) => {
       // CASHIER — orders + payments, no inventory/kitchen internals
       // ------------------------------------------
       const [stats, recentOrders, paymentSummary] = await Promise.all([
-        dashboardService.getTodayStats(store),
-        dashboardService.getRecentOrders({ store, limit: 8 }),
-        dashboardService.getPaymentSummary(store),
+        dashboardService.getTodayStats(outletId),
+        dashboardService.getRecentOrders({ outletId, limit: 8 }),
+        dashboardService.getPaymentSummary(outletId),
       ]);
 
       response.stats = {
@@ -84,8 +91,8 @@ export const getDashboardSummary = async (req, res) => {
       // KITCHEN / CHEF — kitchen load + relevant orders, no financials
       // ------------------------------------------
       const [kitchenStatus, recentOrders] = await Promise.all([
-        dashboardService.getKitchenStatus(store),
-        dashboardService.getRecentOrders({ store, limit: 8 }),
+        dashboardService.getKitchenStatus(outletId),
+        dashboardService.getRecentOrders({ outletId, limit: 8 }),
       ]);
 
       response.kitchenStatus = kitchenStatus;
@@ -94,12 +101,13 @@ export const getDashboardSummary = async (req, res) => {
       // ------------------------------------------
       // WAITER — only their own active orders + table occupancy
       // ------------------------------------------
+      const employeeId = waiterEmployeeId(req);
       const [waiterSummary, myOrders] = await Promise.all([
-        dashboardService.getWaiterSummary(req.user.id, store),
+        dashboardService.getWaiterSummary(employeeId, outletId),
         dashboardService.getRecentOrders({
-          store,
+          outletId,
           limit: 8,
-          waiterId: req.user.id,
+          waiterId: employeeId,
         }),
       ]);
 
@@ -109,7 +117,7 @@ export const getDashboardSummary = async (req, res) => {
       // ------------------------------------------
       // STORE KEEPER — inventory only
       // ------------------------------------------
-      response.lowStockAlerts = await dashboardService.getLowStockAlerts();
+      response.lowStockAlerts = await dashboardService.getLowStockAlerts(outletId);
     } else {
       // Unknown/unsupported role — return an empty-but-valid shape
       response.stats = null;
@@ -142,12 +150,11 @@ export const getSalesChartData = async (req, res) => {
       });
     }
 
-    const store = req.user?.store || "Main Store";
     const period = ["daily", "weekly", "monthly"].includes(req.query.period)
       ? req.query.period
       : "daily";
 
-    const data = await dashboardService.getSalesChart(period, store);
+    const data = await dashboardService.getSalesChart(period, req.tenant.outletId);
 
     res.json({ success: true, data });
   } catch (err) {

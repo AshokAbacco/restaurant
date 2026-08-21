@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Receipt, CreditCard, Trash2 } from "lucide-react";
 import { getOrder } from "../../pos/api/posApi";
+import { fetchWithOfflineFallback } from "../../offline/offlineCache";
 
 const ORDER_TYPE_META = {
   DINE_IN: {
@@ -45,13 +46,19 @@ export default function OrderDetailModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
     if (!orderId) return;
     setLoading(true);
     setError(null);
-    getOrder(orderId)
-      .then(setOrder)
+    fetchWithOfflineFallback(`payments:order:${orderId}`, () =>
+      getOrder(orderId),
+    )
+      .then(({ data, fromCache }) => {
+        setOrder(data);
+        setIsOffline(fromCache);
+      })
       .catch((err) => setError(err.message || "Couldn't load order."))
       .finally(() => setLoading(false));
   }, [orderId]);
@@ -100,6 +107,11 @@ export default function OrderDetailModal({
             <p className="text-sm text-red-600">{error}</p>
           ) : (
             <div className="space-y-5">
+              {isOffline && (
+                <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                  Offline — showing last-synced order detail.
+                </div>
+              )}
               {/* Basic info */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <InfoRow
@@ -225,6 +237,7 @@ export default function OrderDetailModal({
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
           {canDelete &&
+            !isOffline &&
             order &&
             (confirmingDelete ? (
               <div className="mr-auto flex items-center gap-3 rounded-lg bg-red-50 px-3 py-2">

@@ -5,6 +5,8 @@
 import { Router } from "express";
 import {
   loginHandler,
+  selectOutletHandler,
+  switchOutletHandler,
   refreshHandler,
   logoutHandler,
   meHandler,
@@ -14,19 +16,71 @@ import {
   changePasswordHandler,
 } from "./auth.controller.js";
 import { requireAuth } from "./auth.middleware.js";
+import { validate } from "../middleware/validate.js";
+import {
+  loginRateLimiter,
+  forgotPasswordRateLimiter,
+  resetPasswordRateLimiter,
+} from "../middleware/rateLimiters.js";
+import {
+  loginSchema,
+  selectOutletSchema,
+  switchOutletSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
+  updateProfileSchema,
+} from "./auth.validation.js";
 
 const router = Router();
 
-// Public
-router.post("/login", loginHandler);
+// Public — rate limiting + validation added; previously had neither.
+router.post("/login", loginRateLimiter, validate(loginSchema), loginHandler);
+// Same rate limiter as /login — this is still the login flow, just its
+// second step, and carries the same brute-force risk (guessing outletId
+// against a stolen/guessed preAuthToken).
+router.post(
+  "/select-outlet",
+  loginRateLimiter,
+  validate(selectOutletSchema),
+  selectOutletHandler,
+);
 router.post("/refresh", refreshHandler);
 router.post("/logout", logoutHandler);
-router.post("/forgot-password", forgotPasswordHandler);
-router.post("/reset-password", resetPasswordHandler);
+router.post(
+  "/forgot-password",
+  forgotPasswordRateLimiter,
+  validate(forgotPasswordSchema),
+  forgotPasswordHandler,
+);
+router.post(
+  "/reset-password",
+  resetPasswordRateLimiter,
+  validate(resetPasswordSchema),
+  resetPasswordHandler,
+);
 
 // Protected
 router.get("/me", requireAuth, meHandler);
-router.put("/me", requireAuth, updateProfileHandler);
-router.post("/change-password", requireAuth, changePasswordHandler);
+// Header outlet-switcher — requires a real, already-valid session, unlike
+// /select-outlet above which is only for the login-time picker.
+router.post(
+  "/switch-outlet",
+  requireAuth,
+  validate(switchOutletSchema),
+  switchOutletHandler,
+);
+router.put(
+  "/me",
+  requireAuth,
+  validate(updateProfileSchema),
+  updateProfileHandler,
+);
+router.post(
+  "/change-password",
+  requireAuth,
+  validate(changePasswordSchema),
+  changePasswordHandler,
+);
 
 export default router;

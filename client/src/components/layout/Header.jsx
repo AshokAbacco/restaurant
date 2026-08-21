@@ -2,11 +2,7 @@
 // src/components/layout/Header.jsx
 // ==============================================
 
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { Link, useLocation } from "react-router-dom";
 
@@ -25,6 +21,8 @@ import { useTheme } from "../../context/ThemeContext";
 
 import NotificationBell from "./NotificationBell";
 import ProfileMenu from "./ProfileMenu";
+import OfflineIndicator from "./OfflineIndicator";
+import OutletSwitcher from "./OutletSwitcher";
 
 const Header = ({ onMenuClick }) => {
   const { user } = useAuth();
@@ -224,6 +222,10 @@ const Header = ({ onMenuClick }) => {
 
           {/* Notifications */}
 
+          <OutletSwitcher />
+
+          <OfflineIndicator />
+
           <NotificationBell />
 
           {/* Profile */}
@@ -244,9 +246,14 @@ const Header = ({ onMenuClick }) => {
 
           {breadcrumb.map((item, index) => (
             <React.Fragment key={index}>
-              <FiChevronRight size={14} className="flex-shrink-0 text-[#3FA34D] dark:text-[#43B75A]" />
+              <FiChevronRight
+                size={14}
+                className="flex-shrink-0 text-[#3FA34D] dark:text-[#43B75A]"
+              />
 
-              <span className="capitalize whitespace-nowrap">{item.replace("-", " ")}</span>
+              <span className="capitalize whitespace-nowrap">
+                {item.replace("-", " ")}
+              </span>
             </React.Fragment>
           ))}
         </div>

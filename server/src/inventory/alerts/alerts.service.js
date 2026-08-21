@@ -3,8 +3,8 @@ import prisma from "../../config/prisma.js";
 
 const EXPIRING_SOON_WINDOW_DAYS = 30; // outer window; message states exact days left
 
-export const listAlerts = ({ resolved, type, ingredientId }) => {
-  const where = {};
+export const listAlerts = ({ resolved, type, ingredientId }, outletId) => {
+  const where = { outletId };
   if (resolved !== undefined) where.isResolved = resolved === "true" || resolved === true;
   if (type) where.type = type;
   if (ingredientId) where.ingredientId = ingredientId;
@@ -16,18 +16,28 @@ export const listAlerts = ({ resolved, type, ingredientId }) => {
   });
 };
 
-export const resolveAlert = (id) =>
-  prisma.inventoryAlert.update({
+export const resolveAlert = async (id, outletId) => {
+  // FIX: previously updated by id alone with no ownership check.
+  const existing = await prisma.inventoryAlert.findFirst({ where: { id, outletId } });
+  if (!existing) {
+    const err = new Error("Alert not found");
+    err.code = "P2025";
+    throw err;
+  }
+  return prisma.inventoryAlert.update({
     where: { id },
     data: { isResolved: true },
   });
+};
 
 /**
- * Scans current stock + expiry batches and writes InventoryAlert rows for
- * anything that needs attention. Designed to be safe to call repeatedly
- * (e.g. from a cron job every 15 min, or a button in the UI) — it won't
- * create duplicate LOW_STOCK/OUT_OF_STOCK alerts for the same ingredient,
- * and auto-resolves those two types once the underlying condition clears.
+ * Scans current stock + expiry batches (for ONE outlet — this must be run
+ * per-outlet, not globally, since it's called per-request with the caller's
+ * req.tenant.outletId) and writes InventoryAlert rows for anything that
+ * needs attention. Designed to be safe to call repeatedly (e.g. from a cron
+ * job every 15 min, or a button in the UI) — it won't create duplicate
+ * LOW_STOCK/OUT_OF_STOCK alerts for the same ingredient, and auto-resolves
+ * those two types once the underlying condition clears.
  *
  * Known limitation: InventoryAlert has no batchId field in the current
  * schema, so EXPIRING_SOON/EXPIRED alerts are deduped by exact message text
@@ -36,11 +46,14 @@ export const resolveAlert = (id) =>
  * add `batchId String?` to InventoryAlert and switch the dedupe/resolve
  * logic to use it instead of message-matching.
  */
-export const generateAlerts = async () => {
+export const generateAlerts = async (outletId) => {
   const created = [];
 
   // ── LOW_STOCK / OUT_OF_STOCK — one active alert per ingredient per type ──
-  const stockRows = await prisma.inventoryStock.findMany({ include: { ingredient: true } });
+  const stockRows = await prisma.inventoryStock.findMany({
+    where: { outletId },
+    include: { ingredient: true },
+  });
 
   for (const stock of stockRows) {
     const qty = Number(stock.quantityOnHand);
@@ -54,12 +67,13 @@ export const generateAlerts = async () => {
       ["LOW_STOCK", isLowStock],
     ]) {
       const existing = await prisma.inventoryAlert.findFirst({
-        where: { ingredientId: stock.ingredientId, type, isResolved: false },
+        where: { ingredientId: stock.ingredientId, outletId, type, isResolved: false },
       });
 
       if (applies && !existing) {
         const alert = await prisma.inventoryAlert.create({
           data: {
+            outletId,
             ingredientId: stock.ingredientId,
             type,
             message:
@@ -81,7 +95,7 @@ export const generateAlerts = async () => {
 
   // ── EXPIRING_SOON / EXPIRED — per batch ──
   const batches = await prisma.expiryBatch.findMany({
-    where: { quantityRemaining: { gt: 0 } },
+    where: { outletId, quantityRemaining: { gt: 0 } },
     include: { ingredient: true },
   });
 
@@ -103,12 +117,12 @@ export const generateAlerts = async () => {
     if (!type) continue;
 
     const existing = await prisma.inventoryAlert.findFirst({
-      where: { ingredientId: batch.ingredientId, type, message, isResolved: false },
+      where: { ingredientId: batch.ingredientId, outletId, type, message, isResolved: false },
     });
 
     if (!existing) {
       const alert = await prisma.inventoryAlert.create({
-        data: { ingredientId: batch.ingredientId, type, message },
+        data: { outletId, ingredientId: batch.ingredientId, type, message },
       });
       created.push(alert);
     }

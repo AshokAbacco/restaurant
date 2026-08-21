@@ -3,10 +3,20 @@
 // Restaurant ERP Authentication Service (backend-integrated)
 // ==============================================
 
+import { jwtDecode } from "jwt-decode";
 import { apiRequest, setAccessToken, getAccessToken } from "../api/apiClient";
 
 // ==============================================
 // LOGIN
+// FEATURE (multi-tenancy): the backend now supports two shapes here.
+// Most logins (single-outlet staff) get the old shape straight back:
+// { success: true, accessToken, user }. An OWNER/ADMIN on a
+// multi-outlet organization instead gets
+// { success: true, requiresOutletSelection: true, preAuthToken, outlets }
+// — no accessToken yet, since there's no real session until an outlet is
+// picked. Callers (AuthContext.login) need to check for
+// requiresOutletSelection and route to the picker instead of navigating
+// straight to the dashboard.
 // ==============================================
 
 const login = async (identifier, password) => {
@@ -19,6 +29,40 @@ const login = async (identifier, password) => {
     return {
       success: false,
       message: data?.message || "Invalid email or password",
+    };
+  }
+
+  if (data.requiresOutletSelection) {
+    return {
+      success: true,
+      requiresOutletSelection: true,
+      preAuthToken: data.preAuthToken,
+      outlets: data.outlets,
+    };
+  }
+
+  setAccessToken(data.accessToken);
+
+  return { success: true, token: data.accessToken, user: data.user };
+};
+
+// ==============================================
+// SELECT OUTLET
+// Second step of login, only called when login() above returned
+// requiresOutletSelection: true. Finishes the session exactly like a
+// normal login once an outlet is chosen.
+// ==============================================
+
+const selectOutlet = async (preAuthToken, outletId) => {
+  const { ok, data } = await apiRequest("/auth/select-outlet", {
+    method: "POST",
+    body: JSON.stringify({ preAuthToken, outletId }),
+  });
+
+  if (!ok || !data?.success) {
+    return {
+      success: false,
+      message: data?.message || "Unable to select that outlet.",
     };
   }
 
@@ -41,6 +85,19 @@ const logout = async () => {
 // Called on app load. Tries a silent refresh first (the refresh cookie may
 // still be valid even though we have no access token in memory yet), then
 // fetches the current user.
+//
+// FIX: a genuine connectivity failure here (fetch() itself throwing, e.g.
+// offline) used to be indistinguishable from the server actually
+// rejecting the session — both fell through to setAccessToken(null) +
+// logged-out. That meant a hard reload while offline permanently lost the
+// session, which defeats the whole point of offline mode for POS/Kitchen/
+// Menu: those pages need the user to still be "logged in" (so
+// ProtectedRoute/RoleGuard let them through) using only what's already on
+// the device. Now a network failure specifically falls back to decoding
+// the locally-stored access token instead of logging the user out —
+// enough to restore role/employee id for route-gating, even though the
+// full profile (name/email/etc.) won't be available again until the next
+// successful /auth/me call.
 // ==============================================
 
 const restoreSession = async () => {
@@ -49,15 +106,95 @@ const restoreSession = async () => {
     return null;
   }
 
-  const { ok, data } = await apiRequest("/auth/me");
+  try {
+    const { ok, data } = await apiRequest("/auth/me");
 
-  if (!ok || !data?.success) {
-    setAccessToken(null);
+    if (!ok || !data?.success) {
+      // The SERVER actively rejected this session (expired/invalid token,
+      // deactivated account) — this is a real logout, not a connectivity
+      // issue, so clearing the token is correct here.
+      setAccessToken(null);
+      return null;
+    }
+
+    // FEATURE (multi-tenancy): /auth/me now also returns the account's
+    // full outlet list (for the switcher) alongside the user — see
+    // auth.service.js's getCurrentUser. Callers that only care about the
+    // user (most of them) can keep destructuring { user } and ignore
+    // outlets; AuthContext uses both.
+    return { user: data.user, outlets: data.outlets || [] };
+  } catch (err) {
+    // fetch() itself threw — no connectivity, not a server rejection.
+    // Don't log the user out just because we can't reach the server
+    // right now; fall back to what the token itself already tells us.
+    const user = decodeAccessTokenOffline();
+    return user ? { user, outlets: [] } : null;
+  }
+};
+
+// Decodes the locally-stored JWT without verifying its signature (there's
+// no way to verify offline anyway — that's the server's job, and it still
+// will, on the next successful request). This is a BEST-EFFORT fallback
+// specifically for "let a previously-logged-in user keep using the app
+// while offline," not a security boundary — every real write still goes
+// through the server, which independently verifies the token there.
+function decodeAccessTokenOffline() {
+  const token = getAccessToken();
+  if (!token) return null;
+
+  try {
+    const payload = jwtDecode(token);
+
+    // Respect the token's own expiry — an expired token shouldn't be
+    // trusted just because we're offline and can't ask the server.
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return null;
+    }
+
+    return {
+      id: payload.employeeId,
+      userAccountId: payload.sub,
+      role: payload.role,
+      // Not present in the JWT payload — unavailable until the next
+      // successful /auth/me. Components reading these should treat an
+      // empty string the same as "not loaded yet", same as any other
+      // still-loading field.
+      name: "",
+      email: "",
+      username: "",
+      offlineRestored: true,
+    };
+  } catch {
     return null;
   }
+}
+// ==============================================
+// SWITCH OUTLET
+// Used from an already-authenticated session (the header switcher), as
+// opposed to selectOutlet() above which is only for the login-time picker
+// (it needs a preAuthToken since no real session exists yet at that
+// point). This hits a separate endpoint that authenticates normally via
+// the existing access token instead.
+// ==============================================
 
-  return data.user;
+const switchOutlet = async (outletId) => {
+  const { ok, data } = await apiRequest("/auth/switch-outlet", {
+    method: "POST",
+    body: JSON.stringify({ outletId }),
+  });
+
+  if (!ok || !data?.success) {
+    return {
+      success: false,
+      message: data?.message || "Unable to switch outlet.",
+    };
+  }
+
+  setAccessToken(data.accessToken);
+
+  return { success: true, token: data.accessToken, user: data.user };
 };
+
 // ==============================================
 // CURRENT USER / TOKEN (in-memory only)
 // ==============================================
@@ -156,6 +293,8 @@ const resetPassword = async (token, password) => {
 
 const authService = {
   login,
+  selectOutlet,
+  switchOutlet,
   logout,
   restoreSession,
   getToken,

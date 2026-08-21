@@ -32,6 +32,44 @@ export const loginHandler = async (req, res) => {
       .json({ success: false, message: result.message });
   }
 
+  // Account has access to more than one outlet — no full session yet.
+  // Don't set the refresh cookie until POST /api/auth/select-outlet
+  // confirms which outlet this session is for.
+  if (result.requiresOutletSelection) {
+    return res.status(200).json({
+      success: true,
+      requiresOutletSelection: true,
+      preAuthToken: result.preAuthToken,
+      outlets: result.outlets,
+    });
+  }
+
+  res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, cookieOptions);
+
+  return res.status(200).json({
+    success: true,
+    user: result.user,
+    accessToken: result.accessToken,
+  });
+};
+
+// ==============================================
+// POST /api/auth/select-outlet
+// Second step of login, only reached when loginHandler above responded
+// with requiresOutletSelection: true.
+// ==============================================
+
+export const selectOutletHandler = async (req, res) => {
+  const { preAuthToken, outletId } = req.body;
+
+  const result = await authService.selectOutlet(preAuthToken, outletId);
+
+  if (!result.success) {
+    return res
+      .status(result.status)
+      .json({ success: false, message: result.message });
+  }
+
   res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, cookieOptions);
 
   return res.status(200).json({
@@ -82,8 +120,16 @@ export const logoutHandler = async (req, res) => {
 // GET /api/auth/me
 // ==============================================
 
-export const meHandler = async (req, res) => {
-  const result = await authService.getCurrentUser(req.user.id);
+// ==============================================
+// POST /api/auth/switch-outlet
+// Requires an already-valid session (requireAuth) — the header switcher's
+// endpoint, distinct from /select-outlet's login-time picker.
+// ==============================================
+
+export const switchOutletHandler = async (req, res) => {
+  const { outletId } = req.body;
+
+  const result = await authService.switchOutlet(req.user.id, outletId);
 
   if (!result.success) {
     return res
@@ -91,7 +137,27 @@ export const meHandler = async (req, res) => {
       .json({ success: false, message: result.message });
   }
 
-  return res.status(200).json({ success: true, user: result.user });
+  res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, cookieOptions);
+
+  return res.status(200).json({
+    success: true,
+    user: result.user,
+    accessToken: result.accessToken,
+  });
+};
+
+export const meHandler = async (req, res) => {
+  const result = await authService.getCurrentUser(req.user.id, req.user.outletId);
+
+  if (!result.success) {
+    return res
+      .status(result.status)
+      .json({ success: false, message: result.message });
+  }
+
+  return res
+    .status(200)
+    .json({ success: true, user: result.user, outlets: result.outlets });
 };
 
 // ==============================================
@@ -102,7 +168,11 @@ export const meHandler = async (req, res) => {
 // ==============================================
 
 export const updateProfileHandler = async (req, res) => {
-  const result = await authService.updateProfile(req.user.id, req.body);
+  const result = await authService.updateProfile(
+    req.user.id,
+    req.body,
+    req.user.outletId,
+  );
 
   if (!result.success) {
     return res

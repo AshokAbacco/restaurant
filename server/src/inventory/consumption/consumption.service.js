@@ -5,9 +5,11 @@ import { decrementExpiryBatchesFefo } from "../_shared/decrementExpiryBatchesFef
 /**
  * Deducts ingredient stock for menu items that were sold, based on each
  * item's Recipe. This is meant to be called FROM your Orders module at the
- * point an order is confirmed/completed — it is not wired into order
- * creation itself, because that module doesn't exist in this codebase yet.
- * Call `consumeForSale(...)` directly from wherever an order gets finalized.
+ * point an order is confirmed/completed — it is not currently wired into
+ * order creation/completion itself (see pos.service.js/billing.service.js —
+ * neither calls this). It's reachable today only as a standalone manual
+ * endpoint. Wiring it into the real order-completion flow is a genuine
+ * functional gap worth closing in a later phase, not a tenancy issue.
  *
  * items: [{ menuItemId, quantity }]  — quantity = number of that menu item sold
  * Returns an array of the StockMovement rows created (one per ingredient
@@ -20,11 +22,19 @@ import { decrementExpiryBatchesFefo } from "../_shared/decrementExpiryBatchesFef
  * flagging it for review — the doc doesn't specify which behavior it wants,
  * so this is a deliberate choice, not an oversight.
  */
-export const consumeForSale = ({ items, orderId, userId, store }) =>
+export const consumeForSale = ({ items, orderId, userId }, outletId) =>
   prisma.$transaction(async (tx) => {
     const movements = [];
 
     for (const item of items) {
+      // FIX: previously trusted menuItemId outright with no outlet check —
+      // a stray menuItemId from another outlet would have consumed THAT
+      // outlet's ingredient stock while being attributed to this one's sale.
+      const menuItem = await tx.menuItem.findFirst({
+        where: { id: item.menuItemId, outletId },
+      });
+      if (!menuItem) continue; // same "skip items with no recipe" tolerance as below
+
       const recipeLines = await tx.recipeIngredient.findMany({
         where: { menuItemId: item.menuItemId },
       });
@@ -41,18 +51,19 @@ export const consumeForSale = ({ items, orderId, userId, store }) =>
         await tx.inventoryStock.upsert({
           where: { ingredientId: line.ingredientId },
           create: {
+            outletId,
             ingredientId: line.ingredientId,
             quantityOnHand: newQty,
             averageCost: 0,
-            store: store || "Main Store",
           },
           update: { quantityOnHand: newQty },
         });
 
-        await decrementExpiryBatchesFefo(tx, line.ingredientId, deductQty);
+        await decrementExpiryBatchesFefo(tx, line.ingredientId, deductQty, outletId);
 
         const movement = await tx.stockMovement.create({
           data: {
+            outletId,
             ingredientId: line.ingredientId,
             type: "SALE_CONSUMPTION",
             quantity: -deductQty,
@@ -61,7 +72,6 @@ export const consumeForSale = ({ items, orderId, userId, store }) =>
             reason: `Sale consumption${orderId ? ` — order ${orderId}` : ""}`,
             referenceId: orderId || null,
             userId: userId || null,
-            store: store || "Main Store",
           },
         });
 

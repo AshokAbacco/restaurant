@@ -27,8 +27,14 @@ const STATUS_LABEL = {
 // (Dine In and Takeaway alike) so both are easy to tell apart in the
 // combined "All Orders" view. Does not affect status/category logic below.
 const ORDER_TYPE_BADGE = {
-  DINE_IN: { label: "🍽️ Dine In", className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  TAKEAWAY: { label: "🥡 Takeaway", className: "bg-orange-50 text-orange-700 border-orange-200" },
+  DINE_IN: {
+    label: "🍽️ Dine In",
+    className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  TAKEAWAY: {
+    label: "🥡 Takeaway",
+    className: "bg-orange-50 text-orange-700 border-orange-200",
+  },
 };
 
 // Table-level category — the thing that decides sort order and the headline
@@ -46,13 +52,24 @@ export function deriveTableCategory(table) {
 }
 
 const CATEGORY_META = {
-  SERVING: { label: "Serving", className: "bg-blue-50 text-blue-700 border-blue-200" },
-  PENDING: { label: "Pending", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  AVAILABLE: { label: "Available", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  SERVING: {
+    label: "Serving",
+    className: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  PENDING: {
+    label: "Pending",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  AVAILABLE: {
+    label: "Available",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
 };
 
 function useElapsed(since) {
-  const [seconds, setSeconds] = useState(() => Math.floor((Date.now() - new Date(since).getTime()) / 1000));
+  const [seconds, setSeconds] = useState(() =>
+    Math.floor((Date.now() - new Date(since).getTime()) / 1000),
+  );
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -69,10 +86,15 @@ function Timer({ since }) {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
-  const label = h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+  const label =
+    h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${m}:${String(s).padStart(2, "0")}`;
 
   return (
-    <span className="font-mono text-sm font-semibold tabular-nums text-slate-600">{label}</span>
+    <span className="font-mono text-sm font-semibold tabular-nums text-slate-600">
+      {label}
+    </span>
   );
 }
 
@@ -86,7 +108,13 @@ function Timer({ since }) {
 // `onOrderDelivered` (takeaway only) — marks the order COMPLETED in place,
 // no billing step, since takeaway is billed up front before it ever reaches
 // the kitchen. Dine-in behavior is completely untouched by this prop.
-export default function TableOrderCard({ table, onCompleteService, onOrderDelivered, completing }) {
+export default function TableOrderCard({
+  table,
+  onCompleteService,
+  onOrderDelivered,
+  completing,
+  pendingSync = false,
+}) {
   const { order } = table;
   const isTakeaway = order?.orderType === "TAKEAWAY";
   const isFree = !order;
@@ -94,7 +122,7 @@ export default function TableOrderCard({ table, onCompleteService, onOrderDelive
   // the same source the Kitchen Display itself reads from. Falls back to
   // order.status only for an order that hasn't been sent to the kitchen yet.
   const displayStatus = order?.kitchenStatus || order?.status;
-  const canComplete = displayStatus === "SERVED";
+  const canComplete = displayStatus === "SERVED" && !order.awaitingCreate;
   const category = deriveTableCategory(table);
   const categoryMeta = CATEGORY_META[category];
   const typeBadge = order?.orderType ? ORDER_TYPE_BADGE[order.orderType] : null;
@@ -102,7 +130,9 @@ export default function TableOrderCard({ table, onCompleteService, onOrderDelive
   return (
     <div
       className={`flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition-shadow ${
-        isFree ? "border-slate-200" : "border-blue-200 shadow-blue-50 hover:shadow-md"
+        isFree
+          ? "border-slate-200"
+          : "border-blue-200 shadow-blue-50 hover:shadow-md"
       }`}
     >
       <div className="flex items-start justify-between">
@@ -115,7 +145,9 @@ export default function TableOrderCard({ table, onCompleteService, onOrderDelive
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${categoryMeta.className}`}>
+          <span
+            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${categoryMeta.className}`}
+          >
             {categoryMeta.label}
           </span>
           {!isFree && <Timer since={order.createdAt} />}
@@ -135,22 +167,43 @@ export default function TableOrderCard({ table, onCompleteService, onOrderDelive
               {typeBadge.label}
             </span>
           )}
+          {pendingSync && (
+            <span className="mt-2 inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              Sync pending
+            </span>
+          )}
+          {order.awaitingCreate && (
+            <span
+              title="This order was placed offline and hasn't reached the server yet."
+              className="mt-2 inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"
+            >
+              Awaiting sync
+            </span>
+          )}
 
           <div className="mt-3 space-y-2.5 border-t border-slate-100 pt-4">
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Customer</span>
-              <span className="font-medium text-slate-800">{order.customerName || "Walk-in"}</span>
+              <span className="font-medium text-slate-800">
+                {order.customerName || "Walk-in"}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Order</span>
-              <span className="font-mono text-xs font-medium text-slate-500">{order.orderNumber}</span>
+              <span className="font-mono text-xs font-medium text-slate-500">
+                {order.orderNumber}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Items</span>
-              <span className="font-medium text-slate-800">{order.itemCount}</span>
+              <span className="font-medium text-slate-800">
+                {order.itemCount}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">Total</span>
+              <span className="text-slate-500">
+                Total{order.awaitingCreate ? " (est.)" : ""}
+              </span>
               <span className="font-mono text-base font-bold text-blue-600">
                 ₹{Number(order.grandTotal).toFixed(2)}
               </span>
@@ -160,7 +213,8 @@ export default function TableOrderCard({ table, onCompleteService, onOrderDelive
           <div className="mt-4 flex items-center justify-between">
             <span
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                STATUS_BADGE[displayStatus] || "bg-slate-50 text-slate-600 border-slate-200"
+                STATUS_BADGE[displayStatus] ||
+                "bg-slate-50 text-slate-600 border-slate-200"
               }`}
             >
               {STATUS_LABEL[displayStatus] || displayStatus}
@@ -172,7 +226,11 @@ export default function TableOrderCard({ table, onCompleteService, onOrderDelive
               <button
                 onClick={() => onOrderDelivered(order.id)}
                 disabled={completing || !canComplete}
-                title={canComplete ? undefined : "Available once the kitchen marks this order Served"}
+                title={
+                  canComplete
+                    ? undefined
+                    : "Available once the kitchen marks this order Served"
+                }
                 className="mt-3 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-sm shadow-blue-200 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
               >
                 {completing ? "Marking Delivered…" : "Order Delivered"}
@@ -188,14 +246,22 @@ export default function TableOrderCard({ table, onCompleteService, onOrderDelive
               <button
                 onClick={() => onCompleteService(order.id)}
                 disabled={completing || !canComplete}
-                title={canComplete ? undefined : "Available once the order has been served"}
+                title={
+                  canComplete
+                    ? undefined
+                    : order.awaitingCreate
+                      ? "This order hasn't reached the server yet — billing needs it to sync first"
+                      : "Available once the order has been served"
+                }
                 className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-200 transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
               >
                 {completing ? "Completing…" : "Complete Service"}
               </button>
               {!canComplete && (
                 <p className="mt-1.5 text-center text-xs text-slate-400">
-                  Available once the order is marked Served
+                  {order.awaitingCreate
+                    ? "Billing available once this order syncs"
+                    : "Available once the order is marked Served"}
                 </p>
               )}
             </>

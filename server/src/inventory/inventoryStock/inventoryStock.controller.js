@@ -1,9 +1,9 @@
-// server\src\inventory\controllers\inventoryStock.controller.js
+// server/src/inventory/inventoryStock/inventoryStock.controller.js
 import * as inventoryStockService from "./inventoryStock.service.js";
 
 export const getStock = async (req, res) => {
   try {
-    const stock = await inventoryStockService.listStock();
+    const stock = await inventoryStockService.listStock(req.tenant.outletId);
     res.json(stock);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch inventory stock", error: err.message });
@@ -12,7 +12,10 @@ export const getStock = async (req, res) => {
 
 export const getStockByIngredient = async (req, res) => {
   try {
-    const stock = await inventoryStockService.getStockByIngredientId(req.params.id);
+    const stock = await inventoryStockService.getStockByIngredientId(
+      req.params.id,
+      req.tenant.outletId,
+    );
     if (!stock) return res.status(404).json({ message: "Stock record not found" });
     res.json(stock);
   } catch (err) {
@@ -22,7 +25,7 @@ export const getStockByIngredient = async (req, res) => {
 
 export const getDashboardSummary = async (req, res) => {
   try {
-    const summary = await inventoryStockService.getDashboardSummary();
+    const summary = await inventoryStockService.getDashboardSummary(req.tenant.outletId);
     res.json(summary);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch dashboard summary", error: err.message });

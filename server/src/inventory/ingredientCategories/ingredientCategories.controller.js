@@ -1,9 +1,9 @@
-// server\src\inventory\controllers\ingredientCategories.controller.js
+// server/src/inventory/ingredientCategories/ingredientCategories.controller.js
 import * as categoriesService from "./ingredientCategories.service.js";
 
 export const getCategories = async (req, res) => {
   try {
-    const categories = await categoriesService.listCategories();
+    const categories = await categoriesService.listCategories(req.tenant.outletId);
     res.json(categories);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch categories", error: err.message });
@@ -12,7 +12,7 @@ export const getCategories = async (req, res) => {
 
 export const getCategory = async (req, res) => {
   try {
-    const category = await categoriesService.getCategoryById(req.params.id);
+    const category = await categoriesService.getCategoryById(req.params.id, req.tenant.outletId);
     if (!category) return res.status(404).json({ message: "Category not found" });
     res.json(category);
   } catch (err) {
@@ -25,7 +25,10 @@ export const createCategory = async (req, res) => {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ message: "name is required" });
 
-    const category = await categoriesService.createCategory({ name, description });
+    const category = await categoriesService.createCategory(
+      { name, description },
+      req.tenant.outletId,
+    );
     res.status(201).json(category);
   } catch (err) {
     if (err.code === "P2002") {
@@ -38,11 +41,11 @@ export const createCategory = async (req, res) => {
 export const updateCategory = async (req, res) => {
   try {
     const { name, description, isEnabled } = req.body;
-    const category = await categoriesService.updateCategory(req.params.id, {
-      name,
-      description,
-      isEnabled,
-    });
+    const category = await categoriesService.updateCategory(
+      req.params.id,
+      { name, description, isEnabled },
+      req.tenant.outletId,
+    );
     res.json(category);
   } catch (err) {
     if (err.code === "P2025") {
@@ -54,7 +57,7 @@ export const updateCategory = async (req, res) => {
 
 export const deleteCategory = async (req, res) => {
   try {
-    await categoriesService.deleteCategory(req.params.id);
+    await categoriesService.deleteCategory(req.params.id, req.tenant.outletId);
     res.status(204).send();
   } catch (err) {
     if (err.code === "P2025") {

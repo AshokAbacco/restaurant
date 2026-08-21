@@ -6,7 +6,15 @@
 
 import prisma from "../lib/prisma.js";
 
-const DEFAULT_STORE = "Main Store";
+// FIX: every function in this file previously took an optional `store`
+// param defaulting to the string "Main Store" — a convenience default that
+// made sense when store was just a free-text label, but not now that
+// outletId is a real security boundary. There is no sensible default
+// outlet to silently fall back to; every function below requires a real
+// outletId, and several (getKitchenStatus, getLowStockAlerts,
+// getRecentActivities) had NO scoping at all before this pass, not even
+// the old broken pattern — every dashboard tile was showing every outlet's
+// data mixed together.
 
 // Orders in these statuses are excluded from revenue / sales figures.
 const REVENUE_EXCLUDED_STATUS = { notIn: ["CANCELLED"] };
@@ -47,14 +55,14 @@ const monthLabels = [
 // STAT CARDS (revenue, orders, customers, low stock, avg order)
 // ==============================================
 
-export const getTodayStats = async (store = DEFAULT_STORE) => {
+export const getTodayStats = async (outletId) => {
   const todayStart = startOfDay();
   const yesterdayStart = addDays(todayStart, -1);
 
   const [todayOrders, yesterdayOrders, ingredients] = await Promise.all([
     prisma.order.findMany({
       where: {
-        store,
+        outletId,
         createdAt: { gte: todayStart },
         status: REVENUE_EXCLUDED_STATUS,
       },
@@ -62,14 +70,14 @@ export const getTodayStats = async (store = DEFAULT_STORE) => {
     }),
     prisma.order.findMany({
       where: {
-        store,
+        outletId,
         createdAt: { gte: yesterdayStart, lt: todayStart },
         status: REVENUE_EXCLUDED_STATUS,
       },
       select: { grandTotal: true },
     }),
     prisma.ingredient.findMany({
-      where: { isEnabled: true },
+      where: { outletId, isEnabled: true },
       select: {
         minimumStockLevel: true,
         inventoryStock: { select: { quantityOnHand: true } },
@@ -133,10 +141,7 @@ export const getTodayStats = async (store = DEFAULT_STORE) => {
 // SALES CHART
 // ==============================================
 
-export const getSalesChart = async (
-  period = "daily",
-  store = DEFAULT_STORE,
-) => {
+export const getSalesChart = async (period = "daily", outletId) => {
   const now = new Date();
   let from;
 
@@ -149,7 +154,7 @@ export const getSalesChart = async (
   }
 
   const orders = await prisma.order.findMany({
-    where: { store, createdAt: { gte: from }, status: REVENUE_EXCLUDED_STATUS },
+    where: { outletId, createdAt: { gte: from }, status: REVENUE_EXCLUDED_STATUS },
     select: { grandTotal: true, createdAt: true },
   });
 
@@ -192,21 +197,22 @@ export const getSalesChart = async (
 // KITCHEN STATUS
 // ==============================================
 
-export const getKitchenStatus = async () => {
+export const getKitchenStatus = async (outletId) => {
   const todayStart = startOfDay();
 
   const [waiting, preparing, ready, completedToday, chefCount, timedOrders] =
     await Promise.all([
-      prisma.kitchenOrder.count({ where: { status: "NEW" } }),
+      prisma.kitchenOrder.count({ where: { outletId, status: "NEW" } }),
       prisma.kitchenOrder.count({
-        where: { status: { in: ["ACCEPTED", "PREPARING"] } },
+        where: { outletId, status: { in: ["ACCEPTED", "PREPARING"] } },
       }),
-      prisma.kitchenOrder.count({ where: { status: "READY" } }),
+      prisma.kitchenOrder.count({ where: { outletId, status: "READY" } }),
       prisma.kitchenOrder.count({
-        where: { status: "COMPLETED", completedAt: { gte: todayStart } },
+        where: { outletId, status: "COMPLETED", completedAt: { gte: todayStart } },
       }),
       prisma.employee.count({
         where: {
+          outletId,
           status: "ACTIVE",
           OR: [
             { designation: { contains: "Chef", mode: "insensitive" } },
@@ -216,6 +222,7 @@ export const getKitchenStatus = async () => {
       }),
       prisma.kitchenOrder.findMany({
         where: {
+          outletId,
           status: "COMPLETED",
           completedAt: { gte: todayStart },
           acceptedAt: { not: null },
@@ -247,12 +254,12 @@ export const getKitchenStatus = async () => {
 // ==============================================
 
 export const getRecentOrders = async ({
-  store = DEFAULT_STORE,
+  outletId,
   limit = 5,
   waiterId = null,
 } = {}) => {
   const orders = await prisma.order.findMany({
-    where: { store, ...(waiterId ? { waiterId } : {}) },
+    where: { outletId, ...(waiterId ? { waiterId } : {}) },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
@@ -291,9 +298,9 @@ export const getRecentOrders = async ({
 // LOW STOCK ALERTS
 // ==============================================
 
-export const getLowStockAlerts = async () => {
+export const getLowStockAlerts = async (outletId) => {
   const ingredients = await prisma.ingredient.findMany({
-    where: { isEnabled: true },
+    where: { outletId, isEnabled: true },
     include: {
       category: { select: { name: true } },
       consumptionUnit: { select: { name: true, abbreviation: true } },
@@ -329,14 +336,14 @@ export const getLowStockAlerts = async () => {
 // PAYMENT SUMMARY
 // ==============================================
 
-export const getPaymentSummary = async (store = DEFAULT_STORE) => {
+export const getPaymentSummary = async (outletId) => {
   const todayStart = startOfDay();
 
   const payments = await prisma.payment.findMany({
     where: {
       status: "PAID",
       paidAt: { gte: todayStart },
-      order: { store },
+      order: { outletId },
     },
     select: { method: true, amount: true },
   });
@@ -372,16 +379,13 @@ export const getPaymentSummary = async (store = DEFAULT_STORE) => {
 // TOP SELLING ITEMS
 // ==============================================
 
-export const getTopSellingItems = async ({
-  store = DEFAULT_STORE,
-  limit = 5,
-} = {}) => {
+export const getTopSellingItems = async ({ outletId, limit = 5 } = {}) => {
   const todayStart = startOfDay();
 
   const orderItems = await prisma.orderItem.findMany({
     where: {
       order: {
-        store,
+        outletId,
         createdAt: { gte: todayStart },
         status: REVENUE_EXCLUDED_STATUS,
       },
@@ -419,8 +423,11 @@ export const getTopSellingItems = async ({
 // RECENT ACTIVITIES
 // ==============================================
 
-export const getRecentActivities = async ({ limit = 6 } = {}) => {
+export const getRecentActivities = async ({ limit = 6, outletId } = {}) => {
+  // ActivityLog has no outletId of its own (child row — scope comes from
+  // its parent Employee, same pattern as elsewhere in this codebase).
   const logs = await prisma.activityLog.findMany({
+    where: { employee: { outletId } },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: { employee: { select: { fullName: true } } },
@@ -438,27 +445,36 @@ export const getRecentActivities = async ({ limit = 6 } = {}) => {
 // WAITER-SPECIFIC SUMMARY
 // ==============================================
 
-export const getWaiterSummary = async (waiterId, store = DEFAULT_STORE) => {
+export const getWaiterSummary = async (waiterId, outletId) => {
   const todayStart = startOfDay();
 
-  // NOTE: tablesOccupied and assignedTables are now scoped to tables
-  // actually ASSIGNED to this waiter (RestaurantTable.waiterId), not every
-  // occupied table in the store — a waiter should only see the state of
-  // their own section, same as the "My Tables" screen under /tables.
+  // NOTE: tablesOccupied and assignedTables are scoped to tables actually
+  // ASSIGNED to this waiter (RestaurantTable.waiterId), not every occupied
+  // table in the outlet — a waiter should only see the state of their own
+  // section, same as the "My Tables" screen under /tables.
+  //
+  // FIX: activeOrders/myOrdersToday previously filtered by waiterId alone
+  // with no outlet scoping at all, unlike assignedTables/tablesOccupied in
+  // this same function which already used the (broken) store filter — an
+  // inconsistency worth naming: a waiter's order counts could have
+  // silently included orders from a same-named waiterId at a different
+  // outlet (extremely unlikely with UUIDs, but the query itself gave no
+  // guarantee either way, which is the actual problem).
   const [activeOrders, myOrdersToday, assignedTables, tablesOccupied] =
     await Promise.all([
       prisma.order.count({
         where: {
+          outletId,
           waiterId,
           status: { in: ["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED"] },
         },
       }),
       prisma.order.count({
-        where: { waiterId, createdAt: { gte: todayStart } },
+        where: { outletId, waiterId, createdAt: { gte: todayStart } },
       }),
-      prisma.restaurantTable.count({ where: { store, waiterId } }),
+      prisma.restaurantTable.count({ where: { outletId, waiterId } }),
       prisma.restaurantTable.count({
-        where: { store, waiterId, status: "OCCUPIED" },
+        where: { outletId, waiterId, status: "OCCUPIED" },
       }),
     ]);
 

@@ -1,9 +1,15 @@
-import * as storeService from "./stores.service.js";
+// server/src/stores/stores.controller.js
+import * as outletsService from "./stores.service.js";
+
+// NOTE: reads req.tenant.organizationId here, not req.tenant.outletId —
+// see the header comment in stores.service.js for why. This is deliberately
+// the one module in the app where the meaningful scope is "everything my
+// organization owns," not "my current outlet."
 
 export const getAllStores = async (req, res) => {
   try {
-    const stores = await storeService.getAllStores();
-    res.json(stores);
+    const outlets = await outletsService.getAllOutlets(req.tenant.organizationId);
+    res.json(outlets);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -11,9 +17,9 @@ export const getAllStores = async (req, res) => {
 
 export const getStoreById = async (req, res) => {
   try {
-    const store = await storeService.getStoreById(req.params.id);
-    if (!store) return res.status(404).json({ error: "Store not found" });
-    res.json(store);
+    const outlet = await outletsService.getOutletById(req.params.id, req.tenant.organizationId);
+    if (!outlet) return res.status(404).json({ error: "Outlet not found" });
+    res.json(outlet);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -22,11 +28,14 @@ export const getStoreById = async (req, res) => {
 export const createStore = async (req, res) => {
   try {
     if (!req.body.name?.trim()) {
-      return res.status(400).json({ error: "Store name is required" });
+      return res.status(400).json({ error: "Outlet name is required" });
     }
-    const store = await storeService.createStore(req.body);
-    res.status(201).json(store);
+    const outlet = await outletsService.createOutlet(req.body, req.tenant.organizationId);
+    res.status(201).json(outlet);
   } catch (err) {
+    if (err.code === "P2002") {
+      return res.status(409).json({ error: "An outlet with this name already exists in your organization" });
+    }
     res.status(400).json({ error: err.message });
   }
 };
@@ -34,9 +43,10 @@ export const createStore = async (req, res) => {
 export const updateStore = async (req, res) => {
   try {
     if (!req.body.name?.trim()) {
-      return res.status(400).json({ error: "Store name is required" });
+      return res.status(400).json({ error: "Outlet name is required" });
     }
-    const updated = await storeService.updateStore(req.params.id, req.body);
+    const updated = await outletsService.updateOutlet(req.params.id, req.body, req.tenant.organizationId);
+    if (!updated) return res.status(404).json({ error: "Outlet not found" });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -45,9 +55,9 @@ export const updateStore = async (req, res) => {
 
 export const deleteStore = async (req, res) => {
   try {
-    const result = await storeService.deleteStore(req.params.id);
-    if (!result) return res.status(404).json({ error: "Store not found" });
-    res.json({ message: "Store removed", result });
+    const result = await outletsService.deleteOutlet(req.params.id, req.tenant.organizationId);
+    if (!result) return res.status(404).json({ error: "Outlet not found" });
+    res.json({ message: "Outlet deactivated", result });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

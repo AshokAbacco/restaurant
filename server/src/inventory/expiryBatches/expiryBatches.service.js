@@ -1,8 +1,8 @@
 // server/src/inventory/expiryBatches/expiryBatches.service.js
 import prisma from "../../config/prisma.js";
 
-export const listBatches = ({ ingredientId, expiringWithinDays }) => {
-  const where = { quantityRemaining: { gt: 0 } };
+export const listBatches = ({ ingredientId, expiringWithinDays }, outletId) => {
+  const where = { outletId, quantityRemaining: { gt: 0 } };
   if (ingredientId) where.ingredientId = ingredientId;
 
   if (expiringWithinDays) {
@@ -18,8 +18,8 @@ export const listBatches = ({ ingredientId, expiringWithinDays }) => {
   });
 };
 
-export const getBatchById = (id) =>
-  prisma.expiryBatch.findUnique({
-    where: { id },
+export const getBatchById = (id, outletId) =>
+  prisma.expiryBatch.findFirst({
+    where: { id, outletId },
     include: { ingredient: { select: { name: true, itemCode: true, consumptionUnit: true } } },
   });

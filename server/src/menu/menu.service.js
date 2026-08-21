@@ -12,84 +12,90 @@ class AppError extends Error {
 
 // ---------- Category ----------
 
-export const listCategories = () => repo.findAllCategories();
+export const listCategories = (outletId) => repo.findAllCategories(outletId);
 
-export const getCategory = async (id) => {
-  const category = await repo.findCategoryById(id);
+export const getCategory = async (id, outletId) => {
+  const category = await repo.findCategoryById(id, outletId);
   if (!category) throw new AppError("Category not found", 404);
   return category;
 };
 
-export const addCategory = (data) =>
-  repo.createCategory({
-    name: data.name.trim(),
-    description: data.description ?? null,
-    imageUrl: data.imageUrl ?? null,
-    displayOrder: data.displayOrder ? Number(data.displayOrder) : 0,
-    isEnabled: data.isEnabled ?? true,
-  });
+export const addCategory = (data, outletId) =>
+  repo.createCategory(
+    {
+      name: data.name.trim(),
+      description: data.description ?? null,
+      imageUrl: data.imageUrl ?? null,
+      displayOrder: data.displayOrder ? Number(data.displayOrder) : 0,
+      isEnabled: data.isEnabled ?? true,
+    },
+    outletId,
+  );
 
-export const editCategory = async (id, data) => {
-  await getCategory(id); // throws 404 if missing
+export const editCategory = async (id, data, outletId) => {
+  await getCategory(id, outletId); // throws 404 if missing or another outlet's
   return repo.updateCategory(id, data);
 };
 
-export const removeCategory = async (id) => {
-  await getCategory(id);
+export const removeCategory = async (id, outletId) => {
+  await getCategory(id, outletId);
   return repo.deleteCategory(id);
 };
 
 // ---------- Menu Item ----------
 
-export const listMenuItems = (filters) => repo.findAllMenuItems(filters);
+export const listMenuItems = (filters, outletId) => repo.findAllMenuItems(filters, outletId);
 
-export const getMenuItem = async (id) => {
-  const item = await repo.findMenuItemById(id);
+export const getMenuItem = async (id, outletId) => {
+  const item = await repo.findMenuItemById(id, outletId);
   if (!item) throw new AppError("Menu item not found", 404);
   return item;
 };
 
-export const addMenuItem = async (data) => {
-  const category = await repo.findCategoryById(data.categoryId);
+export const addMenuItem = async (data, outletId) => {
+  const category = await repo.findCategoryById(data.categoryId, outletId);
   if (!category) throw new AppError("Category does not exist", 400);
 
-  const existingSku = await repo.findMenuItemBySku(data.sku);
+  const existingSku = await repo.findMenuItemBySku(data.sku, outletId);
   if (existingSku) throw new AppError("SKU already exists", 409);
 
-  return repo.createMenuItem({
-    name: data.name.trim(),
-    shortName: data.shortName ?? null,
-    sku: data.sku.trim(),
-    barcode: data.barcode ?? null,
-    categoryId: data.categoryId,
-    subCategoryId: data.subCategoryId ?? null,
-    foodType: data.foodType ?? "VEG",
-    kitchenSectionId: data.kitchenSectionId ?? null,
-    sellingPrice: Number(data.sellingPrice),
-    costPrice: data.costPrice !== undefined ? Number(data.costPrice) : null,
-    gstPercent: data.gstPercent !== undefined ? Number(data.gstPercent) : 0,
-    serviceCharge: data.serviceCharge !== undefined ? Number(data.serviceCharge) : null,
-    isAvailable: data.isAvailable ?? true,
-    isSeasonal: data.isSeasonal ?? false,
-    isHiddenFromPOS: data.isHiddenFromPOS ?? false,
-    status: data.status ?? "ACTIVE",
-    imageUrl: data.imageUrl ?? null,
-    description: data.description ?? null,
-    prepTimeMinutes: data.prepTimeMinutes ? Number(data.prepTimeMinutes) : null,
-    targetServeMinutes: data.targetServeMinutes ? Number(data.targetServeMinutes) : null,
-  });
+  return repo.createMenuItem(
+    {
+      name: data.name.trim(),
+      shortName: data.shortName ?? null,
+      sku: data.sku.trim(),
+      barcode: data.barcode ?? null,
+      categoryId: data.categoryId,
+      subCategoryId: data.subCategoryId ?? null,
+      foodType: data.foodType ?? "VEG",
+      kitchenSectionId: data.kitchenSectionId ?? null,
+      sellingPrice: Number(data.sellingPrice),
+      costPrice: data.costPrice !== undefined ? Number(data.costPrice) : null,
+      gstPercent: data.gstPercent !== undefined ? Number(data.gstPercent) : 0,
+      serviceCharge: data.serviceCharge !== undefined ? Number(data.serviceCharge) : null,
+      isAvailable: data.isAvailable ?? true,
+      isSeasonal: data.isSeasonal ?? false,
+      isHiddenFromPOS: data.isHiddenFromPOS ?? false,
+      status: data.status ?? "ACTIVE",
+      imageUrl: data.imageUrl ?? null,
+      description: data.description ?? null,
+      prepTimeMinutes: data.prepTimeMinutes ? Number(data.prepTimeMinutes) : null,
+      targetServeMinutes: data.targetServeMinutes ? Number(data.targetServeMinutes) : null,
+    },
+    outletId,
+  );
 };
 
-export const editMenuItem = async (id, data) => {
-  await getMenuItem(id); // throws 404 if missing
+export const editMenuItem = async (id, data, outletId) => {
+  await getMenuItem(id, outletId); // throws 404 if missing or another outlet's
 
   if (data.categoryId) {
-    const category = await repo.findCategoryById(data.categoryId);
+    const category = await repo.findCategoryById(data.categoryId, outletId);
     if (!category) throw new AppError("Category does not exist", 400);
   }
 
   if (data.sku) {
-    const existing = await repo.findMenuItemBySku(data.sku);
+    const existing = await repo.findMenuItemBySku(data.sku, outletId);
     if (existing && existing.id !== id) {
       throw new AppError("SKU already exists", 409);
     }
@@ -99,8 +105,8 @@ export const editMenuItem = async (id, data) => {
 };
 
 // Soft delete by default, matching the doc's "Deleted (Soft Delete)" status
-export const removeMenuItem = async (id) => {
-  await getMenuItem(id);
+export const removeMenuItem = async (id, outletId) => {
+  await getMenuItem(id, outletId);
   return repo.softDeleteMenuItem(id);
 };
 
@@ -112,181 +118,214 @@ export const uploadMenuItemImage = async (file, folder = "menu-items") => {
 
 // ---------- SubCategory ----------
 
-export const listSubCategories = (categoryId) => repo.findAllSubCategories(categoryId);
+export const listSubCategories = (categoryId, outletId) => repo.findAllSubCategories(categoryId, outletId);
 
-export const getSubCategory = async (id) => {
-  const sub = await repo.findSubCategoryById(id);
+export const getSubCategory = async (id, outletId) => {
+  const sub = await repo.findSubCategoryById(id, outletId);
   if (!sub) throw new AppError("Sub-category not found", 404);
   return sub;
 };
 
-export const addSubCategory = async (data) => {
-  const category = await repo.findCategoryById(data.categoryId);
+export const addSubCategory = async (data, outletId) => {
+  const category = await repo.findCategoryById(data.categoryId, outletId);
   if (!category) throw new AppError("Category does not exist", 400);
-  return repo.createSubCategory({ name: data.name.trim(), categoryId: data.categoryId });
+  return repo.createSubCategory(
+    { name: data.name.trim(), categoryId: data.categoryId },
+    outletId,
+  );
 };
 
-export const editSubCategory = async (id, data) => {
-  await getSubCategory(id);
+export const editSubCategory = async (id, data, outletId) => {
+  await getSubCategory(id, outletId);
   return repo.updateSubCategory(id, data);
 };
 
-export const removeSubCategory = async (id) => {
-  await getSubCategory(id);
+export const removeSubCategory = async (id, outletId) => {
+  await getSubCategory(id, outletId);
   return repo.deleteSubCategory(id);
 };
 
 // ---------- Kitchen Section ----------
 
-export const listKitchenSections = () => repo.findAllKitchenSections();
+export const listKitchenSections = (outletId) => repo.findAllKitchenSections(outletId);
 
-export const getKitchenSection = async (id) => {
-  const section = await repo.findKitchenSectionById(id);
+export const getKitchenSection = async (id, outletId) => {
+  const section = await repo.findKitchenSectionById(id, outletId);
   if (!section) throw new AppError("Kitchen section not found", 404);
   return section;
 };
 
-export const addKitchenSection = async (data) => {
-  const existing = await repo.findKitchenSectionByName(data.name.trim());
+export const addKitchenSection = async (data, outletId) => {
+  const existing = await repo.findKitchenSectionByName(data.name.trim(), outletId);
   if (existing) throw new AppError("Kitchen section already exists", 409);
-  return repo.createKitchenSection({ name: data.name.trim() });
+  return repo.createKitchenSection({ name: data.name.trim() }, outletId);
 };
 
-export const editKitchenSection = async (id, data) => {
-  await getKitchenSection(id);
+export const editKitchenSection = async (id, data, outletId) => {
+  await getKitchenSection(id, outletId);
   return repo.updateKitchenSection(id, data);
 };
 
-export const removeKitchenSection = async (id) => {
-  await getKitchenSection(id);
+export const removeKitchenSection = async (id, outletId) => {
+  await getKitchenSection(id, outletId);
   return repo.deleteKitchenSection(id);
 };
 
 // ---------- Menu Variants ----------
 
-export const listVariants = (menuItemId) => repo.findVariantsByMenuItem(menuItemId);
+export const listVariants = (menuItemId, outletId) => repo.findVariantsByMenuItem(menuItemId, outletId);
 
-export const addVariant = async (menuItemId, data) => {
-  await getMenuItem(menuItemId); // 404 if item missing
+export const addVariant = async (menuItemId, data, outletId) => {
+  await getMenuItem(menuItemId, outletId); // 404 if item missing or another outlet's
   if (!data.name || data.price === undefined) {
     throw new AppError("Variant name and price are required", 400);
   }
-  return repo.createVariant({
-    menuItemId,
-    name: data.name.trim(),
-    price: Number(data.price),
-    prepTimeMinutes: data.prepTimeMinutes ? Number(data.prepTimeMinutes) : null,
-    targetServeMinutes: data.targetServeMinutes ? Number(data.targetServeMinutes) : null,
-    calories: data.calories ? Number(data.calories) : null,
-  });
+  return repo.createVariant(
+    {
+      menuItemId,
+      name: data.name.trim(),
+      price: Number(data.price),
+      prepTimeMinutes: data.prepTimeMinutes ? Number(data.prepTimeMinutes) : null,
+      targetServeMinutes: data.targetServeMinutes ? Number(data.targetServeMinutes) : null,
+      calories: data.calories ? Number(data.calories) : null,
+    },
+    outletId,
+  );
 };
 
-export const editVariant = async (id, data) => {
-  const variant = await repo.findVariantById(id);
+export const editVariant = async (id, data, outletId) => {
+  const variant = await repo.findVariantById(id, outletId);
   if (!variant) throw new AppError("Variant not found", 404);
   return repo.updateVariant(id, data);
 };
 
-export const removeVariant = async (id) => {
-  const variant = await repo.findVariantById(id);
+export const removeVariant = async (id, outletId) => {
+  const variant = await repo.findVariantById(id, outletId);
   if (!variant) throw new AppError("Variant not found", 404);
   return repo.deleteVariant(id);
 };
 
 // ---------- Add-ons ----------
 
-export const listAddOns = () => repo.findAllAddOns();
+export const listAddOns = (outletId) => repo.findAllAddOns(outletId);
 
-export const addAddOn = (data) => {
+export const addAddOn = (data, outletId) => {
   if (!data.name || data.price === undefined) {
     throw new AppError("Add-on name and price are required", 400);
   }
-  return repo.createAddOn({ name: data.name.trim(), price: Number(data.price) });
+  return repo.createAddOn({ name: data.name.trim(), price: Number(data.price) }, outletId);
 };
 
-export const editAddOn = async (id, data) => {
-  const addOn = await repo.findAddOnById(id);
+export const editAddOn = async (id, data, outletId) => {
+  const addOn = await repo.findAddOnById(id, outletId);
   if (!addOn) throw new AppError("Add-on not found", 404);
   return repo.updateAddOn(id, data);
 };
 
-export const removeAddOn = async (id) => {
-  const addOn = await repo.findAddOnById(id);
+export const removeAddOn = async (id, outletId) => {
+  const addOn = await repo.findAddOnById(id, outletId);
   if (!addOn) throw new AppError("Add-on not found", 404);
   return repo.deleteAddOn(id);
 };
 
-export const attachAddOnToItem = async (menuItemId, addOnId) => {
-  await getMenuItem(menuItemId);
-  const addOn = await repo.findAddOnById(addOnId);
+export const attachAddOnToItem = async (menuItemId, addOnId, outletId) => {
+  await getMenuItem(menuItemId, outletId);
+  const addOn = await repo.findAddOnById(addOnId, outletId);
   if (!addOn) throw new AppError("Add-on not found", 404);
   return repo.linkAddOnToItem(menuItemId, addOnId);
 };
 
-export const detachAddOnFromItem = (menuItemId, addOnId) =>
-  repo.unlinkAddOnFromItem(menuItemId, addOnId);
+export const detachAddOnFromItem = async (menuItemId, addOnId, outletId) => {
+  // FIX: previously unlinked with no check that either side belonged to
+  // this outlet — added the same ownership check attachAddOnToItem above
+  // already had, so unlink is exactly as strict as link.
+  await getMenuItem(menuItemId, outletId);
+  const addOn = await repo.findAddOnById(addOnId, outletId);
+  if (!addOn) throw new AppError("Add-on not found", 404);
+  return repo.unlinkAddOnFromItem(menuItemId, addOnId);
+};
 
-export const listAddOnsForItem = (menuItemId) => repo.findAddOnsForItem(menuItemId);
+export const listAddOnsForItem = async (menuItemId, outletId) => {
+  await getMenuItem(menuItemId, outletId);
+  return repo.findAddOnsForItem(menuItemId);
+};
 
 // ---------- Combo Meals ----------
 
-export const listCombos = () => repo.findAllCombos();
+export const listCombos = (outletId) => repo.findAllCombos(outletId);
 
-export const getCombo = async (id) => {
-  const combo = await repo.findComboById(id);
+export const getCombo = async (id, outletId) => {
+  const combo = await repo.findComboById(id, outletId);
   if (!combo) throw new AppError("Combo meal not found", 404);
   return combo;
 };
 
-export const addCombo = (data) => {
+export const addCombo = (data, outletId) => {
   if (!data.name || data.price === undefined) {
     throw new AppError("Combo name and price are required", 400);
   }
-  return repo.createCombo({
-    name: data.name.trim(),
-    price: Number(data.price),
-    description: data.description ?? null,
-    imageUrl: data.imageUrl ?? null,
-  });
+  return repo.createCombo(
+    {
+      name: data.name.trim(),
+      price: Number(data.price),
+      description: data.description ?? null,
+      imageUrl: data.imageUrl ?? null,
+    },
+    outletId,
+  );
 };
 
-export const editCombo = async (id, data) => {
-  await getCombo(id);
+export const editCombo = async (id, data, outletId) => {
+  await getCombo(id, outletId);
   return repo.updateCombo(id, data);
 };
 
-export const removeCombo = async (id) => {
-  await getCombo(id);
+export const removeCombo = async (id, outletId) => {
+  await getCombo(id, outletId);
   return repo.deleteCombo(id);
 };
 
-export const addItemToCombo = async (comboMealId, menuItemId, quantity = 1) => {
-  await getCombo(comboMealId);
-  await getMenuItem(menuItemId);
+export const addItemToCombo = async (comboMealId, menuItemId, quantity = 1, outletId) => {
+  await getCombo(comboMealId, outletId);
+  await getMenuItem(menuItemId, outletId);
   return repo.addComboItem(comboMealId, menuItemId, quantity);
 };
 
-export const removeItemFromCombo = (comboItemId) => repo.removeComboItem(comboItemId);
+// FIX: previously removed a combo item by id with no ownership check —
+// verify the combo item's parent combo belongs to this outlet first.
+export const removeItemFromCombo = async (comboItemId, outletId) => {
+  const combo = await repo.findAllCombos(outletId);
+  const owns = combo.some((c) => c.items.some((i) => i.id === comboItemId));
+  if (!owns) throw new AppError("Combo item not found", 404);
+  return repo.removeComboItem(comboItemId);
+};
 
 // ---------- Price History ----------
 // Wraps the existing editMenuItem so a price change is auto-logged.
 
-export const editMenuItemWithPriceTracking = async (id, data, changedBy) => {
-  const existing = await getMenuItem(id);
+export const editMenuItemWithPriceTracking = async (id, data, changedBy, outletId) => {
+  const existing = await getMenuItem(id, outletId);
 
-  const updated = await editMenuItem(id, data);
+  const updated = await editMenuItem(id, data, outletId);
 
   if (
     data.sellingPrice !== undefined &&
     Number(data.sellingPrice) !== Number(existing.sellingPrice)
   ) {
-    await repo.logPriceChange(id, existing.sellingPrice, Number(data.sellingPrice), changedBy);
+    await repo.logPriceChange(
+      id,
+      existing.sellingPrice,
+      Number(data.sellingPrice),
+      changedBy,
+      outletId,
+    );
   }
 
   return updated;
 };
 
-export const getPriceHistory = (menuItemId) => repo.findPriceHistoryForItem(menuItemId);
+export const getPriceHistory = (menuItemId, outletId) =>
+  repo.findPriceHistoryForItem(menuItemId, outletId);
 
 // ---------- Bulk Import / Export ----------
 // Expected columns: name,sku,categoryName,sellingPrice,costPrice,gstPercent,foodType,description
@@ -373,7 +412,7 @@ function parseImportFile(fileBuffer, originalName = "") {
   return { headers, dataRows };
 }
 
-export const bulkImportMenuItems = async (fileBuffer, originalName = "") => {
+export const bulkImportMenuItems = async (fileBuffer, originalName = "", outletId) => {
   const { headers, dataRows } = parseImportFile(fileBuffer, originalName);
 
   const requiredCols = ["name", "sku", "categoryName", "sellingPrice"];
@@ -402,8 +441,8 @@ export const bulkImportMenuItems = async (fileBuffer, originalName = "") => {
       .replace(/\s+/g, " ")
       .toLowerCase();
 
-  // Load all categories once
-  const categories = await repo.findAllCategories();
+  // Load all categories once, scoped to this outlet
+  const categories = await repo.findAllCategories(outletId);
 
   for (let i = 0; i < dataRows.length; i++) {
     const values = dataRows[i];
@@ -454,12 +493,12 @@ export const bulkImportMenuItems = async (fileBuffer, originalName = "") => {
               name: row.categoryName.trim(),
               isEnabled: true,
               displayOrder: 0,
-          });
+          }, outletId);
 
           categories.push(category);
       }
 
-      const existingItem = await repo.findMenuItemBySku(row.sku);
+      const existingItem = await repo.findMenuItemBySku(row.sku, outletId);
 
       const payload = {
         name: row.name.trim(),
@@ -498,7 +537,7 @@ export const bulkImportMenuItems = async (fileBuffer, originalName = "") => {
 
       results.summary.updated++;
       } else {
-      await repo.createMenuItem(payload);
+      await repo.createMenuItem(payload, outletId);
 
       results.created.push({
           sku: payload.sku,
@@ -524,8 +563,8 @@ export const bulkImportMenuItems = async (fileBuffer, originalName = "") => {
   return results;
 };
 
-export const exportMenuItemsToCsv = async () => {
-  const items = await repo.findAllMenuItems({});
+export const exportMenuItemsToCsv = async (outletId) => {
+  const items = await repo.findAllMenuItems({}, outletId);
   const headers = ["name", "sku", "categoryName", "sellingPrice", "costPrice", "gstPercent", "foodType", "status"];
   const lines = [headers.join(",")];
 
@@ -551,8 +590,8 @@ export const exportMenuItemsToCsv = async () => {
 
 // ---------- Reports ----------
 
-export const generateMenuReport = async () => {
-  const items = await repo.findAllMenuItems({});
+export const generateMenuReport = async (outletId) => {
+  const items = await repo.findAllMenuItems({}, outletId);
 
   const totalItems = items.length;
   const activeItems = items.filter((i) => i.status === "ACTIVE").length;

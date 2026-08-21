@@ -1,6 +1,7 @@
 // client/src/menu/pages/Combos.jsx
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiPackage, FiX } from "react-icons/fi";
+import { WifiOff } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { ui } from "../menuTheme";
 import { Spinner, ErrorBanner, EmptyState } from "../MenuUI";
@@ -12,6 +13,7 @@ import {
   addComboItem,
   removeComboItem,
 } from "../menuApi";
+import { fetchWithOfflineFallbackResult } from "../../offline/offlineCache";
 
 const ComboFormModal = ({ menuItems, onClose, onSaved }) => {
   const [name, setName] = useState("");
@@ -25,7 +27,7 @@ const ComboFormModal = ({ menuItems, onClose, onSaved }) => {
     setSelectedItems((prev) =>
       prev.find((i) => i.menuItemId === itemId)
         ? prev.filter((i) => i.menuItemId !== itemId)
-        : [...prev, { menuItemId: itemId, quantity: 1 }]
+        : [...prev, { menuItemId: itemId, quantity: 1 }],
     );
   };
 
@@ -61,7 +63,9 @@ const ComboFormModal = ({ menuItems, onClose, onSaved }) => {
     <div className={ui.modalOverlay}>
       <div className={`${ui.modalCard} max-w-lg max-h-[85vh]`}>
         <div className={ui.modalHeader}>
-          <h2 className={`text-lg font-semibold ${ui.heading}`}>Add Combo Meal</h2>
+          <h2 className={`text-lg font-semibold ${ui.heading}`}>
+            Add Combo Meal
+          </h2>
         </div>
         <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -100,7 +104,9 @@ const ComboFormModal = ({ menuItems, onClose, onSaved }) => {
             </label>
             <div className="border border-[#E7EAE1] dark:border-[#262B24] rounded-xl max-h-56 overflow-y-auto divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {menuItems.map((item) => {
-                const checked = selectedItems.some((i) => i.menuItemId === item.id);
+                const checked = selectedItems.some(
+                  (i) => i.menuItemId === item.id,
+                );
                 return (
                   <label
                     key={item.id}
@@ -113,7 +119,9 @@ const ComboFormModal = ({ menuItems, onClose, onSaved }) => {
                       className="rounded accent-[#3FA34D]"
                     />
                     <span className={`flex-1 ${ui.heading}`}>{item.name}</span>
-                    <span className={ui.faint}>₹{Number(item.sellingPrice).toFixed(2)}</span>
+                    <span className={ui.faint}>
+                      ₹{Number(item.sellingPrice).toFixed(2)}
+                    </span>
                   </label>
                 );
               })}
@@ -124,7 +132,11 @@ const ComboFormModal = ({ menuItems, onClose, onSaved }) => {
           <button onClick={onClose} disabled={saving} className={ui.btnCancel}>
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className={ui.btnPrimary}>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className={ui.btnPrimary}
+          >
             {saving ? "Saving..." : "Create Combo"}
           </button>
         </div>
@@ -143,21 +155,41 @@ const Combos = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
+  // Read-only offline browsing for both lists — create/delete stay
+  // online-only. Menu items failing silently (no error shown) matches the
+  // original tolerant behavior; combos failing does surface an error.
   const loadData = async () => {
     setLoading(true);
     setError("");
-    const [comboResult, itemsResult] = await Promise.all([fetchCombos(), fetchMenuItems()]);
-    if (comboResult.ok) {
-      setCombos(comboResult.data.data || []);
+    const [comboResult, itemsResult] = await Promise.allSettled([
+      fetchWithOfflineFallbackResult("menuAdmin:combos", fetchCombos),
+      fetchWithOfflineFallbackResult(
+        "menuAdmin:comboMenuItems",
+        fetchMenuItems,
+      ),
+    ]);
+
+    let offline = false;
+    if (comboResult.status === "fulfilled") {
+      setCombos(comboResult.value.data.data || []);
+      if (comboResult.value.fromCache) offline = true;
     } else {
-      setError(comboResult.data?.message || "Failed to load combos");
+      setError(comboResult.reason?.message || "Failed to load combos");
     }
-    if (itemsResult.ok) setMenuItems(itemsResult.data.data || []);
+    if (itemsResult.status === "fulfilled") {
+      setMenuItems(itemsResult.value.data.data || []);
+      if (itemsResult.value.fromCache) offline = true;
+    }
+
+    setIsOffline(offline);
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleDeleteCombo = async (combo) => {
     if (!window.confirm(`Delete combo "${combo.name}"?`)) return;
@@ -185,9 +217,18 @@ const Combos = () => {
       </div>
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      {isOffline && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <WifiOff className="h-3.5 w-3.5" />
+          Offline — showing last-synced combos. Adding/editing needs a
+          connection.
+        </div>
+      )}
 
       {loading ? (
-        <div className={ui.card}><Spinner /></div>
+        <div className={ui.card}>
+          <Spinner />
+        </div>
       ) : combos.length === 0 ? (
         <div className={ui.card}>
           <EmptyState
@@ -202,17 +243,26 @@ const Combos = () => {
             <div key={combo.id} className={`${ui.card} ${ui.cardHover} p-5`}>
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className={`font-semibold ${ui.heading}`}>{combo.name}</h3>
+                  <h3 className={`font-semibold ${ui.heading}`}>
+                    {combo.name}
+                  </h3>
                   {combo.description && (
-                    <p className={`text-sm ${ui.muted} mt-0.5`}>{combo.description}</p>
+                    <p className={`text-sm ${ui.muted} mt-0.5`}>
+                      {combo.description}
+                    </p>
                   )}
                 </div>
-                <span className="font-bold text-[#3FA34D] dark:text-[#43B75A]">₹{Number(combo.price).toFixed(2)}</span>
+                <span className="font-bold text-[#3FA34D] dark:text-[#43B75A]">
+                  ₹{Number(combo.price).toFixed(2)}
+                </span>
               </div>
 
               <div className="mt-3 space-y-1.5">
                 {(combo.items || []).map((ci) => (
-                  <div key={ci.id} className="flex items-center justify-between text-sm">
+                  <div
+                    key={ci.id}
+                    className="flex items-center justify-between text-sm"
+                  >
                     <span className={ui.muted}>
                       {ci.quantity}× {ci.menuItem?.name}
                     </span>
@@ -229,7 +279,10 @@ const Combos = () => {
               </div>
 
               {canDelete && (
-                <button onClick={() => handleDeleteCombo(combo)} className={`mt-4 ${ui.linkDanger}`}>
+                <button
+                  onClick={() => handleDeleteCombo(combo)}
+                  className={`mt-4 ${ui.linkDanger}`}
+                >
                   Delete Combo
                 </button>
               )}
@@ -242,7 +295,10 @@ const Combos = () => {
         <ComboFormModal
           menuItems={menuItems}
           onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); loadData(); }}
+          onSaved={() => {
+            setFormOpen(false);
+            loadData();
+          }}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-// server\src\inventory\service\ingredients.service.js
+// server/src/inventory/ingredients/ingredients.service.js
 import prisma from "../../config/prisma.js";
 
 const includeRelations = {
@@ -8,8 +8,8 @@ const includeRelations = {
   inventoryStock: true,
 };
 
-export const listIngredients = async ({ search, categoryId, lowStock, outOfStock }) => {
-  const where = {};
+export const listIngredients = async ({ search, categoryId, lowStock, outOfStock }, outletId) => {
+  const where = { outletId };
 
   if (search) {
     where.OR = [
@@ -43,13 +43,14 @@ export const listIngredients = async ({ search, categoryId, lowStock, outOfStock
   return ingredients;
 };
 
-export const getIngredientById = (id) =>
-  prisma.ingredient.findUnique({ where: { id }, include: includeRelations });
+export const getIngredientById = (id, outletId) =>
+  prisma.ingredient.findFirst({ where: { id, outletId }, include: includeRelations });
 
-export const createIngredient = (data) =>
+export const createIngredient = (data, outletId) =>
   prisma.$transaction(async (tx) => {
     const ingredient = await tx.ingredient.create({
       data: {
+        outletId,
         name: data.name,
         itemCode: data.itemCode,
         barcode: data.barcode,
@@ -64,7 +65,7 @@ export const createIngredient = (data) =>
 
     // Every ingredient needs a stock row to exist, starting at zero on-hand.
     await tx.inventoryStock.create({
-      data: { ingredientId: ingredient.id, quantityOnHand: 0, averageCost: 0 },
+      data: { outletId, ingredientId: ingredient.id, quantityOnHand: 0, averageCost: 0 },
     });
 
     return tx.ingredient.findUnique({
@@ -73,8 +74,14 @@ export const createIngredient = (data) =>
     });
   });
 
-export const updateIngredient = (id, data) =>
-  prisma.ingredient.update({
+export const updateIngredient = async (id, data, outletId) => {
+  const existing = await prisma.ingredient.findFirst({ where: { id, outletId } });
+  if (!existing) {
+    const err = new Error("Ingredient not found");
+    err.code = "P2025";
+    throw err;
+  }
+  return prisma.ingredient.update({
     where: { id },
     data: {
       name: data.name,
@@ -90,5 +97,14 @@ export const updateIngredient = (id, data) =>
     },
     include: includeRelations,
   });
+};
 
-export const deleteIngredient = (id) => prisma.ingredient.delete({ where: { id } });
+export const deleteIngredient = async (id, outletId) => {
+  const existing = await prisma.ingredient.findFirst({ where: { id, outletId } });
+  if (!existing) {
+    const err = new Error("Ingredient not found");
+    err.code = "P2025";
+    throw err;
+  }
+  return prisma.ingredient.delete({ where: { id } });
+};

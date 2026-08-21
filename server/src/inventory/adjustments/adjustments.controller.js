@@ -6,7 +6,7 @@ const VALID_TYPES = ["INCREASE", "DECREASE"];
 export const getAdjustments = async (req, res) => {
   try {
     const { ingredientId } = req.query;
-    const adjustments = await adjustmentsService.listAdjustments({ ingredientId });
+    const adjustments = await adjustmentsService.listAdjustments({ ingredientId }, req.tenant.outletId);
     res.json(adjustments);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch adjustments", error: err.message });
@@ -15,7 +15,7 @@ export const getAdjustments = async (req, res) => {
 
 export const getAdjustment = async (req, res) => {
   try {
-    const adjustment = await adjustmentsService.getAdjustmentById(req.params.id);
+    const adjustment = await adjustmentsService.getAdjustmentById(req.params.id, req.tenant.outletId);
     if (!adjustment) return res.status(404).json({ message: "Adjustment not found" });
     res.json(adjustment);
   } catch (err) {
@@ -38,7 +38,12 @@ export const createAdjustment = async (req, res) => {
       return res.status(400).json({ message: "quantity must be greater than 0" });
     }
 
-    const adjustment = await adjustmentsService.createAdjustment(req.body);
+    // FIX: same silently-always-null userId gap as purchaseEntries.controller.js —
+    // use the authenticated session's employeeId, not an unsent body field.
+    const adjustment = await adjustmentsService.createAdjustment(
+      { ...req.body, userId: req.user?.employeeId },
+      req.tenant.outletId,
+    );
     res.status(201).json(adjustment);
   } catch (err) {
     if (err.code === "P2025") {

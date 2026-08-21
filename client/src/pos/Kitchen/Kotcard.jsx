@@ -40,8 +40,14 @@ const PRIORITY_LABEL = {
 // at a glance — both flow through the exact same Pending -> Ready -> Served
 // stages, this is purely a visual identifier.
 const ORDER_TYPE_BADGE = {
-  DINE_IN: { label: "🍽️ Dine In", className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  TAKEAWAY: { label: "🥡 Takeaway", className: "bg-orange-50 text-orange-700 border-orange-200" },
+  DINE_IN: {
+    label: "🍽️ Dine In",
+    className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  TAKEAWAY: {
+    label: "🥡 Takeaway",
+    className: "bg-orange-50 text-orange-700 border-orange-200",
+  },
 };
 
 // Ticks live while the ticket is active. Once the kitchen order has a
@@ -70,8 +76,26 @@ function useElapsedMinutes(since, frozenAt) {
 // onAddNote is optional — when the parent screen doesn't pass it (i.e. the
 // logged-in user isn't KITCHEN), the whole add-note form is simply not
 // rendered. Existing notes still show for everyone, read-only.
-export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
-  const elapsedMinutes = useElapsedMinutes(kot.createdAt, kot.completedAt || kot.servedAt);
+export default function KotCard({
+  kot,
+  onAdvance,
+  updating,
+  onAddNote,
+  pendingSync = false,
+  // This order was placed offline and hasn't reached the server yet —
+  // it's a preview built entirely from what the POS terminal had queued
+  // locally (see getQueuedKots() in offlineQueue.js), not a real
+  // KitchenOrder row. Ready/Served still work on it (see
+  // advanceQueuedKotStatus in offlineQueue.js) — the status is just
+  // tracked locally and replayed onto the real KOT once this order
+  // syncs. This flag now only drives the informational "Awaiting sync"
+  // badge below, nothing else.
+  awaitingCreate = false,
+}) {
+  const elapsedMinutes = useElapsedMinutes(
+    kot.createdAt,
+    kot.completedAt || kot.servedAt,
+  );
   const elapsedSeconds = Math.floor(elapsedMinutes * 60);
   const hh = Math.floor(elapsedSeconds / 3600);
   const mm = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, "0");
@@ -80,8 +104,13 @@ export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
   // "6:11:47") instead of letting the minutes column run past 60.
   const timerLabel = hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
 
-  const isOverdue = kot.targetPrepMinutes && elapsedMinutes > kot.targetPrepMinutes;
-  const timerColor = isOverdue ? "text-red-600" : elapsedMinutes > 8 ? "text-amber-600" : "text-emerald-600";
+  const isOverdue =
+    kot.targetPrepMinutes && elapsedMinutes > kot.targetPrepMinutes;
+  const timerColor = isOverdue
+    ? "text-red-600"
+    : elapsedMinutes > 8
+      ? "text-amber-600"
+      : "text-emerald-600";
 
   const action = NEXT_STATUS[kot.status];
 
@@ -113,13 +142,17 @@ export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-mono text-sm font-bold text-slate-900">{kot.kotNumber}</p>
+          <p className="font-mono text-sm font-bold text-slate-900">
+            {kot.kotNumber}
+          </p>
           <p className="mt-0.5 text-xs text-slate-400">
             {kot.order?.orderNumber}
             {kot.order?.table?.name ? ` · ${kot.order.table.name}` : ""}
           </p>
         </div>
-        <span className={`font-mono text-lg font-bold tabular-nums ${timerColor}`}>
+        <span
+          className={`font-mono text-lg font-bold tabular-nums ${timerColor}`}
+        >
           {timerLabel}
         </span>
       </div>
@@ -132,10 +165,13 @@ export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
               "bg-slate-50 text-slate-600 border-slate-200"
             }`}
           >
-            {(ORDER_TYPE_BADGE[kot.order.orderType] || {}).label || kot.order.orderType.replace("_", " ")}
+            {(ORDER_TYPE_BADGE[kot.order.orderType] || {}).label ||
+              kot.order.orderType.replace("_", " ")}
           </span>
         )}
-        <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[kot.status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
+        <span
+          className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[kot.status] || "bg-slate-50 text-slate-600 border-slate-200"}`}
+        >
           {STATUS_LABEL[kot.status] || kot.status}
         </span>
         {kot.priority !== "NORMAL" && (
@@ -146,6 +182,19 @@ export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
         {isOverdue && (
           <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
             Delayed
+          </span>
+        )}
+        {pendingSync && (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+            Sync pending
+          </span>
+        )}
+        {awaitingCreate && (
+          <span
+            title="This order was placed offline and hasn't reached the server yet. Ready/Served still work — they'll sync automatically once the connection is back."
+            className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700"
+          >
+            Awaiting sync
           </span>
         )}
       </div>
@@ -159,7 +208,9 @@ export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
               </span>
             </div>
             {item.orderItem.notes && (
-              <p className="mt-0.5 text-xs italic text-amber-600">"{item.orderItem.notes}"</p>
+              <p className="mt-0.5 text-xs italic text-amber-600">
+                "{item.orderItem.notes}"
+              </p>
             )}
           </li>
         ))}
@@ -168,8 +219,14 @@ export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
       {kot.notes && kot.notes.length > 0 && (
         <ul className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
           {kot.notes.map((n) => (
-            <li key={n.id} className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
-              <span className="font-semibold">{n.chef?.fullName || "Kitchen"}:</span> {n.note}
+            <li
+              key={n.id}
+              className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800"
+            >
+              <span className="font-semibold">
+                {n.chef?.fullName || "Kitchen"}:
+              </span>{" "}
+              {n.note}
             </li>
           ))}
         </ul>
@@ -197,7 +254,7 @@ export default function KotCard({ kot, onAdvance, updating, onAddNote }) {
 
       {action && (
         <button
-          onClick={() => onAdvance(kot.id, action.next)}
+          onClick={() => onAdvance(kot, action.next)}
           disabled={updating}
           className="mt-4 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >

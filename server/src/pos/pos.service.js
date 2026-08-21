@@ -1,6 +1,7 @@
 // server/src/pos/pos.service.js
 import prisma from "../config/prisma.js";
 import * as kotService from "./kot/kot.service.js";
+import { writeAuditLog } from "../lib/auditLog.service.js";
 
 /**
  * Generates the next sequential order number, e.g. ORD-000123.
@@ -14,8 +15,9 @@ import * as kotService from "./kot/kot.service.js";
 // Basing it on the highest orderNumber actually seen removes that
 // possibility. Lexicographic DESC sort matches numeric order here because
 // every orderNumber is zero-padded to the same width.
-async function generateOrderNumber(client = prisma) {
+async function generateOrderNumber(outletId, client = prisma) {
   const last = await client.order.findFirst({
+    where: { outletId },
     orderBy: { orderNumber: "desc" },
     select: { orderNumber: true },
   });
@@ -25,10 +27,13 @@ async function generateOrderNumber(client = prisma) {
   return `ORD-${String(lastNum + 1).padStart(6, "0")}`;
 }
 
-// Same fix as generateOrderNumber above — holdNumber is also @unique.
-async function generateHoldNumber() {
-  const last = await prisma.order.findFirst({
-    where: { holdNumber: { not: null } },
+// Same fix as generateOrderNumber above — holdNumber is also
+// @@unique([outletId, holdNumber]) now, so the sequence must be per-outlet
+// too, or two outlets numbering independently would still collide the
+// moment they both reach the same count.
+async function generateHoldNumber(outletId, client = prisma) {
+  const last = await client.order.findFirst({
+    where: { outletId, holdNumber: { not: null } },
     orderBy: { holdNumber: "desc" },
     select: { holdNumber: true },
   });
@@ -56,10 +61,10 @@ const STATUS_FLOW = {
   REFUNDED: [],
 };
 
-async function computeItemPricing(items, client = prisma) {
+async function computeItemPricing(items, outletId, client = prisma) {
   const menuItemIds = items.map((i) => i.menuItemId);
   const menuItems = await client.menuItem.findMany({
-    where: { id: { in: menuItemIds } },
+    where: { id: { in: menuItemIds }, outletId },
   });
   const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));
 
@@ -68,6 +73,11 @@ async function computeItemPricing(items, client = prisma) {
 
   const itemsData = items.map((item) => {
     const menuItem = menuItemMap.get(item.menuItemId);
+    // Also covers the cross-outlet case: a menuItemId that's real but
+    // belongs to a DIFFERENT outlet simply won't be in menuItemMap (the
+    // findMany above is already scoped to this outlet), so it fails the
+    // same "not found" path rather than silently pricing/ordering another
+    // outlet's item.
     if (!menuItem) throw new Error(`Menu item ${item.menuItemId} not found`);
 
     const unitPrice = Number(menuItem.sellingPrice);
@@ -97,12 +107,12 @@ async function computeItemPricing(items, client = prisma) {
   return { itemsData, subtotal, gstAmount };
 }
 
-async function resolveAddOnPricing(itemsData, client = prisma) {
+async function resolveAddOnPricing(itemsData, outletId, client = prisma) {
   const addOnIds = itemsData.flatMap((i) => i.addOns.map((a) => a.addOnId));
   if (addOnIds.length === 0) return { itemsData, addOnTotal: 0 };
 
   const addOns = await client.addOn.findMany({
-    where: { id: { in: addOnIds } },
+    where: { id: { in: addOnIds }, outletId },
   });
   const addOnMap = new Map(addOns.map((a) => [a.id, a]));
 
@@ -119,7 +129,44 @@ async function resolveAddOnPricing(itemsData, client = prisma) {
   return { itemsData, addOnTotal };
 }
 
-export async function createOrder(payload, client = prisma) {
+// Verifies every foreign reference on an order payload (table, customer,
+// waiter, delivery partner) actually belongs to THIS outlet before
+// anything is created. None of this existed before — a tableId, customerId
+// etc. was trusted outright — which was already a latent bug (a stale ID
+// from a deleted row would only fail deep inside a nested Prisma create)
+// and would have been a real cross-outlet data leak once multiple outlets
+// existed, letting one outlet's order silently reference another outlet's
+// table/customer/waiter.
+async function validateOrderReferences(
+  { tableId, customerId, waiterId, deliveryPartnerId },
+  outletId,
+  client = prisma,
+) {
+  const [table, customer, waiter, deliveryPartner] = await Promise.all([
+    tableId
+      ? client.restaurantTable.findFirst({ where: { id: tableId, outletId } })
+      : null,
+    customerId
+      ? client.customer.findFirst({ where: { id: customerId, outletId } })
+      : null,
+    waiterId
+      ? client.employee.findFirst({ where: { id: waiterId, outletId } })
+      : null,
+    deliveryPartnerId
+      ? client.deliveryPartner.findFirst({
+          where: { id: deliveryPartnerId, outletId },
+        })
+      : null,
+  ]);
+
+  if (tableId && !table) throw new Error("Table not found");
+  if (customerId && !customer) throw new Error("Customer not found");
+  if (waiterId && !waiter) throw new Error("Waiter not found");
+  if (deliveryPartnerId && !deliveryPartner)
+    throw new Error("Delivery partner not found");
+}
+
+export async function createOrder(payload, outletId, client = prisma) {
   const {
     orderType,
     tableId,
@@ -135,17 +182,41 @@ export async function createOrder(payload, client = prisma) {
     packagingCharge,
     serviceChargeAmount = 0,
     notes,
-    store,
+    clientRequestId,
   } = payload;
 
   if (!items || items.length === 0)
     throw new Error("Order must have at least one item");
 
-  const { itemsData, subtotal, gstAmount } = await computeItemPricing(
-    items,
+  // FEATURE: offline mode idempotency (phase 1, step 6). If this exact
+  // clientRequestId already produced an order — e.g. the offline queue's
+  // sync succeeded once already but the client never saw the response and
+  // is retrying — return that SAME order instead of creating a second
+  // one. This must be checked before any pricing/creation work below.
+  // Scoped to outletId too: clientRequestId is client-generated
+  // (crypto.randomUUID()), effectively unique regardless, but scoping
+  // keeps this lookup consistent with every other query in this file
+  // rather than being the one exception that reads across outlets.
+  if (clientRequestId) {
+    const existing = await client.order.findFirst({
+      where: { clientRequestId, outletId },
+      include: { items: { include: { addOns: true } } },
+    });
+    if (existing) return existing;
+  }
+
+  await validateOrderReferences(
+    { tableId, customerId, waiterId, deliveryPartnerId },
+    outletId,
     client,
   );
-  const { addOnTotal } = await resolveAddOnPricing(itemsData, client);
+
+  const { itemsData, subtotal, gstAmount } = await computeItemPricing(
+    items,
+    outletId,
+    client,
+  );
+  const { addOnTotal } = await resolveAddOnPricing(itemsData, outletId, client);
 
   const grandTotal =
     subtotal +
@@ -155,49 +226,71 @@ export async function createOrder(payload, client = prisma) {
     Number(deliveryCharge || 0) +
     Number(packagingCharge || 0);
 
-  const orderNumber = await generateOrderNumber(client);
+  const orderNumber = await generateOrderNumber(outletId, client);
 
-  const order = await client.order.create({
-    data: {
-      orderNumber,
-      orderType,
-      status: "NEW",
-      tableId,
-      customerId,
-      waiterId,
-      numberOfGuests,
-      deliveryPartnerId,
-      deliveryCharge,
-      deliveryAddress,
-      estimatedDeliveryTime,
-      pickupTime,
-      packagingCharge,
-      subtotal,
-      gstAmount,
-      serviceChargeAmount,
-      grandTotal,
-      notes,
-      store,
-      items: {
-        create: itemsData.map((item) => ({
-          menuItemId: item.menuItemId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-          notes: item.notes,
-          addOns: {
-            create: item.addOns.map((a) => ({
-              addOnId: a.addOnId,
-              quantity: a.quantity,
-              unitPrice: a.unitPrice,
-              totalPrice: a.totalPrice,
-            })),
-          },
-        })),
+  let order;
+  try {
+    order = await client.order.create({
+      data: {
+        outletId,
+        orderNumber,
+        orderType,
+        status: "NEW",
+        tableId,
+        customerId,
+        waiterId,
+        numberOfGuests,
+        deliveryPartnerId,
+        deliveryCharge,
+        deliveryAddress,
+        estimatedDeliveryTime,
+        pickupTime,
+        packagingCharge,
+        subtotal,
+        gstAmount,
+        serviceChargeAmount,
+        grandTotal,
+        notes,
+        clientRequestId,
+        items: {
+          create: itemsData.map((item) => ({
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            notes: item.notes,
+            addOns: {
+              create: item.addOns.map((a) => ({
+                addOnId: a.addOnId,
+                quantity: a.quantity,
+                unitPrice: a.unitPrice,
+                totalPrice: a.totalPrice,
+              })),
+            },
+          })),
+        },
       },
-    },
-    include: { items: { include: { addOns: true } } },
-  });
+      include: { items: { include: { addOns: true } } },
+    });
+  } catch (err) {
+    // Extremely narrow race: two near-simultaneous sync attempts for the
+    // SAME clientRequestId both pass the findFirst check above before
+    // either has inserted. The @unique constraint on clientRequestId
+    // catches it at the DB level — fetch and return the winner's row
+    // instead of surfacing a confusing constraint-violation error.
+    if (
+      err.code === "P2002" &&
+      err.meta?.target?.includes("clientRequestId") &&
+      clientRequestId
+    ) {
+      const winner = await client.order.findFirst({
+        where: { clientRequestId, outletId },
+        include: { items: { include: { addOns: true } } },
+      });
+      if (winner) return winner;
+    }
+    throw err;
+  }
 
   // Dine-in orders occupy the table immediately
   if (orderType === "DINE_IN" && tableId) {
@@ -216,35 +309,48 @@ export async function createOrder(payload, client = prisma) {
 // change ever gets committed. This is the endpoint the POS UI should call
 // instead of createOrder + sendToKitchen as two separate requests, since that
 // two-step version can leave a real Order behind even when the kitchen send fails.
-export async function createOrderAndSendToKitchen(payload) {
+export async function createOrderAndSendToKitchen(payload, outletId) {
   return prisma
     .$transaction(
       async (tx) => {
-        const order = await createOrder(payload, tx);
+        // FEATURE: offline-sync idempotency guard. If this
+        // clientRequestId already produced an order, it was also already
+        // sent to the kitchen the first time — return it as-is rather
+        // than calling createOrder+sendToKitchen again. This MUST be
+        // checked here (not just inside createOrder) because
+        // kot.service.js's sendToKitchen deliberately THROWS on items
+        // that are already ticketed (that's its own duplicate-KOT guard
+        // for double-clicks) — without this early return, a harmless
+        // retried sync would surface as a hard failure instead of a
+        // silent no-op.
+        if (payload.clientRequestId) {
+          const existing = await tx.order.findFirst({
+            where: { clientRequestId: payload.clientRequestId, outletId },
+            select: { id: true },
+          });
+          if (existing) return existing.id;
+        }
+
+        const order = await createOrder(payload, outletId, tx);
 
         const orderItemIds = order.items.map((i) => i.id);
         if (orderItemIds.length > 0) {
-          await kotService.sendToKitchen(order.id, orderItemIds, tx);
+          await kotService.sendToKitchen(order.id, orderItemIds, outletId, tx);
         }
 
         return order.id;
       },
       { timeout: 15000 },
     )
-    .then((orderId) => getOrderById(orderId));
+    .then((orderId) => getOrderById(orderId, outletId));
 }
 
-export async function listOrders({
-  status,
-  orderType,
-  tableId,
-  customerId,
-  from,
-  to,
-  page = 1,
-  limit = 20,
-}) {
+export async function listOrders(
+  { status, orderType, tableId, customerId, from, to, page = 1, limit = 20 },
+  outletId,
+) {
   const where = {
+    outletId,
     ...(status ? { status } : {}),
     ...(orderType ? { orderType } : {}),
     ...(tableId ? { tableId } : {}),
@@ -281,9 +387,9 @@ export async function listOrders({
   return { data, total, page: Number(page), limit: Number(limit) };
 }
 
-export async function getOrderById(id) {
-  return prisma.order.findUnique({
-    where: { id },
+export async function getOrderById(id, outletId) {
+  return prisma.order.findFirst({
+    where: { id, outletId },
     include: {
       table: true,
       customer: true,
@@ -301,9 +407,20 @@ export async function getOrderById(id) {
   });
 }
 
-export async function updateOrderStatus(id, status) {
-  const order = await prisma.order.findUnique({ where: { id } });
+export async function updateOrderStatus(id, status, outletId) {
+  const order = await prisma.order.findFirst({ where: { id, outletId } });
   if (!order) throw new Error("Order not found");
+
+  // FIX: idempotent replay guard — same reasoning as kot.service.js's
+  // KOT_STAGE_RANK guard. Without this, ANY retried request for the same
+  // status (an offline-queued "mark COMPLETED" replaying after it already
+  // succeeded once, or even a plain network retry with no offline
+  // involved at all) would re-run consumeStockForOrder below and
+  // DOUBLE-DEDUCT inventory for the same order — and would also throw
+  // unnecessarily, since STATUS_FLOW's COMPLETED entry doesn't list
+  // COMPLETED as a valid "next" status from itself. Already at the
+  // target status -> safe no-op, return as-is.
+  if (order.status === status) return order;
 
   const allowed = STATUS_FLOW[order.status] || [];
   if (!allowed.includes(status)) {
@@ -368,23 +485,29 @@ async function consumeStockForOrder(orderId) {
   }
 }
 
-export async function holdOrder(id) {
-  const holdNumber = await generateHoldNumber();
+export async function holdOrder(id, outletId) {
+  const order = await prisma.order.findFirst({ where: { id, outletId } });
+  if (!order) throw new Error("Order not found");
+
+  const holdNumber = await generateHoldNumber(outletId);
   return prisma.order.update({
     where: { id },
     data: { status: "ON_HOLD", holdNumber },
   });
 }
 
-export async function resumeOrder(id) {
+export async function resumeOrder(id, outletId) {
+  const order = await prisma.order.findFirst({ where: { id, outletId } });
+  if (!order) throw new Error("Order not found");
+
   return prisma.order.update({
     where: { id },
     data: { status: "NEW", holdNumber: null },
   });
 }
 
-export async function cancelOrder(id, reason) {
-  const order = await prisma.order.findUnique({ where: { id } });
+export async function cancelOrder(id, reason, outletId) {
+  const order = await prisma.order.findFirst({ where: { id, outletId } });
   if (!order) throw new Error("Order not found");
 
   if (order.tableId) {
@@ -405,9 +528,20 @@ export async function cancelOrder(id, reason) {
   });
 }
 
-export async function transferTable(orderId, newTableId) {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+export async function transferTable(orderId, newTableId, outletId) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, outletId },
+  });
   if (!order) throw new Error("Order not found");
+
+  // Both the order's current table and the destination table must belong
+  // to the same outlet — without this check a stray/guessed tableId from
+  // another outlet would silently move an order onto a table it can never
+  // actually reach on the floor plan.
+  const newTable = await prisma.restaurantTable.findFirst({
+    where: { id: newTableId, outletId },
+  });
+  if (!newTable) throw new Error("Table not found");
 
   if (order.tableId) {
     await prisma.restaurantTable.update({
@@ -430,9 +564,18 @@ export async function transferTable(orderId, newTableId) {
 // asks for 2 more items mid-meal). Returns both the updated order AND the
 // newly created OrderItem rows specifically — the caller needs those ids to
 // send ONLY the new items to the kitchen, not the whole order again.
-export async function addItemsToOrder(orderId, items) {
-  const { itemsData } = await computeItemPricing(items);
-  await resolveAddOnPricing(itemsData);
+export async function addItemsToOrder(orderId, items, outletId) {
+  // FIX: this function previously never checked the order existed at all
+  // (let alone that it belonged to this outlet) before creating OrderItem
+  // rows against orderId — a stray/guessed orderId from another outlet
+  // would have silently attached items to it.
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, outletId },
+  });
+  if (!order) throw new Error("Order not found");
+
+  const { itemsData } = await computeItemPricing(items, outletId);
+  await resolveAddOnPricing(itemsData, outletId);
 
   // Created one-by-one (not createMany) specifically so we get each row's id
   // back — createMany doesn't return the created rows in Postgres.
@@ -452,8 +595,8 @@ export async function addItemsToOrder(orderId, items) {
     ),
   );
 
-  const order = await recalculateOrderTotals(orderId);
-  return { order, newItems };
+  const updatedOrder = await recalculateOrderTotals(orderId);
+  return { order: updatedOrder, newItems };
 }
 
 async function recalculateOrderTotals(orderId) {
@@ -493,8 +636,8 @@ async function recalculateOrderTotals(orderId) {
 // its rows represent a customer's points ledger history (points already
 // earned/redeemed) rather than order-specific data, so instead of deleting
 // that history we just detach the reference (orderId -> null).
-export async function deleteOrder(id) {
-  const order = await prisma.order.findUnique({ where: { id } });
+export async function deleteOrder(id, actor, outletId) {
+  const order = await prisma.order.findFirst({ where: { id, outletId } });
   if (!order) throw new Error("Order not found");
 
   await prisma.$transaction(async (tx) => {
@@ -523,6 +666,26 @@ export async function deleteOrder(id) {
       data: { status: "FREE" },
     });
   }
+
+  // Highest-priority audit case of the three wired up in this pass — this
+  // is a permanent delete of a potentially-paid order, requested
+  // specifically as a kept feature despite the record-keeping tradeoff
+  // discussed earlier. This is the row that lets you answer "who deleted
+  // order ORD-000123 and when" after the fact.
+  await writeAuditLog({
+    outletId,
+    action: "ORDER_DELETED",
+    entityType: "Order",
+    entityId: id,
+    performedById: actor?.employeeId ?? actor?.id ?? null,
+    performedByRole: actor?.role ?? null,
+    metadata: {
+      orderNumber: order.orderNumber,
+      orderType: order.orderType,
+      status: order.status,
+      grandTotal: order.grandTotal,
+    },
+  });
 
   return { success: true, id };
 }

@@ -2,8 +2,9 @@
 import prisma from "../../config/prisma.js";
 import * as activityLogsService from "../activity-logs/activityLogs.service.js";
 
-export async function listLeaves({ employeeId, status, page = 1, limit = 20 }) {
+export async function listLeaves({ employeeId, status, page = 1, limit = 20 }, outletId) {
   const where = {
+    outletId,
     ...(employeeId ? { employeeId } : {}),
     ...(status ? { status } : {}),
   };
@@ -24,7 +25,7 @@ export async function listLeaves({ employeeId, status, page = 1, limit = 20 }) {
 
 const LEAVE_TYPES = new Set(["CASUAL", "SICK", "PAID", "EMERGENCY"]);
 
-export async function createLeaveRequest(payload) {
+export async function createLeaveRequest(payload, outletId) {
   const { employeeId, type, fromDate, toDate, reason } = payload || {};
 
   // CHANGED: validate explicitly instead of handing req.body straight to
@@ -53,8 +54,8 @@ export async function createLeaveRequest(payload) {
     throw new Error("The 'to' date can't be before the 'from' date.");
   }
 
-  const employee = await prisma.employee.findUnique({
-    where: { id: employeeId },
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, outletId },
     select: { id: true, fullName: true },
   });
   if (!employee) {
@@ -63,6 +64,7 @@ export async function createLeaveRequest(payload) {
 
   const leave = await prisma.leaveRequest.create({
     data: {
+      outletId,
       employeeId,
       type,
       fromDate: from,
@@ -79,12 +81,20 @@ export async function createLeaveRequest(payload) {
     action: `Applied for ${type} leave (${from.toISOString().slice(0, 10)} to ${to
       .toISOString()
       .slice(0, 10)})`,
-  });
+  }, outletId);
 
   return leave;
 }
 
-export async function decideLeaveRequest(id, { status, approvedById }) {
+export async function decideLeaveRequest(id, { status, approvedById }, outletId) {
+  // FIX: previously updated by id alone with no ownership check.
+  const existing = await prisma.leaveRequest.findFirst({ where: { id, outletId } });
+  if (!existing) {
+    const err = new Error("Leave request not found");
+    err.code = "P2025";
+    throw err;
+  }
+
   // status: "APPROVED" | "REJECTED"
   const leave = await prisma.leaveRequest.update({
     where: { id },
@@ -105,7 +115,7 @@ export async function decideLeaveRequest(id, { status, approvedById }) {
       dates.map((date) =>
         prisma.attendance.upsert({
           where: { employeeId_date: { employeeId: leave.employeeId, date } },
-          create: { employeeId: leave.employeeId, date, status: "LEAVE" },
+          create: { outletId, employeeId: leave.employeeId, date, status: "LEAVE" },
           update: { status: "LEAVE" },
         }),
       ),
@@ -120,7 +130,7 @@ export async function decideLeaveRequest(id, { status, approvedById }) {
     )
       .toISOString()
       .slice(0, 10)} to ${new Date(leave.toDate).toISOString().slice(0, 10)})`,
-  });
+  }, outletId);
 
   return leave;
 }

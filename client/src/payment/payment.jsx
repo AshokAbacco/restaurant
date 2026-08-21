@@ -11,9 +11,10 @@
 // Requires `npm install exceljs` in this project.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
-import { Eye, Trash2 } from "lucide-react";
+import { Eye, Trash2, WifiOff } from "lucide-react";
 import { getOrders, deleteOrder } from "../pos/api/posApi";
 import { useAuth } from "../auth/AuthContext";
+import { fetchWithOfflineFallback } from "../offline/offlineCache";
 import OrderDetailModal from "./components/OrderDetailModal";
 
 const COMPLETED_ORDER_STATUSES = ["COMPLETED"];
@@ -143,15 +144,32 @@ export default function Payment() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
+  const [isOffline, setIsOffline] = useState(false);
+
+  // Read-only offline browsing — every stat card, filter, and the Excel
+  // export all keep working off the last-synced data for this exact date
+  // range if the connection drops. Delete stays online-only regardless
+  // (see the Delete button/modal below) — deleting a financial record is
+  // not something that should ever be queued for "whenever a connection
+  // shows up later."
   const load = useCallback((fromDate, toDate) => {
     setLoading(true);
     setError(null);
-    getOrders({
-      from: startOfDayISO(fromDate),
-      to: endOfDayISO(toDate),
-      limit: 500,
-    })
-      .then((data) => setOrders(data?.data || []))
+    fetchWithOfflineFallback(
+      `payments:orders:${fromDate}_${toDate}`,
+      async () => {
+        const data = await getOrders({
+          from: startOfDayISO(fromDate),
+          to: endOfDayISO(toDate),
+          limit: 500,
+        });
+        return data?.data || [];
+      },
+    )
+      .then(({ data, fromCache }) => {
+        setOrders(data);
+        setIsOffline(fromCache);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -508,6 +526,14 @@ export default function Payment() {
         </p>
       )}
 
+      {isOffline && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <WifiOff className="h-3.5 w-3.5" />
+          Offline — showing last-synced data for this date range. Deleting an
+          order needs a connection.
+        </div>
+      )}
+
       {/* ============ Summary cards ============ */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
@@ -657,7 +683,7 @@ export default function Payment() {
                             >
                               <Eye className="h-4 w-4" />
                             </button>
-                            {isOwner && (
+                            {isOwner && !isOffline && (
                               <button
                                 onClick={() => setConfirmDeleteId(order.id)}
                                 title="Delete order"
@@ -682,7 +708,7 @@ export default function Payment() {
         <OrderDetailModal
           orderId={viewingOrderId}
           onClose={() => setViewingOrderId(null)}
-          canDelete={isOwner}
+          canDelete={isOwner && !isOffline}
           onDelete={handleDelete}
           deleting={deletingId === viewingOrderId}
         />
