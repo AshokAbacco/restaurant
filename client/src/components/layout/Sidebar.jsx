@@ -27,6 +27,7 @@ import {
   FiExternalLink,
 } from "react-icons/fi";
 import { TableProperties } from "lucide-react";
+import { MdOutlineTableRestaurant } from "react-icons/md";
 
 import { useAuth } from "../../auth/AuthContext";
 
@@ -87,7 +88,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
     {
       name: "Tables Reservations",
       path: "/table-reservations",
-      icon: <TableProperties />,
+      icon: <MdOutlineTableRestaurant  />,
     },
 
     {
