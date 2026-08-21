@@ -1,7 +1,29 @@
 // server/src/pos/tables/tables.service.js
 import prisma from "../../config/prisma.js";
+import { getUpcomingReservationsByTableIds } from "../../reservations/reservations.service.js";
 
 const WAITER_SELECT = { id: true, fullName: true, employeeCode: true };
+
+// Additive, read-only: attaches each table's soonest upcoming BOOKED
+// reservation (if any) as `upcomingReservation`. Never reads or writes
+// RestaurantTable.status — the existing FREE/OCCUPIED status flow (driven
+// by orders/KOT/billing, e.g. mergeTables below) is completely untouched.
+async function withUpcomingReservations(tables) {
+  const byTable = await getUpcomingReservationsByTableIds(
+    tables.map((t) => t.id),
+  );
+  return tables.map((t) => ({
+    ...t,
+    upcomingReservation: byTable[t.id]
+      ? {
+          id: byTable[t.id].id,
+          customerName: byTable[t.id].customerName,
+          partySize: byTable[t.id].partySize,
+          reservedFor: byTable[t.id].reservedFor,
+        }
+      : null,
+  }));
+}
 
 // ---------------------------------------------------------------------------
 // Floors — power the floor tabs on the Tables Management page. A floor is
@@ -42,8 +64,14 @@ export async function deleteFloor(id, outletId) {
   return prisma.floor.delete({ where: { id } });
 }
 
-export async function listTables({ status, section, outletId, floorId, waiterId }) {
-  return prisma.restaurantTable.findMany({
+export async function listTables({
+  status,
+  section,
+  store,
+  floorId,
+  waiterId,
+}) {
+  const tables = await prisma.restaurantTable.findMany({
     where: {
       outletId,
       ...(status ? { status } : {}),
@@ -65,6 +93,8 @@ export async function listTables({ status, section, outletId, floorId, waiterId 
     },
     orderBy: { name: "asc" },
   });
+
+  return withUpcomingReservations(tables);
 }
 
 // Kitchen stage ranking, lowest = least progressed. Used to pick the
@@ -123,8 +153,13 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
     orderBy: { name: "asc" },
   });
 
+  const byTable = await getUpcomingReservationsByTableIds(
+    tables.map((t) => t.id),
+  );
+
   return tables.map((table) => {
     const order = table.orders[0] || null;
+    const upcoming = byTable[table.id];
     return {
       id: table.id,
       name: table.name,
@@ -132,6 +167,16 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
       section: table.section,
       status: table.status,
       waiter: table.waiter,
+      // Additive, read-only — does not affect status/order/kitchen logic
+      // above in any way.
+      upcomingReservation: upcoming
+        ? {
+            id: upcoming.id,
+            customerName: upcoming.customerName,
+            partySize: upcoming.partySize,
+            reservedFor: upcoming.reservedFor,
+          }
+        : null,
       order: order
         ? {
             id: order.id,

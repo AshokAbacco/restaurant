@@ -928,18 +928,19 @@ model Employee {
   outletId String
   outlet   Outlet @relation(fields: [outletId], references: [id])
 
-  address            EmployeeAddress?
-  userAccount        UserAccount?
-  attendance         Attendance[]
-  attendanceLogs     AttendanceLog[]
-  shiftAssignments   ShiftAssignment[]
-  leaveRequests      LeaveRequest[]
-  approvedLeaves     LeaveRequest[]      @relation("LeaveApprovedBy")
-  payrollRecords     PayrollRecord[]
-  incentives         Incentive[]
-  approvedIncentives Incentive[]         @relation("IncentiveApprovedBy")
-  performanceRecords PerformanceRecord[]
-  activityLogs       ActivityLog[]
+  address             EmployeeAddress?
+  userAccount         UserAccount?
+  attendance          Attendance[]
+  attendanceLogs      AttendanceLog[]
+  shiftAssignments    ShiftAssignment[]
+  leaveRequests       LeaveRequest[]
+  approvedLeaves      LeaveRequest[]      @relation("LeaveApprovedBy")
+  payrollRecords      PayrollRecord[]
+  incentives          Incentive[]
+  approvedIncentives  Incentive[]         @relation("IncentiveApprovedBy")
+  performanceRecords  PerformanceRecord[]
+  activityLogs        ActivityLog[]
+  reservationsCreated TableReservation[]  @relation("ReservationsCreatedBy")
 
   // reverse relations into existing modules
   stockMovements   StockMovement[]   @relation("StockMovementsByUser")
@@ -949,9 +950,9 @@ model Employee {
   salaryExpenses   SalaryExpense[]   @relation("SalaryExpensesByEmployee")
   expenseAuditLogs ExpenseAuditLog[] @relation("ExpenseAuditLogsByEmployee")
 
-  ordersAsWaiter    Order[]         @relation("OrdersByWaiter")
+  ordersAsWaiter    Order[]           @relation("OrdersByWaiter")
   assignedTables    RestaurantTable[] @relation("TablesByWaiter")
-  discountsApproved OrderDiscount[] @relation("DiscountsApprovedBy")
+  discountsApproved OrderDiscount[]   @relation("DiscountsApprovedBy")
 
   kitchenOrdersAsChef  KitchenOrder[]          @relation("KOTsByChef")
   kitchenStatusChanges KitchenOrderStatusLog[] @relation("KOTStatusChangedBy")
@@ -1238,6 +1239,19 @@ enum TableStatus {
   RESERVED
 }
 
+// Lifecycle for a single TableReservation record. Deliberately separate from
+// TableStatus above — a reservation's status tracks the booking itself,
+// while RestaurantTable.status continues to track live floor occupancy
+// (FREE/OCCUPIED/RESERVED) exactly as it does today. See TableReservation
+// model for how the two relate.
+enum ReservationStatus {
+  BOOKED
+  SEATED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
@@ -1311,6 +1325,10 @@ model RestaurantTable {
 
   orders Order[]
 
+  // A table can have many reservations over time (past + future). This is
+  // an additional layer on top of existing occupancy — see TableReservation.
+  reservations TableReservation[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1319,6 +1337,56 @@ model RestaurantTable {
   @@index([waiterId])
   @@index([outletId])
   @@map("restaurant_tables")
+}
+
+// ==============================================
+// TABLE RESERVATION
+// An additional layer on top of RestaurantTable — booking a table ahead of
+// time. Does NOT replace or drive RestaurantTable.status; the existing
+// FREE/OCCUPIED/RESERVED occupancy flow (driven by orders/KOT/billing) is
+// untouched. A table's upcoming reservation is surfaced alongside its
+// existing status in the tables list API as extra read-only info.
+//
+// "store" follows the same single-string-field convention already used on
+// RestaurantTable/Employee/Expense (no separate outlet/tenant model exists
+// in this schema) and is always taken server-side from req.user.store, the
+// same as every other module — never trusted from the request body.
+// ==============================================
+model TableReservation {
+  id String @id @default(uuid())
+
+  tableId String
+  table   RestaurantTable @relation(fields: [tableId], references: [id])
+
+  store String @default("Main Store")
+
+  customerName  String
+  customerPhone String
+
+  partySize       Int
+  reservedFor     DateTime // combined reservation date + time
+  durationMinutes Int      @default(60)
+
+  status ReservationStatus @default(BOOKED)
+  notes  String?
+
+  // Same pattern as Expense.createdBy / Expense.createdByEmployee
+  createdBy         String?
+  createdByEmployee Employee? @relation("ReservationsCreatedBy", fields: [createdBy], references: [id])
+
+  seatedAt    DateTime?
+  cancelledAt DateTime?
+  noShowAt    DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tableId])
+  @@index([status])
+  @@index([reservedFor])
+  @@index([store])
+  @@map("table_reservations")
 }
 
 model Customer {

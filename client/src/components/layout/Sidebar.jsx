@@ -1,3 +1,5 @@
+// src/components/sidebar.jsx
+
 import React, { useEffect, useMemo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -80,6 +82,11 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
     {
       name: "Tables",
       path: "/tables",
+      icon: <TableProperties />,
+    },
+    {
+      name: "Tables Reservations",
+      path: "/table-reservations",
       icon: <TableProperties />,
     },
 
@@ -432,31 +439,6 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
       {/* ===================== USER ===================== */}
 
-      <div
-        className={`border-b border-[#E7EAE1] dark:border-[#262B24] ${collapsed ? "p-3" : "p-5"}`}
-      >
-        <div
-          className={`flex items-center ${
-            collapsed ? "justify-center" : "gap-4"
-          }`}
-        >
-          <div className="w-12 h-12 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] flex items-center justify-center text-white text-lg font-bold">
-            {user?.name?.charAt(0) || "R"}
-          </div>
-
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <h3 className="font-semibold text-[#1F2937] dark:text-white truncate">
-                {user?.name}
-              </h3>
-
-              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] capitalize">
-                {user?.role?.toLowerCase()}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* ===================== MENU ===================== */}
 

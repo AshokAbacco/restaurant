@@ -1,3 +1,5 @@
+// src/pos/posRouts.jsx
+
 import { Routes, Route } from "react-router-dom";
 import PosOrderScreen from "./PosOrderScreen";
 import KitchenDisplayScreen from "./Kitchen/KitchenDisplayScreen";
