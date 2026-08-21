@@ -22,6 +22,7 @@ import { useTheme } from "../../context/ThemeContext";
 import NotificationBell from "./NotificationBell";
 import ProfileMenu from "./ProfileMenu";
 import OfflineIndicator from "./OfflineIndicator";
+import OutletSwitcher from "./OutletSwitcher";
 
 const Header = ({ onMenuClick }) => {
   const { user } = useAuth();
@@ -221,6 +222,8 @@ const Header = ({ onMenuClick }) => {
           </button>
 
           {/* Notifications */}
+
+          <OutletSwitcher />
 
           <OfflineIndicator />
 

@@ -1,8 +1,6 @@
 // server/src/pos/tables/tables.controller.js
 import * as tablesService from "./tables.service.js";
 
-const storeOf = (req) => req.user?.store || "Main Store";
-
 // FIX: this codebase isn't fully consistent about which field on req.user
 // carries the Employee id — dashboard.controller.js reads req.user.id,
 // while kot.controller.js reads req.user?.employeeId for the same purpose.
@@ -19,7 +17,7 @@ const waiterEmployeeId = (req) => req.user?.employeeId ?? req.user?.id;
 
 export async function getFloors(req, res) {
   try {
-    res.json(await tablesService.listFloors(req.query));
+    res.json(await tablesService.listFloors(req.tenant.outletId));
   } catch (err) {
     res
       .status(500)
@@ -32,7 +30,7 @@ export async function createFloor(req, res) {
     if (!req.body.name?.trim()) {
       return res.status(400).json({ message: "Floor name is required" });
     }
-    const floor = await tablesService.createFloor(req.body);
+    const floor = await tablesService.createFloor(req.body, req.tenant.outletId);
     res.status(201).json(floor);
   } catch (err) {
     res
@@ -43,7 +41,11 @@ export async function createFloor(req, res) {
 
 export async function updateFloor(req, res) {
   try {
-    const floor = await tablesService.updateFloor(req.params.id, req.body);
+    const floor = await tablesService.updateFloor(
+      req.params.id,
+      req.body,
+      req.tenant.outletId,
+    );
     res.json(floor);
   } catch (err) {
     res
@@ -54,7 +56,7 @@ export async function updateFloor(req, res) {
 
 export async function deleteFloor(req, res) {
   try {
-    await tablesService.deleteFloor(req.params.id);
+    await tablesService.deleteFloor(req.params.id, req.tenant.outletId);
     res.status(204).send();
   } catch (err) {
     res
@@ -75,7 +77,7 @@ export async function getTables(req, res) {
     // order saw every table's floor/table picker, not just the ones
     // assigned to them. Scoping here (rather than per-frontend) means any
     // screen that calls GET /pos/tables is automatically correct.
-    const query = { ...req.query };
+    const query = { ...req.query, outletId: req.tenant.outletId };
     if (req.user?.role === "WAITER") {
       query.waiterId = waiterEmployeeId(req);
     }
@@ -89,7 +91,7 @@ export async function getTables(req, res) {
 
 export async function getTablesBoard(req, res) {
   try {
-    const query = { ...req.query };
+    const query = { ...req.query, outletId: req.tenant.outletId };
     if (req.user?.role === "WAITER") {
       query.waiterId = waiterEmployeeId(req);
     }
@@ -103,7 +105,10 @@ export async function getTablesBoard(req, res) {
 
 export async function getTable(req, res) {
   try {
-    const table = await tablesService.getTableById(req.params.id);
+    const table = await tablesService.getTableById(
+      req.params.id,
+      req.tenant.outletId,
+    );
     if (!table) return res.status(404).json({ message: "Table not found" });
     // Defense in depth: even though the frontend never links a waiter to
     // another waiter's table, don't let a direct request to this id leak it.
@@ -123,7 +128,7 @@ export async function getTable(req, res) {
 
 export async function createTable(req, res) {
   try {
-    const table = await tablesService.createTable(req.body);
+    const table = await tablesService.createTable(req.body, req.tenant.outletId);
     res.status(201).json(table);
   } catch (err) {
     res
@@ -134,7 +139,11 @@ export async function createTable(req, res) {
 
 export async function updateTable(req, res) {
   try {
-    const table = await tablesService.updateTable(req.params.id, req.body);
+    const table = await tablesService.updateTable(
+      req.params.id,
+      req.body,
+      req.tenant.outletId,
+    );
     res.json(table);
   } catch (err) {
     res
@@ -145,7 +154,7 @@ export async function updateTable(req, res) {
 
 export async function deleteTable(req, res) {
   try {
-    await tablesService.deleteTable(req.params.id);
+    await tablesService.deleteTable(req.params.id, req.tenant.outletId);
     res.status(204).send();
   } catch (err) {
     res
@@ -159,6 +168,7 @@ export async function mergeTables(req, res) {
     const order = await tablesService.mergeTables(
       req.body.sourceTableId,
       req.body.targetTableId,
+      req.tenant.outletId,
     );
     res.json(order);
   } catch (err) {
@@ -174,7 +184,7 @@ export async function mergeTables(req, res) {
 
 export async function getWaiters(req, res) {
   try {
-    res.json(await tablesService.listWaiters(req.query));
+    res.json(await tablesService.listWaiters(req.tenant.outletId));
   } catch (err) {
     res
       .status(500)
@@ -185,7 +195,11 @@ export async function getWaiters(req, res) {
 export async function assignTables(req, res) {
   try {
     const { tableIds, waiterId } = req.body;
-    const tables = await tablesService.assignTables({ tableIds, waiterId });
+    const tables = await tablesService.assignTables({
+      tableIds,
+      waiterId,
+      outletId: req.tenant.outletId,
+    });
     res.json({ message: "Tables assigned", tables });
   } catch (err) {
     res
@@ -200,6 +214,7 @@ export async function assignFloor(req, res) {
     const result = await tablesService.assignFloorToWaiter({
       floorId,
       waiterId,
+      outletId: req.tenant.outletId,
     });
     res.json({
       message: `Assigned ${result.count} table(s) on this floor`,
@@ -214,10 +229,10 @@ export async function assignFloor(req, res) {
 
 export async function assignAll(req, res) {
   try {
-    const { waiterId, store } = req.body;
+    const { waiterId } = req.body;
     const result = await tablesService.assignAllTables({
       waiterId,
-      store: store || storeOf(req),
+      outletId: req.tenant.outletId,
     });
     res.json({ message: `Assigned all ${result.count} table(s)`, ...result });
   } catch (err) {
@@ -229,7 +244,10 @@ export async function assignAll(req, res) {
 
 export async function unassignTable(req, res) {
   try {
-    const table = await tablesService.unassignTable(req.params.id);
+    const table = await tablesService.unassignTable(
+      req.params.id,
+      req.tenant.outletId,
+    );
     res.json(table);
   } catch (err) {
     res
@@ -242,6 +260,7 @@ export async function unassignAllForWaiter(req, res) {
   try {
     const result = await tablesService.unassignAllForWaiter(
       req.params.waiterId,
+      req.tenant.outletId,
     );
     res.json({ message: `Unassigned ${result.count} table(s)`, ...result });
   } catch (err) {
@@ -262,7 +281,9 @@ export async function unassignAllForWaiter(req, res) {
 
 export async function getMyTables(req, res) {
   try {
-    res.json(await tablesService.getMyTables(waiterEmployeeId(req)));
+    res.json(
+      await tablesService.getMyTables(waiterEmployeeId(req), req.tenant.outletId),
+    );
   } catch (err) {
     res
       .status(500)
@@ -275,6 +296,7 @@ export async function getMyTableDetail(req, res) {
     const table = await tablesService.getTableDetailForWaiter(
       req.params.id,
       waiterEmployeeId(req),
+      req.tenant.outletId,
     );
     if (!table) {
       return res

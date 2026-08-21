@@ -10,11 +10,16 @@ import { sendExport } from "./profitLoss.utils.js";
 // Common filters accepted across most endpoints. `shift` is accepted for
 // forward-compatibility (see note in profitLoss.service.js) but not yet
 // applied to any query.
+//
+// FIX: outletId here comes from req.tenant (the authenticated session),
+// never from req.query — the old `store` query param let a client request
+// figures for any store as a plain string. There is no client-controlled
+// equivalent of that anymore, by design.
 const parseCommonQuery = (req) => ({
   from: req.query.from,
   to: req.query.to,
   period: req.query.period, // today | week | month | year
-  store: req.query.store || undefined,
+  outletId: req.tenant.outletId,
   employeeId: req.query.employeeId || undefined,
   categoryId: req.query.categoryId || undefined,
   menuItemId: req.query.menuItemId || undefined,
@@ -23,7 +28,7 @@ const parseCommonQuery = (req) => ({
 export const getDashboard = async (req, res, next) => {
   try {
     const data = await profitLossService.getDashboard({
-      store: req.query.store || undefined,
+      outletId: req.tenant.outletId,
     });
     res.json({ success: true, data });
   } catch (err) {

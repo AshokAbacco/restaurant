@@ -68,13 +68,13 @@ const DEFAULT_FOOD_COST_THRESHOLD_PCT = 30;
 const orderWhere = ({
   fromDate,
   toDate,
-  store,
+  outletId,
   employeeId,
   status = COMPLETED,
 }) => ({
   status,
   createdAt: { gte: fromDate, lte: toDate },
-  ...(store ? { store } : {}),
+  outletId,
   ...(employeeId ? { waiterId: employeeId } : {}),
 });
 
@@ -85,10 +85,10 @@ const orderWhere = ({
 export const getRevenueSummary = async ({
   fromDate,
   toDate,
-  store,
+  outletId,
   employeeId,
 }) => {
-  const where = orderWhere({ fromDate, toDate, store, employeeId });
+  const where = orderWhere({ fromDate, toDate, outletId, employeeId });
 
   const [totals, byType] = await Promise.all([
     prisma.order.aggregate({
@@ -125,9 +125,9 @@ export const getRevenueSummary = async ({
   };
 };
 
-export const getRevenue = async ({ from, to, period, store, employeeId }) => {
+export const getRevenue = async ({ from, to, period, outletId, employeeId }) => {
   const range = parseDateRange({ from, to, period });
-  const summary = await getRevenueSummary({ ...range, store, employeeId });
+  const summary = await getRevenueSummary({ ...range, outletId, employeeId });
   return { period: range, ...summary };
 };
 
@@ -138,14 +138,14 @@ export const getRevenue = async ({ from, to, period, store, employeeId }) => {
 const getCogsInternal = async ({
   fromDate,
   toDate,
-  store,
+  outletId,
   employeeId,
   categoryId,
   menuItemId,
 }) => {
   const orderItems = await prisma.orderItem.findMany({
     where: {
-      order: orderWhere({ fromDate, toDate, store, employeeId }),
+      order: orderWhere({ fromDate, toDate, outletId, employeeId }),
       ...(menuItemId ? { menuItemId } : {}),
       ...(categoryId ? { menuItem: { categoryId } } : {}),
     },
@@ -203,7 +203,7 @@ export const getCogs = async ({
   from,
   to,
   period,
-  store,
+  outletId,
   employeeId,
   categoryId,
   menuItemId,
@@ -211,7 +211,7 @@ export const getCogs = async ({
   const range = parseDateRange({ from, to, period });
   const cogs = await getCogsInternal({
     ...range,
-    store,
+    outletId,
     employeeId,
     categoryId,
     menuItemId,
@@ -226,14 +226,14 @@ export const getFoodCost = async ({
   from,
   to,
   period,
-  store,
+  outletId,
   employeeId,
   thresholdPct = DEFAULT_FOOD_COST_THRESHOLD_PCT,
 }) => {
   const range = parseDateRange({ from, to, period });
   const [cogs, categories] = await Promise.all([
-    getCogsInternal({ ...range, store, employeeId }),
-    getCategoryProfitInternal({ ...range, store, employeeId }),
+    getCogsInternal({ ...range, outletId, employeeId }),
+    getCategoryProfitInternal({ ...range, outletId, employeeId }),
   ]);
 
   const overallPct = percent(cogs.totalCogs, cogs.totalRevenue);
@@ -260,11 +260,11 @@ export const getFoodCost = async ({
 const getCategoryProfitInternal = async ({
   fromDate,
   toDate,
-  store,
+  outletId,
   employeeId,
 }) => {
   const orderItems = await prisma.orderItem.findMany({
-    where: { order: orderWhere({ fromDate, toDate, store, employeeId }) },
+    where: { order: orderWhere({ fromDate, toDate, outletId, employeeId }) },
     select: {
       quantity: true,
       totalPrice: true,
@@ -313,11 +313,11 @@ export const getCategoryProfit = async ({
   from,
   to,
   period,
-  store,
+  outletId,
   employeeId,
 }) => {
   const range = parseDateRange({ from, to, period });
-  const rows = await getCategoryProfitInternal({ ...range, store, employeeId });
+  const rows = await getCategoryProfitInternal({ ...range, outletId, employeeId });
   return { period: range, categories: rows };
 };
 
@@ -325,14 +325,14 @@ export const getItemProfit = async ({
   from,
   to,
   period,
-  store,
+  outletId,
   employeeId,
   categoryId,
 }) => {
   const range = parseDateRange({ from, to, period });
   const cogs = await getCogsInternal({
     ...range,
-    store,
+    outletId,
     employeeId,
     categoryId,
   });
@@ -357,11 +357,11 @@ export const getItemProfit = async ({
 // 4. OPERATING EXPENSES
 // ------------------------------------------------------------------
 
-const getExpensesInternal = async ({ fromDate, toDate, store }) => {
+const getExpensesInternal = async ({ fromDate, toDate, outletId }) => {
   const expenseWhere = {
     expenseDate: { gte: fromDate, lte: toDate },
     status: { notIn: EXCLUDED_EXPENSE_STATUSES },
-    ...(store ? { store } : {}),
+    outletId,
   };
 
   const [expenseTotals, expensesByCategory, salaries, utilities] =
@@ -379,7 +379,7 @@ const getExpensesInternal = async ({ fromDate, toDate, store }) => {
       prisma.salaryExpense.aggregate({
         where: {
           salaryMonth: { gte: fromDate, lte: toDate },
-          ...(store ? { store } : {}),
+          outletId,
         },
         _sum: { netSalary: true },
         _count: true,
@@ -387,7 +387,7 @@ const getExpensesInternal = async ({ fromDate, toDate, store }) => {
       prisma.utilityBill.aggregate({
         where: {
           billingPeriodStart: { gte: fromDate, lte: toDate },
-          ...(store ? { store } : {}),
+          outletId,
         },
         _sum: { amount: true },
         _count: true,
@@ -432,9 +432,9 @@ const getExpensesInternal = async ({ fromDate, toDate, store }) => {
   };
 };
 
-export const getExpenses = async ({ from, to, period, store }) => {
+export const getExpenses = async ({ from, to, period, outletId }) => {
   const range = parseDateRange({ from, to, period });
-  const expenses = await getExpensesInternal({ ...range, store });
+  const expenses = await getExpensesInternal({ ...range, outletId });
   return { period: range, ...expenses };
 };
 
@@ -442,13 +442,13 @@ export const getExpenses = async ({ from, to, period, store }) => {
 // 5. DISCOUNT IMPACT
 // ------------------------------------------------------------------
 
-export const getDiscounts = async ({ from, to, period, store }) => {
+export const getDiscounts = async ({ from, to, period, outletId }) => {
   const { fromDate, toDate } = parseDateRange({ from, to, period });
 
   const orderDiscounts = await prisma.orderDiscount.findMany({
     where: {
       createdAt: { gte: fromDate, lte: toDate },
-      ...(store ? { order: { store } } : {}),
+      order: { outletId },
     },
     select: {
       type: true,
@@ -491,14 +491,14 @@ export const getDiscounts = async ({ from, to, period, store }) => {
 // 6. REFUND ANALYSIS
 // ------------------------------------------------------------------
 
-export const getRefunds = async ({ from, to, period, store }) => {
+export const getRefunds = async ({ from, to, period, outletId }) => {
   const { fromDate, toDate } = parseDateRange({ from, to, period });
 
   const refundedOrders = await prisma.order.findMany({
     where: {
       status: REFUNDED,
       updatedAt: { gte: fromDate, lte: toDate },
-      ...(store ? { store } : {}),
+      outletId,
     },
     select: { grandTotal: true, notes: true },
   });
@@ -532,18 +532,18 @@ export const getRefunds = async ({ from, to, period, store }) => {
 // 7. TAX ANALYSIS
 // ------------------------------------------------------------------
 
-export const getTax = async ({ from, to, period, store }) => {
+export const getTax = async ({ from, to, period, outletId }) => {
   const { fromDate, toDate } = parseDateRange({ from, to, period });
 
   const [collectedAgg, purchaseEntries] = await Promise.all([
     prisma.order.aggregate({
-      where: orderWhere({ fromDate, toDate, store }),
+      where: orderWhere({ fromDate, toDate, outletId }),
       _sum: { gstAmount: true },
     }),
     prisma.purchaseEntry.findMany({
       where: {
         createdAt: { gte: fromDate, lte: toDate },
-        ...(store ? { store } : {}),
+        outletId,
       },
       select: {
         quantityReceived: true,
@@ -577,7 +577,7 @@ export const getTax = async ({ from, to, period, store }) => {
 // 8. PAYMENT-WISE REVENUE
 // ------------------------------------------------------------------
 
-export const getPaymentRevenue = async ({ from, to, period, store }) => {
+export const getPaymentRevenue = async ({ from, to, period, outletId }) => {
   const { fromDate, toDate } = parseDateRange({ from, to, period });
 
   const rows = await prisma.payment.groupBy({
@@ -585,7 +585,7 @@ export const getPaymentRevenue = async ({ from, to, period, store }) => {
     where: {
       status: "PAID",
       paidAt: { gte: fromDate, lte: toDate },
-      ...(store ? { order: { store } } : {}),
+      order: { outletId },
     },
     _sum: { amount: true },
     _count: true,
@@ -613,9 +613,9 @@ export const getPaymentRevenue = async ({ from, to, period, store }) => {
 // Reconstructs an approximate stock quantity at a boundary date using the
 // last StockMovement at/before that date, then values it at *current*
 // Ingredient average cost (schema doesn't retain historical unit cost).
-const approximateStockValueAt = async (boundaryDate, store) => {
+const approximateStockValueAt = async (boundaryDate, outletId) => {
   const latestPerIngredient = await prisma.stockMovement.findMany({
-    where: { createdAt: { lte: boundaryDate }, ...(store ? { store } : {}) },
+    where: { createdAt: { lte: boundaryDate }, outletId, },
     orderBy: { createdAt: "desc" },
     distinct: ["ingredientId"],
     select: { ingredientId: true, newStock: true },
@@ -640,24 +640,24 @@ const approximateStockValueAt = async (boundaryDate, store) => {
   );
 };
 
-export const getInventoryCost = async ({ from, to, period, store }) => {
+export const getInventoryCost = async ({ from, to, period, outletId }) => {
   const { fromDate, toDate } = parseDateRange({ from, to, period });
 
   const [openingValue, closingValue, purchasesAgg, wastageAgg] =
     await Promise.all([
-      approximateStockValueAt(new Date(fromDate.getTime() - 1), store),
-      approximateStockValueAt(toDate, store),
+      approximateStockValueAt(new Date(fromDate.getTime() - 1), outletId),
+      approximateStockValueAt(toDate, outletId),
       prisma.purchaseEntry.aggregate({
         where: {
           createdAt: { gte: fromDate, lte: toDate },
-          ...(store ? { store } : {}),
+          outletId,
         },
         _sum: { totalAmount: true },
       }),
       prisma.wastage.aggregate({
         where: {
           createdAt: { gte: fromDate, lte: toDate },
-          ...(store ? { store } : {}),
+          outletId,
         },
         _sum: { cost: true },
       }),
@@ -680,13 +680,13 @@ export const getInventoryCost = async ({ from, to, period, store }) => {
   };
 };
 
-export const getWastage = async ({ from, to, period, store }) => {
+export const getWastage = async ({ from, to, period, outletId }) => {
   const { fromDate, toDate } = parseDateRange({ from, to, period });
 
   const rows = await prisma.wastage.findMany({
     where: {
       createdAt: { gte: fromDate, lte: toDate },
-      ...(store ? { store } : {}),
+      outletId,
     },
     select: {
       quantity: true,
@@ -731,12 +731,12 @@ export const getWastage = async ({ from, to, period, store }) => {
 // 10. DASHBOARD (today, at a glance)
 // ------------------------------------------------------------------
 
-export const getDashboard = async ({ store }) => {
+export const getDashboard = async ({ outletId }) => {
   const range = parseDateRange({ period: "today" });
   const [revenue, cogs, expenses] = await Promise.all([
-    getRevenueSummary({ ...range, store }),
-    getCogsInternal({ ...range, store }),
-    getExpensesInternal({ ...range, store }),
+    getRevenueSummary({ ...range, outletId }),
+    getCogsInternal({ ...range, outletId }),
+    getExpensesInternal({ ...range, outletId }),
   ]);
 
   const grossProfit = round2(revenue.netRevenue - cogs.totalCogs);
@@ -762,12 +762,12 @@ export const getProfitLossSummary = async ({
   from,
   to,
   period,
-  store,
+  outletId,
   employeeId,
   includeCapex = false,
 }) => {
   const range = parseDateRange({ from, to, period });
-  const params = { ...range, store, employeeId };
+  const params = { ...range, outletId, employeeId };
 
   const [revenue, cogs, operatingExpenses, wastage, tax] = await Promise.all([
     getRevenueSummary(params),
@@ -777,14 +777,14 @@ export const getProfitLossSummary = async ({
       from: undefined,
       to: undefined,
       period: undefined,
-      store,
+      outletId,
       ...range,
     }),
     getTax({
       from: undefined,
       to: undefined,
       period: undefined,
-      store,
+      outletId,
       ...range,
     }),
   ]);
@@ -793,7 +793,7 @@ export const getProfitLossSummary = async ({
     ? await prisma.assetPurchase.aggregate({
         where: {
           purchaseDate: { gte: range.fromDate, lte: range.toDate },
-          ...(store ? { store } : {}),
+          outletId,
         },
         _sum: { cost: true },
       })
@@ -808,7 +808,11 @@ export const getProfitLossSummary = async ({
 
   return {
     period: range,
-    store: store || "All Stores",
+    // CHANGED: this used to be a "store" label falling back to "All
+    // Stores" for the no-filter case — that fallback doesn't apply anymore
+    // since outletId is always required (never optional) now. Just echo
+    // the actual outlet id back; the caller already knows its own name.
+    outletId,
     revenue,
     cogs,
     grossProfit,
@@ -826,9 +830,7 @@ export const getProfitLossSummary = async ({
 // 12. CHARTS
 // ------------------------------------------------------------------
 
-const getTrendSeries = async ({ fromDate, toDate, store, groupBy }) => {
-  const storeParam = store ?? null;
-
+const getTrendSeries = async ({ fromDate, toDate, outletId, groupBy }) => {
   const [revenueRows, cogsRows, expenseRows] = await Promise.all([
     prisma.$queryRaw`
       SELECT date_trunc(${groupBy}, "createdAt") AS period,
@@ -837,7 +839,7 @@ const getTrendSeries = async ({ fromDate, toDate, store, groupBy }) => {
       FROM orders
       WHERE status = 'COMPLETED'
         AND "createdAt" BETWEEN ${fromDate} AND ${toDate}
-        AND (${storeParam}::text IS NULL OR store = ${storeParam})
+        AND "outletId" = ${outletId}
       GROUP BY period ORDER BY period
     `,
     prisma.$queryRaw`
@@ -848,7 +850,7 @@ const getTrendSeries = async ({ fromDate, toDate, store, groupBy }) => {
       JOIN menu_items mi ON mi.id = oi."menuItemId"
       WHERE o.status = 'COMPLETED'
         AND o."createdAt" BETWEEN ${fromDate} AND ${toDate}
-        AND (${storeParam}::text IS NULL OR o.store = ${storeParam})
+        AND o."outletId" = ${outletId}
       GROUP BY period ORDER BY period
     `,
     prisma.$queryRaw`
@@ -857,7 +859,7 @@ const getTrendSeries = async ({ fromDate, toDate, store, groupBy }) => {
       FROM expenses
       WHERE status NOT IN ('DRAFT', 'REJECTED')
         AND "expenseDate" BETWEEN ${fromDate} AND ${toDate}
-        AND (${storeParam}::text IS NULL OR store = ${storeParam})
+        AND "outletId" = ${outletId}
       GROUP BY period ORDER BY period
     `,
   ]);
@@ -922,7 +924,7 @@ const CHART_TYPES = [
   "net-profit-trend",
 ];
 
-export const getCharts = async ({ type, from, to, period, store, groupBy }) => {
+export const getCharts = async ({ type, from, to, period, outletId, groupBy }) => {
   if (!CHART_TYPES.includes(type)) {
     const err = new Error(`type must be one of: ${CHART_TYPES.join(", ")}`);
     err.status = 400;
@@ -933,12 +935,12 @@ export const getCharts = async ({ type, from, to, period, store, groupBy }) => {
   const range = parseDateRange({ from, to, period });
 
   if (type === "expense-breakdown") {
-    const expenses = await getExpensesInternal({ ...range, store });
+    const expenses = await getExpensesInternal({ ...range, outletId });
     return { type, data: expenses.byCategory };
   }
 
   if (type === "category-revenue") {
-    const rows = await getCategoryProfitInternal({ ...range, store });
+    const rows = await getCategoryProfitInternal({ ...range, outletId });
     return {
       type,
       data: rows.map((r) => ({
@@ -962,7 +964,7 @@ export const getCharts = async ({ type, from, to, period, store, groupBy }) => {
 
   const series = await getTrendSeries({
     ...range,
-    store,
+    outletId,
     groupBy: resolvedGroupBy,
   });
 
@@ -1007,7 +1009,7 @@ export const REPORT_TYPES = [
   "wastage-cost",
 ];
 
-export const buildReport = async ({ type, from, to, period, store }) => {
+export const buildReport = async ({ type, from, to, period, outletId }) => {
   if (!REPORT_TYPES.includes(type)) {
     const err = new Error(`type must be one of: ${REPORT_TYPES.join(", ")}`);
     err.status = 400;
@@ -1025,7 +1027,7 @@ export const buildReport = async ({ type, from, to, period, store }) => {
       from,
       to,
       period: from || to ? undefined : presetPeriod,
-      store,
+      outletId,
     });
 
     const rows = [
@@ -1048,7 +1050,7 @@ export const buildReport = async ({ type, from, to, period, store }) => {
   }
 
   if (type === "food-cost") {
-    const data = await getFoodCost({ from, to, period, store });
+    const data = await getFoodCost({ from, to, period, outletId });
     return {
       title: "Food Cost Report",
       rows: [
@@ -1063,7 +1065,7 @@ export const buildReport = async ({ type, from, to, period, store }) => {
   }
 
   if (type === "category-profit") {
-    const data = await getCategoryProfit({ from, to, period, store });
+    const data = await getCategoryProfit({ from, to, period, outletId });
     return {
       title: "Category Profit Report",
       rows: data.categories,
@@ -1072,22 +1074,22 @@ export const buildReport = async ({ type, from, to, period, store }) => {
   }
 
   if (type === "item-profit") {
-    const data = await getItemProfit({ from, to, period, store });
+    const data = await getItemProfit({ from, to, period, outletId });
     return { title: "Item Profit Report", rows: data.items, raw: data };
   }
 
   if (type === "expense") {
-    const data = await getExpenses({ from, to, period, store });
+    const data = await getExpenses({ from, to, period, outletId });
     return { title: "Expense Report", rows: data.byCategory, raw: data };
   }
 
   if (type === "revenue") {
-    const data = await getRevenue({ from, to, period, store });
+    const data = await getRevenue({ from, to, period, outletId });
     return { title: "Revenue Report", rows: data.byOrderType, raw: data };
   }
 
   // wastage-cost
-  const data = await getWastage({ from, to, period, store });
+  const data = await getWastage({ from, to, period, outletId });
   return { title: "Wastage Cost Report", rows: data.byIngredient, raw: data };
 };
 
@@ -1099,7 +1101,7 @@ export const getAlerts = async ({
   from,
   to,
   period,
-  store,
+  outletId,
   foodCostThresholdPct = DEFAULT_FOOD_COST_THRESHOLD_PCT,
 }) => {
   const range = parseDateRange({ from, to, period });
@@ -1110,12 +1112,12 @@ export const getAlerts = async ({
       from,
       to,
       period,
-      store,
+      outletId,
       thresholdPct: foodCostThresholdPct,
     }),
-    getExpensesInternal({ ...range, store }),
-    getExpensesInternal({ ...prevRange, store }),
-    getTrendSeries({ ...range, store, groupBy: "day" }),
+    getExpensesInternal({ ...range, outletId }),
+    getExpensesInternal({ ...prevRange, outletId }),
+    getTrendSeries({ ...range, outletId, groupBy: "day" }),
   ]);
 
   const alerts = [];

@@ -1,9 +1,9 @@
-// server\src\inventory\controllers\suppliers.controller.js
+// server/src/inventory/suppliers/suppliers.controller.js
 import * as suppliersService from "./suppliers.service.js";
 
 export const getSuppliers = async (req, res) => {
   try {
-    const suppliers = await suppliersService.listSuppliers();
+    const suppliers = await suppliersService.listSuppliers(req.tenant.outletId);
     res.json(suppliers);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch suppliers", error: err.message });
@@ -12,7 +12,7 @@ export const getSuppliers = async (req, res) => {
 
 export const getSupplier = async (req, res) => {
   try {
-    const supplier = await suppliersService.getSupplierById(req.params.id);
+    const supplier = await suppliersService.getSupplierById(req.params.id, req.tenant.outletId);
     if (!supplier) return res.status(404).json({ message: "Supplier not found" });
     res.json(supplier);
   } catch (err) {
@@ -22,7 +22,8 @@ export const getSupplier = async (req, res) => {
 
 export const getSupplierHistory = async (req, res) => {
   try {
-    const history = await suppliersService.getSupplierHistory(req.params.id);
+    const history = await suppliersService.getSupplierHistory(req.params.id, req.tenant.outletId);
+    if (history === null) return res.status(404).json({ message: "Supplier not found" });
     res.json(history);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch supplier history", error: err.message });
@@ -34,7 +35,7 @@ export const createSupplier = async (req, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ message: "name is required" });
 
-    const supplier = await suppliersService.createSupplier(req.body);
+    const supplier = await suppliersService.createSupplier(req.body, req.tenant.outletId);
     res.status(201).json(supplier);
   } catch (err) {
     res.status(500).json({ message: "Failed to create supplier", error: err.message });
@@ -43,7 +44,11 @@ export const createSupplier = async (req, res) => {
 
 export const updateSupplier = async (req, res) => {
   try {
-    const supplier = await suppliersService.updateSupplier(req.params.id, req.body);
+    const supplier = await suppliersService.updateSupplier(
+      req.params.id,
+      req.body,
+      req.tenant.outletId,
+    );
     res.json(supplier);
   } catch (err) {
     if (err.code === "P2025") {
@@ -55,7 +60,7 @@ export const updateSupplier = async (req, res) => {
 
 export const deleteSupplier = async (req, res) => {
   try {
-    await suppliersService.deleteSupplier(req.params.id);
+    await suppliersService.deleteSupplier(req.params.id, req.tenant.outletId);
     res.status(204).send();
   } catch (err) {
     if (err.code === "P2025") {

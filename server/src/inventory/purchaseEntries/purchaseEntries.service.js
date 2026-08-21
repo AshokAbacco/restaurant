@@ -7,8 +7,8 @@ const includeRelations = {
   ingredient: { include: { consumptionUnit: true, purchaseUnit: true } },
 };
 
-export const listPurchaseEntries = ({ ingredientId, supplierId, purchaseOrderId }) => {
-  const where = {};
+export const listPurchaseEntries = ({ ingredientId, supplierId, purchaseOrderId }, outletId) => {
+  const where = { outletId };
   if (ingredientId) where.ingredientId = ingredientId;
   if (supplierId) where.supplierId = supplierId;
   if (purchaseOrderId) where.purchaseOrderId = purchaseOrderId;
@@ -20,8 +20,8 @@ export const listPurchaseEntries = ({ ingredientId, supplierId, purchaseOrderId 
   });
 };
 
-export const getPurchaseEntryById = (id) =>
-  prisma.purchaseEntry.findUnique({ where: { id }, include: includeRelations });
+export const getPurchaseEntryById = (id, outletId) =>
+  prisma.purchaseEntry.findFirst({ where: { id, outletId }, include: includeRelations });
 
 /**
  * Records goods actually received and moves stock accordingly. This is the
@@ -30,18 +30,45 @@ export const getPurchaseEntryById = (id) =>
  * in one transaction so a crash mid-way can't leave stock partially updated.
  *
  * data: {
- *   purchaseOrderId?, supplierId, ingredientId, store?,
+ *   purchaseOrderId?, supplierId, ingredientId,
  *   invoiceNumber?, batchNumber?, expiryDate?,
  *   quantityReceived (in the ingredient's PURCHASE unit),
  *   purchasePrice (cost per purchase unit),
  *   gstPercent?, discount?
  * }
  */
-export const createPurchaseEntry = (data) =>
+export const createPurchaseEntry = (data, outletId) =>
   prisma.$transaction(async (tx) => {
-    const ingredient = await tx.ingredient.findUnique({ where: { id: data.ingredientId } });
+    // FIX: was findUnique({ where: { id: data.ingredientId } }) with no
+    // outlet check — a stray/guessed ingredientId from another outlet
+    // would have received stock against ITS ingredient record while being
+    // billed/logged under this outlet's purchase entry. Scoped now.
+    const ingredient = await tx.ingredient.findFirst({
+      where: { id: data.ingredientId, outletId },
+    });
     if (!ingredient) {
       const err = new Error("Ingredient not found");
+      err.code = "P2025";
+      throw err;
+    }
+
+    // Same check for purchaseOrderId/supplierId, if given — previously
+    // trusted outright.
+    if (data.purchaseOrderId) {
+      const po = await tx.purchaseOrder.findFirst({
+        where: { id: data.purchaseOrderId, outletId },
+      });
+      if (!po) {
+        const err = new Error("Purchase order not found");
+        err.code = "P2025";
+        throw err;
+      }
+    }
+    const supplier = await tx.supplier.findFirst({
+      where: { id: data.supplierId, outletId },
+    });
+    if (!supplier) {
+      const err = new Error("Supplier not found");
       err.code = "P2025";
       throw err;
     }
@@ -67,10 +94,10 @@ export const createPurchaseEntry = (data) =>
 
     const purchaseEntry = await tx.purchaseEntry.create({
       data: {
+        outletId,
         purchaseOrderId: data.purchaseOrderId || null,
         supplierId: data.supplierId,
         ingredientId: data.ingredientId,
-        store: data.store || "Main Store",
         invoiceNumber: data.invoiceNumber,
         batchNumber: data.batchNumber,
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
@@ -101,10 +128,10 @@ export const createPurchaseEntry = (data) =>
     await tx.inventoryStock.upsert({
       where: { ingredientId: data.ingredientId },
       create: {
+        outletId,
         ingredientId: data.ingredientId,
         quantityOnHand: newQty,
         averageCost: newAverageCost,
-        store: data.store || "Main Store",
       },
       update: {
         quantityOnHand: newQty,
@@ -114,6 +141,7 @@ export const createPurchaseEntry = (data) =>
 
     await tx.stockMovement.create({
       data: {
+        outletId,
         ingredientId: data.ingredientId,
         type: "PURCHASE",
         quantity: consumptionQtyReceived,
@@ -122,7 +150,6 @@ export const createPurchaseEntry = (data) =>
         reason: "Purchase entry (goods received)",
         referenceId: purchaseEntry.id,
         userId: data.userId || null,
-        store: data.store || "Main Store",
       },
     });
 
@@ -130,6 +157,7 @@ export const createPurchaseEntry = (data) =>
     if (data.expiryDate) {
       await tx.expiryBatch.create({
         data: {
+          outletId,
           ingredientId: data.ingredientId,
           batchNumber: data.batchNumber || purchaseEntry.id,
           manufacturingDate: data.manufacturingDate ? new Date(data.manufacturingDate) : null,

@@ -7,7 +7,7 @@ export async function checkIn(req, res) {
     const attendance = await attendanceService.checkIn(employeeId, {
       ipAddress: req.ip,
       device: req.headers["user-agent"],
-    });
+    }, req.tenant.outletId);
     res.status(201).json(attendance);
   } catch (err) {
     res.status(400).json({ message: "Check-in failed", error: err.message });
@@ -20,7 +20,7 @@ export async function checkOut(req, res) {
     const attendance = await attendanceService.checkOut(employeeId, {
       ipAddress: req.ip,
       device: req.headers["user-agent"],
-    });
+    }, req.tenant.outletId);
     res.json(attendance);
   } catch (err) {
     res.status(400).json({ message: "Check-out failed", error: err.message });
@@ -33,7 +33,7 @@ export async function recordBreak(req, res) {
     const log = await attendanceService.recordBreak(employeeId, type, {
       ipAddress: req.ip,
       device: req.headers["user-agent"],
-    });
+    }, req.tenant.outletId);
     res.status(201).json(log);
   } catch (err) {
     res
@@ -44,7 +44,7 @@ export async function recordBreak(req, res) {
 
 export async function getAttendance(req, res) {
   try {
-    const result = await attendanceService.listAttendance(req.query);
+    const result = await attendanceService.listAttendance(req.query, req.tenant.outletId);
     res.json(result);
   } catch (err) {
     res
@@ -58,6 +58,7 @@ export async function getEmployeeLogs(req, res) {
     const logs = await attendanceService.getEmployeeAttendanceLogs(
       req.params.employeeId,
       req.query,
+      req.tenant.outletId,
     );
     res.json(logs);
   } catch (err) {
@@ -74,6 +75,7 @@ export async function markStatus(req, res) {
       employeeId,
       date,
       status,
+      req.tenant.outletId,
     );
     res.json(attendance);
   } catch (err) {
@@ -91,7 +93,7 @@ export async function markStatus(req, res) {
 export async function closeDayAttendance(req, res) {
   try {
     const { date } = req.body;
-    const result = await attendanceService.markAbsentees(date);
+    const result = await attendanceService.markAbsentees(date, req.tenant.outletId);
     res.json(result);
   } catch (err) {
     res

@@ -55,6 +55,8 @@ enum AlertType {
 
 model Category {
   id            String        @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name          String
   description   String?
   imageUrl      String?
@@ -65,11 +67,14 @@ model Category {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  @@index([outletId])
   @@map("categories")
 }
 
 model SubCategory {
   id         String     @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name       String
   categoryId String
   category   Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -77,24 +82,31 @@ model SubCategory {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
+  @@index([outletId])
   @@map("sub_categories")
 }
 
 model KitchenSection {
   id            String         @id @default(uuid())
-  name          String         @unique
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+  name          String
   menuItems     MenuItem[]
   kitchenOrders KitchenOrder[]
   createdAt     DateTime       @default(now())
 
+  @@index([outletId])
+  @@unique([outletId, name])
   @@map("kitchen_sections")
 }
 
 model MenuItem {
   id        String  @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name      String
   shortName String?
-  sku       String  @unique
+  sku       String
   barcode   String?
 
   categoryId    String
@@ -130,6 +142,8 @@ model MenuItem {
   comboLinks        ComboItem[]
   priceHistory      PriceHistory[]
 
+  @@unique([outletId, sku])
+  @@index([outletId])
   @@map("menu_items")
 }
 
@@ -139,30 +153,40 @@ model MenuItem {
 
 model Unit {
   id           String   @id @default(uuid())
-  name         String   @unique // Kg, Gram, Liter, ml, Piece, Packet, Bottle, Box
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+  name         String    // Kg, Gram, Liter, ml, Piece, Packet, Bottle, Box
   abbreviation String?
   createdAt    DateTime @default(now())
 
   purchaseUnitIngredients    Ingredient[] @relation("PurchaseUnit")
   consumptionUnitIngredients Ingredient[] @relation("ConsumptionUnit")
 
+  @@index([outletId])
+  @@unique([outletId, name])
   @@map("units")
 }
 
 model IngredientCategory {
   id          String       @id @default(uuid())
-  name        String       @unique // Vegetables, Meat, Dairy, Beverages, Masala, Oil, Packaging, Cleaning
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+  name        String        // Vegetables, Meat, Dairy, Beverages, Masala, Oil, Packaging, Cleaning
   description String?
   isEnabled   Boolean      @default(true)
   ingredients Ingredient[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  @@index([outletId])
+  @@unique([outletId, name])
   @@map("ingredient_categories")
 }
 
 model Supplier {
   id                 String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name               String
   contactPerson      String?
   phone              String?
@@ -181,13 +205,16 @@ model Supplier {
   recurringExpenses RecurringExpense[]
   assetPurchases    AssetPurchase[]
 
+  @@index([outletId])
   @@map("suppliers")
 }
 
 model Ingredient {
   id          String  @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name        String
-  itemCode    String  @unique
+  itemCode    String
   barcode     String?
   description String?
 
@@ -216,12 +243,16 @@ model Ingredient {
   recipeIngredients  RecipeIngredient[]
   inventoryAlerts    InventoryAlert[]
 
+  @@index([outletId])
+  @@unique([outletId, itemCode])
   @@map("ingredients")
 }
 
 model PurchaseOrder {
   id               String              @id @default(uuid())
-  poNumber         String              @unique
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+  poNumber         String
   supplierId       String
   supplier         Supplier            @relation(fields: [supplierId], references: [id])
   purchaseDate     DateTime            @default(now())
@@ -236,6 +267,8 @@ model PurchaseOrder {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([outletId])
+  @@unique([outletId, poNumber])
   @@map("purchase_orders")
 }
 
@@ -264,7 +297,8 @@ model PurchaseEntry {
   ingredientId    String
   ingredient      Ingredient     @relation(fields: [ingredientId], references: [id])
 
-  store            String    @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   invoiceNumber    String?
   batchNumber      String?
   expiryDate       DateTime?
@@ -276,6 +310,7 @@ model PurchaseEntry {
 
   createdAt DateTime @default(now())
 
+  @@index([outletId])
   @@map("purchase_entries")
 }
 
@@ -287,9 +322,11 @@ model InventoryStock {
   ingredient     Ingredient @relation(fields: [ingredientId], references: [id])
   quantityOnHand Decimal    @default(0) @db.Decimal(14, 4) // consumption units
   averageCost    Decimal    @default(0) @db.Decimal(12, 4) // cost per consumption unit
-  store          String     @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   updatedAt      DateTime   @updatedAt
 
+  @@index([outletId])
   @@map("inventory_stock")
 }
 
@@ -310,15 +347,19 @@ model StockMovement {
   userId String?
   user   Employee? @relation("StockMovementsByUser", fields: [userId], references: [id])
 
-  store     String   @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   createdAt DateTime @default(now())
 
   @@index([ingredientId, createdAt])
+  @@index([outletId])
   @@map("stock_movements")
 }
 
 model StockAdjustment {
   id           String         @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   ingredientId String
   ingredient   Ingredient     @relation(fields: [ingredientId], references: [id])
   type         AdjustmentType
@@ -328,6 +369,7 @@ model StockAdjustment {
   notes        String?
   createdAt    DateTime       @default(now())
 
+  @@index([outletId])
   @@map("stock_adjustments")
 }
 
@@ -335,7 +377,8 @@ model Wastage {
   id           String     @id @default(uuid())
   ingredientId String
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
-  store        String     @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   quantity     Decimal    @db.Decimal(14, 4)
   reason       String
   cost         Decimal    @db.Decimal(12, 2)
@@ -346,11 +389,14 @@ model Wastage {
 
   createdAt DateTime @default(now())
 
+  @@index([outletId])
   @@map("wastage")
 }
 
 model ExpiryBatch {
   id                String     @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   ingredientId      String
   ingredient        Ingredient @relation(fields: [ingredientId], references: [id])
   batchNumber       String
@@ -360,6 +406,7 @@ model ExpiryBatch {
   createdAt         DateTime   @default(now())
 
   @@index([expiryDate])
+  @@index([outletId])
   @@map("expiry_batches")
 }
 
@@ -380,6 +427,8 @@ model RecipeIngredient {
 // Pre-computed alert rows so the dashboard doesn't have to scan everything live.
 model InventoryAlert {
   id           String     @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   ingredientId String
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
   type         AlertType
@@ -387,6 +436,7 @@ model InventoryAlert {
   isResolved   Boolean    @default(false)
   createdAt    DateTime   @default(now())
 
+  @@index([outletId])
   @@map("inventory_alerts")
 }
 
@@ -434,7 +484,9 @@ enum ApprovalLevel {
 
 model ExpenseCategory {
   id          String  @id @default(uuid())
-  name        String  @unique
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+  name        String
   description String?
   isDefault   Boolean @default(false) // true for seeded defaults (Rent, Electricity, etc.)
   isEnabled   Boolean @default(true)
@@ -447,20 +499,101 @@ model ExpenseCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([outletId])
+  @@unique([outletId, name])
   @@map("expense_categories")
 }
 
-model Store {
-  id       String  @id @default(uuid())
-  name     String  @unique
-  address  String?
-  phone    String?
-  isActive Boolean @default(true)
+// ─────────────────────────────────────────────
+// MULTI-TENANCY — ORGANIZATION / OUTLET
+// ─────────────────────────────────────────────
+// Organization = the brand/owner account (one signup = one Organization).
+// Outlet = a physical restaurant branch under an Organization. Everywhere
+// else in this schema, "outletId" is what used to be the free-text
+// `store String @default("Main Store")` convention -- that field has been
+// removed from every model below in favor of this real relation.
+model Organization {
+  id         String   @id @default(uuid())
+  name       String
+  ownerEmail String   @unique
+  isActive   Boolean  @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("stores")
+  outlets      Outlet[]
+  userAccounts UserAccount[]
+
+  @@map("organizations")
+}
+
+model Outlet {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name            String
+  address         String?
+  phone           String?
+  gstin           String?
+  timezone        String?  @default("Asia/Kolkata")
+  defaultLanguage String?  @default("en")
+  isActive        Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Back-relations -- one array field per model that carries outletId below.
+  categories               Category[]
+  subCategories            SubCategory[]
+  kitchenSections          KitchenSection[]
+  menuItems                MenuItem[]
+  menuVariants             MenuVariant[]
+  addOns                   AddOn[]
+  comboMeals               ComboMeal[]
+  units                    Unit[]
+  ingredientCategories     IngredientCategory[]
+  suppliers                Supplier[]
+  ingredients              Ingredient[]
+  purchaseOrders           PurchaseOrder[]
+  purchaseEntries          PurchaseEntry[]
+  inventoryStocks          InventoryStock[]
+  stockMovements           StockMovement[]
+  stockAdjustments         StockAdjustment[]
+  wastages                 Wastage[]
+  expiryBatches            ExpiryBatch[]
+  inventoryAlerts          InventoryAlert[]
+  expenseCategories        ExpenseCategory[]
+  expenses                 Expense[]
+  recurringExpenses        RecurringExpense[]
+  payrollRecords           PayrollRecord[]
+  salaryExpenses           SalaryExpense[]
+  utilityBills             UtilityBill[]
+  pettyCashSessions        PettyCashSession[]
+  assetPurchases           AssetPurchase[]
+  employees                Employee[]
+  userAccounts             UserAccount[]
+  refreshTokens            RefreshToken[]
+  attendances              Attendance[]
+  shifts                   Shift[]
+  shiftAssignments         ShiftAssignment[]
+  leaveRequests            LeaveRequest[]
+  incentives               Incentive[]
+  performanceRecords       PerformanceRecord[]
+  activityLogs             ActivityLog[]
+  floors                   Floor[]
+  restaurantTables         RestaurantTable[]
+  customers                Customer[]
+  deliveryPartners         DeliveryPartner[]
+  orders                   Order[]
+  kitchenOrders            KitchenOrder[]
+  invoices                 Invoice[]
+  loyaltyTransactions      LoyaltyTransaction[]
+  discounts                Discount[]
+  priceHistories           PriceHistory[]
+  auditLogs                AuditLog[]
+  @@unique([organizationId, name])
+  @@map("outlets")
 }
 
 // Core expense record. Utility bills and petty cash entries also live here
@@ -468,7 +601,7 @@ model Store {
 // while UtilityBill/PettyCashSession hold the feature-specific metadata.
 model Expense {
   id            String @id @default(uuid())
-  expenseNumber String @unique // auto-generated, e.g. EXP-000123
+  expenseNumber String  // auto-generated, e.g. EXP-000123
 
   categoryId String
   category   ExpenseCategory @relation(fields: [categoryId], references: [id])
@@ -492,7 +625,8 @@ model Expense {
   transactionReference String?
 
   status ExpenseStatus @default(DRAFT)
-  store  String        @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   isPettyCash        Boolean           @default(false)
   pettyCashSessionId String?
@@ -514,6 +648,8 @@ model Expense {
 
   @@index([expenseDate])
   @@index([status])
+  @@index([outletId])
+  @@unique([outletId, expenseNumber])
   @@map("expenses")
 }
 
@@ -546,13 +682,15 @@ model RecurringExpense {
 
   supplierId String?
   supplier   Supplier? @relation(fields: [supplierId], references: [id])
-  store      String    @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   expenses Expense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([outletId])
   @@map("recurring_expenses")
 }
 
@@ -579,6 +717,8 @@ model ExpenseApproval {
 // is created below so it lands in the accounting/P&L ledger too.
 model PayrollRecord {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -599,6 +739,7 @@ model PayrollRecord {
   updatedAt DateTime @updatedAt
 
   @@unique([employeeId, month])
+  @@index([outletId])
   @@map("payroll_records")
 }
 
@@ -620,7 +761,8 @@ model SalaryExpense {
 
   paymentStatus PaymentStatus @default(UNPAID)
   paymentDate   DateTime?
-  store         String        @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   payrollRecord PayrollRecord?
 
@@ -628,6 +770,7 @@ model SalaryExpense {
   updatedAt DateTime @updatedAt
 
   @@index([salaryMonth])
+  @@index([outletId])
   @@map("salary_expenses")
 }
 
@@ -641,12 +784,14 @@ model UtilityBill {
   paymentDate        DateTime?
   amount             Decimal       @db.Decimal(12, 2)
   paymentStatus      PaymentStatus @default(UNPAID)
-  store              String        @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([dueDate])
+  @@index([outletId])
   @@map("utility_bills")
 }
 
@@ -655,7 +800,8 @@ model UtilityBill {
 // linked back here via pettyCashSessionId.
 model PettyCashSession {
   id             String    @id @default(uuid())
-  store          String    @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   periodStart    DateTime
   periodEnd      DateTime?
   openingBalance Decimal   @db.Decimal(12, 2)
@@ -667,6 +813,7 @@ model PettyCashSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([outletId])
   @@map("petty_cash_sessions")
 }
 
@@ -680,11 +827,13 @@ model AssetPurchase {
 
   supplierId String?
   supplier   Supplier? @relation(fields: [supplierId], references: [id])
-  store      String    @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([outletId])
   @@map("asset_purchases")
 }
 
@@ -762,13 +911,13 @@ enum SalaryStatus {
 
 model Employee {
   id               String    @id @default(uuid())
-  employeeCode     String    @unique // auto-generated, e.g. EMP-0001
+  employeeCode     String    // auto-generated, e.g. EMP-0001 — unique per outlet, see @@unique below
   fullName         String
   photoUrl         String?
   gender           String?
   dob              DateTime?
   mobile           String?
-  email            String?   @unique
+  email            String? // personal contact email — not the login email (see UserAccount.email); intentionally not unique, two employees at different outlets may share a family email
   emergencyContact String?
 
   department     String // free text — Kitchen, Service, Inventory...
@@ -776,7 +925,8 @@ model Employee {
   joiningDate    DateTime
   employmentType String? // free text — full-time / part-time / contract
   status         EmployeeStatus @default(ACTIVE)
-  store          String         @default("Main Store") // matches store convention used across inventory/expenses
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   address            EmployeeAddress?
   userAccount        UserAccount?
@@ -810,9 +960,11 @@ model Employee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([outletId, employeeCode])
   @@index([department])
   @@index([designation])
   @@index([status])
+  @@index([outletId])
   @@map("employees")
 }
 
@@ -833,10 +985,22 @@ model EmployeeAddress {
 // Login schema only — no auth middleware wired yet.
 model UserAccount {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+  // Denormalized alongside outletId so we can resolve "which orgs can this login
+  // access" and switch outlets without a join through Outlet every time (see
+  // POST /api/auth/select-outlet). Must always equal outlet.organizationId —
+  // enforced in the service layer, not at the DB level.
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String   @unique
 
-  username            String    @unique
+  // Unique per organization, not per outlet — one owner login should be able to
+  // use the same username across every outlet they own.
+  username            String
+  // Globally unique across the whole platform — this is the login/password-reset
+  // lookup key before an organization is even known.
   email               String?   @unique
   passwordHash        String
   pin                 String? // optional, for POS quick login
@@ -852,7 +1016,10 @@ model UserAccount {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([organizationId, username])
   @@index([role])
+  @@index([outletId])
+  @@index([organizationId])
   @@map("user_accounts")
 }
 
@@ -877,12 +1044,20 @@ model RefreshToken {
   id            String      @id @default(uuid())
   userAccountId String
   userAccount   UserAccount @relation("RefreshTokensByUser", fields: [userAccountId], references: [id], onDelete: Cascade)
+  // Which outlet this session was for — an OWNER/ADMIN can hold sessions
+  // for different outlets from different devices/tabs simultaneously, so
+  // this can't be derived from the account alone; it has to be recorded
+  // per-session, at login/select-outlet time, and echoed back into the
+  // access token on every /refresh (see auth.service.js).
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   tokenHash     String      @unique
   expiresAt     DateTime
   revokedAt     DateTime?
   createdAt     DateTime    @default(now())
 
   @@index([userAccountId])
+  @@index([outletId])
   @@map("refresh_tokens")
 }
 
@@ -898,10 +1073,12 @@ model Attendance {
   workingHours  Decimal?         @db.Decimal(5, 2)
   overtimeHours Decimal?         @db.Decimal(5, 2)
   status        AttendanceStatus @default(PRESENT)
-  store         String           @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   @@unique([employeeId, date])
   @@index([date])
+  @@index([outletId])
   @@map("attendance")
 }
 
@@ -925,17 +1102,21 @@ model Shift {
   name      String // Morning / Afternoon / Night / Custom
   startTime String // "09:00"
   endTime   String // "17:00"
-  store     String @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   assignments ShiftAssignment[]
 
   createdAt DateTime @default(now())
 
+  @@index([outletId])
   @@map("shifts")
 }
 
 model ShiftAssignment {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
   shift      Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
@@ -945,11 +1126,14 @@ model ShiftAssignment {
 
   @@unique([employeeId, date])
   @@index([shiftId, date])
+  @@index([outletId])
   @@map("shift_assignments")
 }
 
 model LeaveRequest {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -966,11 +1150,14 @@ model LeaveRequest {
   updatedAt DateTime @updatedAt
 
   @@index([employeeId, status])
+  @@index([outletId])
   @@map("leave_requests")
 }
 
 model Incentive {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -983,11 +1170,14 @@ model Incentive {
 
   createdAt DateTime @default(now())
 
+  @@index([outletId])
   @@map("incentives")
 }
 
 model PerformanceRecord {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -998,11 +1188,14 @@ model PerformanceRecord {
   lateArrivals   Int?     @default(0)
 
   @@unique([employeeId, period])
+  @@index([outletId])
   @@map("performance_records")
 }
 
 model ActivityLog {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -1012,6 +1205,7 @@ model ActivityLog {
   createdAt DateTime @default(now())
 
   @@index([employeeId, createdAt])
+  @@index([outletId])
   @@map("employee_activity_logs")
 }
 
@@ -1084,13 +1278,15 @@ enum SplitType {
 model Floor {
   id    String  @id @default(uuid())
   name  String
-  store String? @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   tables RestaurantTable[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([outletId])
   @@map("floors")
 }
 
@@ -1100,7 +1296,8 @@ model RestaurantTable {
   capacity Int?
   section  String? // legacy free-text grouping, kept for back-compat with existing filters
   status   TableStatus @default(FREE)
-  store    String?     @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   floorId String?
   floor   Floor?  @relation(fields: [floorId], references: [id])
@@ -1120,13 +1317,16 @@ model RestaurantTable {
   @@index([status])
   @@index([floorId])
   @@index([waiterId])
+  @@index([outletId])
   @@map("restaurant_tables")
 }
 
 model Customer {
   id            String  @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name          String
-  mobile        String  @unique
+  mobile        String
   email         String?
   address       String?
   landmark      String?
@@ -1139,11 +1339,15 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   @@index([mobile])
+  @@index([outletId])
+  @@unique([outletId, mobile])
   @@map("customers")
 }
 
 model DeliveryPartner {
   id       String  @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name     String
   phone    String?
   isActive Boolean @default(true)
@@ -1152,15 +1356,16 @@ model DeliveryPartner {
 
   createdAt DateTime @default(now())
 
+  @@index([outletId])
   @@map("delivery_partners")
 }
 
 model Order {
   id          String      @id @default(uuid())
-  orderNumber String      @unique // e.g. ORD-000123
+  orderNumber String       // e.g. ORD-000123
   orderType   OrderType
   status      OrderStatus @default(NEW)
-  holdNumber  String?     @unique
+  holdNumber  String?
 
   // FEATURE: offline mode, phase 1 step 6 (idempotency). Generated
   // client-side (crypto.randomUUID()) the moment an order is created
@@ -1204,7 +1409,8 @@ model Order {
   grandTotal          Decimal @db.Decimal(12, 2)
 
   notes String?
-  store String  @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   items               OrderItem[]
   payments            Payment[]
@@ -1220,6 +1426,9 @@ model Order {
   @@index([status])
   @@index([orderType])
   @@index([createdAt])
+  @@index([outletId])
+  @@unique([outletId, orderNumber])
+  @@unique([outletId, holdNumber])
   @@map("orders")
 }
 
@@ -1246,6 +1455,8 @@ model OrderItem {
 
 model AddOn {
   id        String  @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name      String
   price     Decimal @db.Decimal(10, 2)
   isEnabled Boolean @default(true)
@@ -1255,6 +1466,7 @@ model AddOn {
 
   createdAt DateTime @default(now())
 
+  @@index([outletId])
   @@map("add_ons")
 }
 
@@ -1274,7 +1486,7 @@ model OrderItemAddOn {
 
 model Discount {
   id             String       @id @default(uuid())
-  code           String?      @unique
+  code           String?
   type           DiscountType
   value          Decimal      @db.Decimal(10, 2) // percent or fixed amount
   isActive       Boolean      @default(true)
@@ -1282,13 +1494,16 @@ model Discount {
   validTo        DateTime?
   usageLimit     Int?
   minOrderAmount Decimal?     @db.Decimal(12, 2)
-  store          String       @default("Main Store")
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   orderDiscounts OrderDiscount[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([outletId])
+  @@unique([outletId, code])
   @@map("discounts")
 }
 
@@ -1348,9 +1563,11 @@ model BillSplit {
 
 model KitchenOrder {
   id        String      @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   orderId   String
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  kotNumber String      @unique
+  kotNumber String
   status    KotStatus   @default(NEW)
   priority  KotPriority @default(NORMAL)
 
@@ -1385,6 +1602,8 @@ model KitchenOrder {
   @@index([status])
   @@index([kitchenSectionId, status])
   @@index([isDelayed])
+  @@index([outletId])
+  @@unique([outletId, kotNumber])
   @@map("kitchen_orders")
 }
 
@@ -1434,20 +1653,26 @@ model KitchenNote {
 
 model Invoice {
   id            String  @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   orderId       String  @unique
   order         Order   @relation(fields: [orderId], references: [id])
-  invoiceNumber String  @unique
+  invoiceNumber String
   gstNumber     String?
   sentVia       String? // print / email / whatsapp — comma-separated or JSON if multiple
   pdfUrl        String?
 
   createdAt DateTime @default(now())
 
+  @@index([outletId])
+  @@unique([outletId, invoiceNumber])
   @@map("invoices")
 }
 
 model LoyaltyTransaction {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
   orderId    String?
@@ -1458,6 +1683,7 @@ model LoyaltyTransaction {
 
   createdAt DateTime @default(now())
 
+  @@index([outletId])
   @@map("loyalty_transactions")
 }
 
@@ -1471,6 +1697,8 @@ model LoyaltyTransaction {
 // Small / Medium / Large style variants for a single menu item
 model MenuVariant {
   id              String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   menuItemId      String
   menuItem        MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   name            String // e.g. "Small", "Medium", "Large"
@@ -1480,6 +1708,7 @@ model MenuVariant {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  @@index([outletId])
   @@map("menu_variants")
 }
 
@@ -1502,6 +1731,8 @@ model MenuItemAddOn {
 // Combo meals — bundle several menu items at a fixed price
 model ComboMeal {
   id          String      @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   name        String
   price       Decimal     @db.Decimal(10, 2)
   description String?
@@ -1511,6 +1742,7 @@ model ComboMeal {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
+  @@index([outletId])
   @@map("combo_meals")
 }
 
@@ -1528,6 +1760,8 @@ model ComboItem {
 // Audit trail — logged automatically whenever MenuItem.sellingPrice changes
 model PriceHistory {
   id         String   @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   menuItemId String
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   oldPrice   Decimal  @db.Decimal(10, 2)
@@ -1535,6 +1769,7 @@ model PriceHistory {
   changedBy  String? // userAccountId (req.user.id) of whoever made the change
   changedAt  DateTime @default(now())
 
+  @@index([outletId])
   @@map("price_history")
 }
 
@@ -1547,6 +1782,8 @@ model PriceHistory {
 // thing it describes (e.g. a deleted Order) no longer exists.
 model AuditLog {
   id         String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
   action     String // e.g. "ORDER_DELETED", "LOGIN_ACCOUNT_CREATED", "EMPLOYEE_TERMINATED"
   entityType String // e.g. "Order", "Employee", "UserAccount"
   entityId   String
@@ -1560,5 +1797,6 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([action])
   @@index([performedById])
+  @@index([outletId])
   @@map("audit_logs")
 }

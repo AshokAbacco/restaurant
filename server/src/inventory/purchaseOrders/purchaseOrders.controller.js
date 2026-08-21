@@ -6,7 +6,10 @@ const VALID_STATUSES = ["DRAFT", "ORDERED", "RECEIVED", "CANCELLED"];
 export const getPurchaseOrders = async (req, res) => {
   try {
     const { supplierId, status } = req.query;
-    const orders = await purchaseOrdersService.listPurchaseOrders({ supplierId, status });
+    const orders = await purchaseOrdersService.listPurchaseOrders(
+      { supplierId, status },
+      req.tenant.outletId,
+    );
     res.json(orders);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch purchase orders", error: err.message });
@@ -15,7 +18,7 @@ export const getPurchaseOrders = async (req, res) => {
 
 export const getPurchaseOrder = async (req, res) => {
   try {
-    const order = await purchaseOrdersService.getPurchaseOrderById(req.params.id);
+    const order = await purchaseOrdersService.getPurchaseOrderById(req.params.id, req.tenant.outletId);
     if (!order) return res.status(404).json({ message: "Purchase order not found" });
     res.json(order);
   } catch (err) {
@@ -39,7 +42,7 @@ export const createPurchaseOrder = async (req, res) => {
         .json({ message: "Each item requires ingredientId, quantity, and unitPrice" });
     }
 
-    const order = await purchaseOrdersService.createPurchaseOrder(req.body);
+    const order = await purchaseOrdersService.createPurchaseOrder(req.body, req.tenant.outletId);
     res.status(201).json(order);
   } catch (err) {
     if (err.code === "P2003") {
@@ -58,7 +61,11 @@ export const updatePurchaseOrderStatus = async (req, res) => {
         .json({ message: `status must be one of: ${VALID_STATUSES.join(", ")}` });
     }
 
-    const order = await purchaseOrdersService.updatePurchaseOrderStatus(req.params.id, status);
+    const order = await purchaseOrdersService.updatePurchaseOrderStatus(
+      req.params.id,
+      status,
+      req.tenant.outletId,
+    );
     res.json(order);
   } catch (err) {
     if (err.code === "P2025") {
@@ -70,7 +77,11 @@ export const updatePurchaseOrderStatus = async (req, res) => {
 
 export const updatePurchaseOrder = async (req, res) => {
   try {
-    const order = await purchaseOrdersService.updatePurchaseOrderDetails(req.params.id, req.body);
+    const order = await purchaseOrdersService.updatePurchaseOrderDetails(
+      req.params.id,
+      req.body,
+      req.tenant.outletId,
+    );
     res.json(order);
   } catch (err) {
     if (err.code === "P2025") {
@@ -82,7 +93,7 @@ export const updatePurchaseOrder = async (req, res) => {
 
 export const deletePurchaseOrder = async (req, res) => {
   try {
-    await purchaseOrdersService.deletePurchaseOrder(req.params.id);
+    await purchaseOrdersService.deletePurchaseOrder(req.params.id, req.tenant.outletId);
     res.status(204).send();
   } catch (err) {
     if (err.code === "P2025") {

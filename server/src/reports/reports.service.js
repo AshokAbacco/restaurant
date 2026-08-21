@@ -63,12 +63,11 @@ function getPreviousRange(start, end) {
   return { start: prevStart, end: prevEnd };
 }
 
-function parseFilters(query = {}) {
+function parseFilters(query = {}, outletId) {
   const {
     period,
     startDate,
     endDate,
-    store,
     orderType,
     paymentMethod,
     category,
@@ -87,7 +86,12 @@ function parseFilters(query = {}) {
     start,
     end,
     period: period || "today",
-    store: clean(store),
+    // outletId is NEVER read from query — it comes only from the
+    // authenticated session (req.tenant.outletId in the controller). The
+    // old `store` query param let a client claim any store as a plain
+    // string; there is no client-controlled equivalent of that anymore,
+    // by design.
+    outletId,
     orderType: clean(orderType),
     paymentMethod: clean(paymentMethod),
     category: clean(category),
@@ -100,20 +104,21 @@ function parseFilters(query = {}) {
 }
 
 function buildOrderWhere(filters, { includeAllStatuses = false } = {}) {
-  const where = { createdAt: { gte: filters.start, lte: filters.end } };
-  if (filters.store) where.store = filters.store;
+  const where = {
+    outletId: filters.outletId,
+    createdAt: { gte: filters.start, lte: filters.end },
+  };
   if (filters.orderType) where.orderType = filters.orderType;
   if (!includeAllStatuses) where.status = { notIn: ["CANCELLED"] };
   return where;
 }
 
 function buildExpenseWhere(filters) {
-  const where = {
+  return {
+    outletId: filters.outletId,
     expenseDate: { gte: filters.start, lte: filters.end },
     status: { not: "REJECTED" },
   };
-  if (filters.store) where.store = filters.store;
-  return where;
 }
 
 const num = (v) => Number(v || 0);
@@ -191,8 +196,9 @@ async function getSalesSummary(filters) {
   };
 }
 
-async function getInventoryValue() {
+async function getInventoryValue(outletId) {
   const stocks = await prisma.inventoryStock.findMany({
+    where: { outletId },
     select: { quantityOnHand: true, averageCost: true },
   });
   return stocks.reduce(
@@ -326,7 +332,7 @@ async function getTopSellingItems(filters) {
 
   const menuItemIds = grouped.map((g) => g.menuItemId);
   const menuItems = await prisma.menuItem.findMany({
-    where: { id: { in: menuItemIds } },
+    where: { id: { in: menuItemIds }, outletId: filters.outletId },
     select: { id: true, name: true, costPrice: true },
   });
   const menuMap = new Map(menuItems.map((m) => [m.id, m]));
@@ -355,7 +361,7 @@ async function getExpenseBreakdown(filters) {
   });
   const categoryIds = grouped.map((g) => g.categoryId);
   const categories = await prisma.expenseCategory.findMany({
-    where: { id: { in: categoryIds } },
+    where: { id: { in: categoryIds }, outletId: filters.outletId },
     select: { id: true, name: true },
   });
   const catMap = new Map(categories.map((c) => [c.id, c.name]));
@@ -383,7 +389,7 @@ async function getEmployeePerformance(filters) {
 
   const ids = grouped.map((g) => g.waiterId);
   const employees = await prisma.employee.findMany({
-    where: { id: { in: ids } },
+    where: { id: { in: ids }, outletId: filters.outletId },
     select: { id: true, fullName: true, designation: true },
   });
   const empMap = new Map(employees.map((e) => [e.id, e]));
@@ -417,7 +423,7 @@ async function getCustomerAnalytics(filters) {
 
   const customerIds = [...new Set(distinctOrders.map((o) => o.customerId))];
   const customers = await prisma.customer.findMany({
-    where: { id: { in: customerIds } },
+    where: { id: { in: customerIds }, outletId: filters.outletId },
     select: { id: true, name: true, createdAt: true, loyaltyPoints: true },
   });
   const custMap = new Map(customers.map((c) => [c.id, c]));
@@ -433,8 +439,13 @@ async function getCustomerAnalytics(filters) {
     if (c.loyaltyPoints >= 500) loyalCount++;
   }
 
+  // FIX: this previously counted every customer in the ENTIRE database not
+  // present in customerIds — meaning it counted every other outlet's (and
+  // every other organization's) customers as "inactive" for THIS outlet's
+  // dashboard. Scoped to this outlet now, which is what the number was
+  // always supposed to mean.
   const inactiveCount = await prisma.customer.count({
-    where: { id: { notIn: customerIds } },
+    where: { id: { notIn: customerIds }, outletId: filters.outletId },
   });
 
   let topCustomer = null;
@@ -459,9 +470,9 @@ async function getCustomerAnalytics(filters) {
   };
 }
 
-async function getInventoryAlerts(limit = 20) {
+async function getInventoryAlerts(limit = 20, outletId) {
   const alerts = await prisma.inventoryAlert.findMany({
-    where: { isResolved: false },
+    where: { outletId, isResolved: false },
     include: {
       ingredient: {
         select: {
@@ -496,8 +507,14 @@ async function getInventoryAlerts(limit = 20) {
 }
 
 async function getKitchenPerformance(filters) {
-  const where = { createdAt: { gte: filters.start, lte: filters.end } };
-  if (filters.store) where.order = { store: filters.store };
+  // KitchenOrder has its own direct outletId (see kot.service.js /
+  // kds.service.js from earlier retrofit work) — simpler and more direct
+  // than the old `where.order = { store: filters.store }`, which routed
+  // through a field (Order.store) that no longer exists anyway.
+  const where = {
+    outletId: filters.outletId,
+    createdAt: { gte: filters.start, lte: filters.end },
+  };
 
   const kots = await prisma.kitchenOrder.findMany({
     where,
@@ -624,10 +641,10 @@ async function getDashboard(filters) {
     getExpenseBreakdown(filters),
     getEmployeePerformance({ ...filters, limit: 5 }),
     getCustomerAnalytics(filters),
-    getInventoryAlerts(5),
+    getInventoryAlerts(5, filters.outletId),
     getKitchenPerformance(filters),
     getRecentTransactions({ ...filters, page: 1, pageSize: 5 }),
-    getInventoryValue(),
+    getInventoryValue(filters.outletId),
     getRefundsAndDiscounts(filters),
   ]);
 
@@ -777,7 +794,7 @@ async function getExportData(reportType, filters) {
         limit: filters.limit || 200,
       });
     case "inventory-alerts":
-      return getInventoryAlerts(filters.limit || 200);
+      return getInventoryAlerts(filters.limit || 200, filters.outletId);
     case "sales-trend":
       return getSalesTrend(filters);
     case "order-type-breakdown":

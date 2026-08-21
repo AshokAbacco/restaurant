@@ -1,26 +1,33 @@
 // server/src/pos/discounts/discounts.service.js
 import prisma from "../../config/prisma.js";
 
-export async function listDiscounts({ isActive } = {}) {
+export async function listDiscounts({ isActive } = {}, outletId) {
   return prisma.discount.findMany({
-    where: isActive !== undefined ? { isActive: isActive === "true" } : {},
+    where: {
+      outletId,
+      ...(isActive !== undefined ? { isActive: isActive === "true" } : {}),
+    },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function getDiscountById(id) {
-  return prisma.discount.findUnique({ where: { id } });
+export async function getDiscountById(id, outletId) {
+  return prisma.discount.findFirst({ where: { id, outletId } });
 }
 
-export async function createDiscount(payload) {
-  return prisma.discount.create({ data: payload });
+export async function createDiscount(payload, outletId) {
+  return prisma.discount.create({ data: { ...payload, outletId } });
 }
 
-export async function updateDiscount(id, payload) {
+export async function updateDiscount(id, payload, outletId) {
+  const existing = await prisma.discount.findFirst({ where: { id, outletId } });
+  if (!existing) throw new Error("Discount not found");
   return prisma.discount.update({ where: { id }, data: payload });
 }
 
-export async function deleteDiscount(id) {
+export async function deleteDiscount(id, outletId) {
+  const existing = await prisma.discount.findFirst({ where: { id, outletId } });
+  if (!existing) throw new Error("Discount not found");
   return prisma.discount.update({ where: { id }, data: { isActive: false } });
 }
 
@@ -31,8 +38,12 @@ function computeDiscountAmount(discount, subtotal) {
 
 // Applies a catalog discount (by code or id) to an order, or records a MANUAL
 // discount that requires an approving employee (role-gated at the route/controller level).
-export async function applyDiscountToOrder(orderId, { discountId, code, type, amount, reason, approvedById }) {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+export async function applyDiscountToOrder(
+  orderId,
+  { discountId, code, type, amount, reason, approvedById },
+  outletId,
+) {
+  const order = await prisma.order.findFirst({ where: { id: orderId, outletId } });
   if (!order) throw new Error("Order not found");
 
   let amountDeducted = amount;
@@ -40,9 +51,14 @@ export async function applyDiscountToOrder(orderId, { discountId, code, type, am
   let resolvedType = type;
 
   if (discountId || code) {
+    // code is @@unique([outletId, code]) now, not globally unique — a plain
+    // findUnique({ where: { code } }) no longer matches Prisma's generated
+    // unique input shape (and would be wrong anyway, since two outlets can
+    // legitimately share a discount code). findFirst scoped to this outlet
+    // covers both the id and code lookup paths.
     const discount = discountId
-      ? await prisma.discount.findUnique({ where: { id: discountId } })
-      : await prisma.discount.findUnique({ where: { code } });
+      ? await prisma.discount.findFirst({ where: { id: discountId, outletId } })
+      : await prisma.discount.findFirst({ where: { code, outletId } });
 
     if (!discount || !discount.isActive) throw new Error("Discount not found or inactive");
     if (discount.minOrderAmount && Number(order.subtotal) < Number(discount.minOrderAmount)) {

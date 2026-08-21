@@ -3,21 +3,22 @@ import prisma from "../config/prisma.js";
 
 // ---------- Category ----------
 
-export const findAllCategories = () =>
+export const findAllCategories = (outletId) =>
   prisma.category.findMany({
+    where: { outletId },
     orderBy: { displayOrder: "asc" },
     include: { subCategories: true },
   });
 
-export const findCategoryById = (id) =>
-  prisma.category.findUnique({
-    where: { id },
+export const findCategoryById = (id, outletId) =>
+  prisma.category.findFirst({
+    where: { id, outletId },
     include: { subCategories: true },
   });
 
-export const createCategory = (data) =>
+export const createCategory = (data, outletId) =>
     prisma.category.create({
-        data,
+        data: { ...data, outletId },
     });
 
 export const updateCategory = (id, data) =>
@@ -28,8 +29,8 @@ export const deleteCategory = (id) =>
 
 // ---------- Menu Item ----------
 
-export const findAllMenuItems = (filters = {}) => {
-  const where = {};
+export const findAllMenuItems = (filters = {}, outletId) => {
+  const where = { outletId };
 
   if (filters.categoryId) where.categoryId = filters.categoryId;
   if (filters.subCategoryId) where.subCategoryId = filters.subCategoryId;
@@ -54,16 +55,20 @@ export const findAllMenuItems = (filters = {}) => {
   });
 };
 
-export const findMenuItemById = (id) =>
-  prisma.menuItem.findUnique({
-    where: { id },
+export const findMenuItemById = (id, outletId) =>
+  prisma.menuItem.findFirst({
+    where: { id, outletId },
     include: { category: true, subCategory: true, kitchenSection: true },
   });
 
-export const findMenuItemBySku = (sku) =>
-  prisma.menuItem.findUnique({ where: { sku } });
+// sku is @@unique([outletId, sku]) now, not globally unique — findUnique
+// with just { sku } no longer matches Prisma's generated unique input
+// shape, and would be wrong anyway since two outlets can share a SKU.
+export const findMenuItemBySku = (sku, outletId) =>
+  prisma.menuItem.findFirst({ where: { sku, outletId } });
 
-export const createMenuItem = (data) => prisma.menuItem.create({ data });
+export const createMenuItem = (data, outletId) =>
+  prisma.menuItem.create({ data: { ...data, outletId } });
 
 export const updateMenuItem = (id, data) => {
   return prisma.menuItem.update({
@@ -80,17 +85,21 @@ export const hardDeleteMenuItem = (id) =>
 
 // ---------- SubCategory ----------
 
-export const findAllSubCategories = (categoryId) =>
+export const findAllSubCategories = (categoryId, outletId) =>
   prisma.subCategory.findMany({
-    where: categoryId ? { categoryId } : undefined,
+    where: { outletId, ...(categoryId ? { categoryId } : {}) },
     include: { category: true },
     orderBy: { name: "asc" },
   });
 
-export const findSubCategoryById = (id) =>
-  prisma.subCategory.findUnique({ where: { id }, include: { category: true } });
+export const findSubCategoryById = (id, outletId) =>
+  prisma.subCategory.findFirst({
+    where: { id, outletId },
+    include: { category: true },
+  });
 
-export const createSubCategory = (data) => prisma.subCategory.create({ data });
+export const createSubCategory = (data, outletId) =>
+  prisma.subCategory.create({ data: { ...data, outletId } });
 
 export const updateSubCategory = (id, data) =>
   prisma.subCategory.update({ where: { id }, data });
@@ -100,17 +109,19 @@ export const deleteSubCategory = (id) =>
 
 // ---------- Kitchen Section ----------
 
-export const findAllKitchenSections = () =>
-  prisma.kitchenSection.findMany({ orderBy: { name: "asc" } });
+export const findAllKitchenSections = (outletId) =>
+  prisma.kitchenSection.findMany({ where: { outletId }, orderBy: { name: "asc" } });
 
-export const findKitchenSectionById = (id) =>
-  prisma.kitchenSection.findUnique({ where: { id } });
+export const findKitchenSectionById = (id, outletId) =>
+  prisma.kitchenSection.findFirst({ where: { id, outletId } });
 
-export const findKitchenSectionByName = (name) =>
-  prisma.kitchenSection.findUnique({ where: { name } });
+// name is @@unique([outletId, name]) now — see findMenuItemBySku above for
+// why this can't be findUnique({ where: { name } }) any more.
+export const findKitchenSectionByName = (name, outletId) =>
+  prisma.kitchenSection.findFirst({ where: { name, outletId } });
 
-export const createKitchenSection = (data) =>
-  prisma.kitchenSection.create({ data });
+export const createKitchenSection = (data, outletId) =>
+  prisma.kitchenSection.create({ data: { ...data, outletId } });
 
 export const updateKitchenSection = (id, data) =>
   prisma.kitchenSection.update({ where: { id }, data });
@@ -120,12 +131,14 @@ export const deleteKitchenSection = (id) =>
 
 // ---------- Menu Variants ----------
 
-export const findVariantsByMenuItem = (menuItemId) =>
-  prisma.menuVariant.findMany({ where: { menuItemId } });
+export const findVariantsByMenuItem = (menuItemId, outletId) =>
+  prisma.menuVariant.findMany({ where: { menuItemId, outletId } });
 
-export const findVariantById = (id) => prisma.menuVariant.findUnique({ where: { id } });
+export const findVariantById = (id, outletId) =>
+  prisma.menuVariant.findFirst({ where: { id, outletId } });
 
-export const createVariant = (data) => prisma.menuVariant.create({ data });
+export const createVariant = (data, outletId) =>
+  prisma.menuVariant.create({ data: { ...data, outletId } });
 
 export const updateVariant = (id, data) =>
   prisma.menuVariant.update({ where: { id }, data });
@@ -133,13 +146,20 @@ export const updateVariant = (id, data) =>
 export const deleteVariant = (id) => prisma.menuVariant.delete({ where: { id } });
 
 // ---------- Add-ons ----------
+// NOTE: this duplicates server/src/pos/add-ons/addOns.service.js almost
+// exactly — same AddOn model, same CRUD shape, reachable at a different
+// URL (/api/addons here vs /api/pos/add-ons there). Both are now correctly
+// outlet-scoped, but this is worth consolidating onto one implementation;
+// see the note left in menu.service.js's Add-ons section.
 
-export const findAllAddOns = () =>
-  prisma.addOn.findMany({ orderBy: { name: "asc" } });
+export const findAllAddOns = (outletId) =>
+  prisma.addOn.findMany({ where: { outletId }, orderBy: { name: "asc" } });
 
-export const findAddOnById = (id) => prisma.addOn.findUnique({ where: { id } });
+export const findAddOnById = (id, outletId) =>
+  prisma.addOn.findFirst({ where: { id, outletId } });
 
-export const createAddOn = (data) => prisma.addOn.create({ data });
+export const createAddOn = (data, outletId) =>
+  prisma.addOn.create({ data: { ...data, outletId } });
 
 export const updateAddOn = (id, data) => prisma.addOn.update({ where: { id }, data });
 
@@ -161,19 +181,21 @@ export const findAddOnsForItem = (menuItemId) =>
 
 // ---------- Combo Meals ----------
 
-export const findAllCombos = () =>
+export const findAllCombos = (outletId) =>
   prisma.comboMeal.findMany({
+    where: { outletId },
     include: { items: { include: { menuItem: true } } },
     orderBy: { createdAt: "desc" },
   });
 
-export const findComboById = (id) =>
-  prisma.comboMeal.findUnique({
-    where: { id },
+export const findComboById = (id, outletId) =>
+  prisma.comboMeal.findFirst({
+    where: { id, outletId },
     include: { items: { include: { menuItem: true } } },
   });
 
-export const createCombo = (data) => prisma.comboMeal.create({ data });
+export const createCombo = (data, outletId) =>
+  prisma.comboMeal.create({ data: { ...data, outletId } });
 
 export const updateCombo = (id, data) =>
   prisma.comboMeal.update({ where: { id }, data });
@@ -187,13 +209,13 @@ export const removeComboItem = (id) => prisma.comboItem.delete({ where: { id } }
 
 // ---------- Price History ----------
 
-export const logPriceChange = (menuItemId, oldPrice, newPrice, changedBy) =>
+export const logPriceChange = (menuItemId, oldPrice, newPrice, changedBy, outletId) =>
   prisma.priceHistory.create({
-    data: { menuItemId, oldPrice, newPrice, changedBy },
+    data: { outletId, menuItemId, oldPrice, newPrice, changedBy },
   });
 
-export const findPriceHistoryForItem = (menuItemId) =>
+export const findPriceHistoryForItem = (menuItemId, outletId) =>
   prisma.priceHistory.findMany({
-    where: { menuItemId },
+    where: { menuItemId, outletId },
     orderBy: { changedAt: "desc" },
   });

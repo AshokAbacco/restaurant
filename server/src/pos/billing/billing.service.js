@@ -34,9 +34,9 @@ function toInvoiceLine(orderItem) {
 
 // Read-only bill preview shown in the Billing & Payment modal before any
 // payment is taken. Safe to call repeatedly (e.g. if the modal reopens).
-export async function getBillingSummary(orderId) {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
+export async function getBillingSummary(orderId, outletId) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, outletId },
     include: {
       table: true,
       customer: true,
@@ -97,8 +97,8 @@ export async function getBillingSummary(orderId) {
 
 // payments: [{ method: "CASH"|"CARD"|"UPI"|"OTHER", amount, transactionReference? }]
 // discount (optional): { discountId } | { code } | { type: "MANUAL", amount, reason, approvedById }
-export async function completeBilling(orderId, { payments, discount } = {}) {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+export async function completeBilling(orderId, { payments, discount } = {}, outletId) {
+  const order = await prisma.order.findFirst({ where: { id: orderId, outletId } });
   if (!order) throw new Error("Order not found");
 
   // FEATURE: offline billing replay guard (cash-only offline billing —
@@ -111,10 +111,10 @@ export async function completeBilling(orderId, { payments, discount } = {}) {
   // accidental double-click on "Complete Payment", independent of
   // offline mode entirely.
   if (order.status === "COMPLETED") {
-    const existingInvoice = await invoicesService.getInvoiceByOrder(orderId);
+    const existingInvoice = await invoicesService.getInvoiceByOrder(orderId, outletId);
     if (existingInvoice) {
       const existingPayments =
-        await paymentsService.listPaymentsForOrder(orderId);
+        await paymentsService.listPaymentsForOrder(orderId, outletId);
       return {
         order,
         payments: existingPayments,
@@ -142,7 +142,7 @@ export async function completeBilling(orderId, { payments, discount } = {}) {
   // Optional discount applied at the billing counter (e.g. a manual
   // discount the cashier keys in). Skipped entirely if not provided.
   if (discount && (discount.discountId || discount.code || discount.amount)) {
-    await discountsService.applyDiscountToOrder(orderId, discount);
+    await discountsService.applyDiscountToOrder(orderId, discount, outletId);
   }
 
   // Record every payment line (also covers split payments — just pass
@@ -150,15 +150,19 @@ export async function completeBilling(orderId, { payments, discount } = {}) {
   // status in sync as it goes.
   const createdPayments = [];
   for (const p of payments) {
-    const payment = await paymentsService.createPayment(orderId, {
-      method: p.method,
-      amount: p.amount,
-      transactionReference: p.transactionReference,
-    });
+    const payment = await paymentsService.createPayment(
+      orderId,
+      {
+        method: p.method,
+        amount: p.amount,
+        transactionReference: p.transactionReference,
+      },
+      outletId,
+    );
     createdPayments.push(payment);
   }
 
-  const paymentCheck = await paymentsService.syncOrderPaymentStatus(orderId);
+  const paymentCheck = await paymentsService.syncOrderPaymentStatus(orderId, outletId);
   if (paymentCheck.paymentStatus !== "PAID") {
     throw new Error(
       `Payment is incomplete — received ₹${paymentCheck.totalPaid.toFixed(2)} of ₹${paymentCheck.grandTotal.toFixed(2)}. The order has not been marked completed and the table has not been freed.`,
@@ -171,10 +175,11 @@ export async function completeBilling(orderId, { payments, discount } = {}) {
   const completedOrder = await posService.updateOrderStatus(
     orderId,
     "COMPLETED",
+    outletId,
   );
 
-  const invoice = await invoicesService.generateInvoice(orderId, {});
-  const fullInvoice = await invoicesService.getInvoiceByOrder(orderId);
+  await invoicesService.generateInvoice(orderId, {}, outletId);
+  const fullInvoice = await invoicesService.getInvoiceByOrder(orderId, outletId);
 
   return {
     order: completedOrder,

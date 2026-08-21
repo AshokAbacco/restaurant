@@ -1,11 +1,29 @@
 // server/src/pos/payments/payments.service.js
 import prisma from "../../config/prisma.js";
 
-export async function listPaymentsForOrder(orderId) {
-  return prisma.payment.findMany({ where: { orderId }, orderBy: { createdAt: "asc" } });
+// Payment has no outletId of its own (it's a child row — scope comes from
+// its parent Order, same pattern as OrderItem/KitchenNote elsewhere in this
+// codebase), so every query here scopes through the order relation.
+
+export async function listPaymentsForOrder(orderId, outletId) {
+  return prisma.payment.findMany({
+    where: { orderId, order: { outletId } },
+    orderBy: { createdAt: "asc" },
+  });
 }
 
-export async function createPayment(orderId, { method, amount, transactionReference, billSplitId }) {
+export async function createPayment(
+  orderId,
+  { method, amount, transactionReference, billSplitId },
+  outletId,
+) {
+  // FIX: previously created a Payment against orderId with no check the
+  // order even existed, let alone belonged to this outlet.
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, outletId },
+  });
+  if (!order) throw new Error("Order not found");
+
   const payment = await prisma.payment.create({
     data: {
       orderId,
@@ -18,14 +36,19 @@ export async function createPayment(orderId, { method, amount, transactionRefere
     },
   });
 
-  await syncOrderPaymentStatus(orderId);
+  await syncOrderPaymentStatus(orderId, outletId);
   return payment;
 }
 
 // Recomputes whether an order is fully paid, partially paid, or unpaid
 // by summing all its Payment rows against grandTotal.
-async function syncOrderPaymentStatus(orderId) {
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { payments: true } });
+async function syncOrderPaymentStatus(orderId, outletId) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, outletId },
+    include: { payments: true },
+  });
+  if (!order) throw new Error("Order not found");
+
   const totalPaid = order.payments.reduce((sum, p) => sum + Number(p.amount), 0);
 
   let paymentStatus = "UNPAID";
@@ -38,11 +61,13 @@ async function syncOrderPaymentStatus(orderId) {
   return { totalPaid, grandTotal: Number(order.grandTotal), paymentStatus };
 }
 
-export async function deletePayment(id) {
-  const payment = await prisma.payment.findUnique({ where: { id } });
+export async function deletePayment(id, outletId) {
+  const payment = await prisma.payment.findFirst({
+    where: { id, order: { outletId } },
+  });
   if (!payment) throw new Error("Payment not found");
   await prisma.payment.delete({ where: { id } });
-  return syncOrderPaymentStatus(payment.orderId);
+  return syncOrderPaymentStatus(payment.orderId, outletId);
 }
 
 export { syncOrderPaymentStatus };

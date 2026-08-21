@@ -6,7 +6,7 @@ export const uploadMiddleware = multer({ storage: multer.memoryStorage() }).sing
 
 export const downloadImportTemplate = async (req, res) => {
   try {
-    const buffer = await expenseService.generateImportTemplate();
+    const buffer = await expenseService.generateImportTemplate(req.tenant.outletId);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", 'attachment; filename="expense-import-template.xlsx"');
     return res.send(Buffer.from(buffer));
@@ -20,7 +20,7 @@ export const validateImport = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "Please attach an .xlsx file" });
     }
-    const result = await expenseService.parseImportFile(req.file.buffer);
+    const result = await expenseService.parseImportFile(req.file.buffer, req.tenant.outletId);
     return res.status(200).json(result);
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -33,7 +33,14 @@ export const confirmImport = async (req, res) => {
     if (!Array.isArray(rows) || rows.length === 0) {
       return res.status(400).json({ error: "No rows to import" });
     }
-    const result = await expenseService.confirmImportRows(rows, req.body.createdBy);
+    // FIX: was req.body.createdBy — nothing in the frontend actually sends
+    // that, so every imported expense's audit trail silently had no
+    // creator. Using the authenticated session's employeeId instead.
+    const result = await expenseService.confirmImportRows(
+      rows,
+      req.user?.employeeId,
+      req.tenant.outletId,
+    );
     return res.status(201).json(result);
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -42,7 +49,7 @@ export const confirmImport = async (req, res) => {
 
 export const exportExpenses = async (req, res) => {
   try {
-    const buffer = await expenseService.exportExpensesToExcel(req.query);
+    const buffer = await expenseService.exportExpensesToExcel(req.query, req.tenant.outletId);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", 'attachment; filename="expenses-export.xlsx"');
     return res.send(Buffer.from(buffer));
@@ -53,7 +60,7 @@ export const exportExpenses = async (req, res) => {
 
 export const getAllExpenses = async (req, res) => {
   try {
-    const expenses = await expenseService.getAllExpenses(req.query);
+    const expenses = await expenseService.getAllExpenses(req.query, req.tenant.outletId);
     return res.status(200).json(expenses);
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -62,7 +69,7 @@ export const getAllExpenses = async (req, res) => {
 
 export const getExpenseById = async (req, res) => {
   try {
-    const expense = await expenseService.getExpenseById(req.params.id);
+    const expense = await expenseService.getExpenseById(req.params.id, req.tenant.outletId);
 
     if (!expense) {
       return res.status(404).json({ error: "Expense not found" });
@@ -99,9 +106,11 @@ export const createExpense = async (req, res) => {
       return res.status(400).json({ error: "Amount must be greater than 0" });
     }
 
+    // FIX: was req.body.createdBy — same always-unsent gap as confirmImport.
     const expense = await expenseService.createExpense(
       req.body,
-      req.body.createdBy
+      req.user?.employeeId,
+      req.tenant.outletId,
     );
 
     return res.status(201).json(expense);
@@ -138,7 +147,8 @@ export const updateExpense = async (req, res) => {
     const updated = await expenseService.updateExpense(
       req.params.id,
       req.body,
-      req.body.updatedBy
+      req.user?.employeeId,
+      req.tenant.outletId,
     );
 
     if (!updated) {
@@ -155,7 +165,8 @@ export const deleteExpense = async (req, res) => {
   try {
     const deleted = await expenseService.deleteExpense(
       req.params.id,
-      req.query.userId
+      req.user?.employeeId,
+      req.tenant.outletId,
     );
 
     if (!deleted) {
@@ -173,7 +184,7 @@ export const deleteExpense = async (req, res) => {
 
 export const approveExpense = async (req, res) => {
   try {
-    const { action, level, approverId, comment } = req.body;
+    const { action, level, comment } = req.body;
 
     if (!action) {
       return res.status(400).json({ error: "Approval action is required" });
@@ -185,12 +196,19 @@ export const approveExpense = async (req, res) => {
       });
     }
 
-    const updated = await expenseService.approveExpense(req.params.id, {
-      action,
-      level,
-      approverId,
-      comment,
-    });
+    // FIX: was req.body.approverId — same always-unsent gap; the approver
+    // is whoever is actually logged in and clicking Approve/Reject, not a
+    // value the client should get to assert about itself.
+    const updated = await expenseService.approveExpense(
+      req.params.id,
+      {
+        action,
+        level,
+        approverId: req.user?.employeeId,
+        comment,
+      },
+      req.tenant.outletId,
+    );
 
     if (!updated) {
       return res.status(404).json({ error: "Expense not found" });
@@ -204,7 +222,7 @@ export const approveExpense = async (req, res) => {
 
 export const getDashboard = async (req, res) => {
   try {
-    const dashboard = await expenseService.getDashboard(req.query.store);
+    const dashboard = await expenseService.getDashboard(req.tenant.outletId);
     return res.status(200).json(dashboard);
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -213,7 +231,7 @@ export const getDashboard = async (req, res) => {
 
 export const getReports = async (req, res) => {
   try {
-    const report = await expenseService.getReports(req.query);
+    const report = await expenseService.getReports(req.query, req.tenant.outletId);
     return res.status(200).json(report);
   } catch (err) {
     return res.status(500).json({ error: err.message });

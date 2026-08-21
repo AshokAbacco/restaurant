@@ -7,7 +7,11 @@ import { verifyAccessToken } from "./jwt.utils.js";
 // ==============================================
 // requireAuth
 // Reads the access token from the Authorization header, verifies it, and
-// attaches { id (userAccountId), employeeId, role } to req.user.
+// attaches { id (userAccountId), employeeId, organizationId, outletId,
+// role } to req.user. organizationId/outletId are what section 0.3's
+// tenantContext middleware (server/src/middleware/tenantContext.js) reads
+// to build req.tenant — every outlet-scoped query downstream depends on
+// them being here.
 // ==============================================
 
 export const requireAuth = (req, res, next) => {
@@ -26,6 +30,8 @@ export const requireAuth = (req, res, next) => {
     req.user = {
       id: payload.sub,
       employeeId: payload.employeeId,
+      organizationId: payload.organizationId,
+      outletId: payload.outletId,
       role: payload.role,
     };
 

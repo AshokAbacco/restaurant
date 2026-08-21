@@ -2,7 +2,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import * as controller from "./kiosk.controller.js";
-import { requireKioskAuth } from "./kiosk.middleware.js";
+import { requireKioskAuth, resolveKioskOutlet } from "./kiosk.middleware.js";
 console.log("USING kiosk.routes.js", new Date().toISOString());
 // Kiosk endpoints are public-facing (device key, not staff login) so they
 // get a rate limiter to keep an unattended device from being abused as a
@@ -61,7 +61,13 @@ router.use((req, res, next) => {
 router.post("/webhook/razorpay", controller.razorpayWebhook);
 
 router.use(requireKioskAuth);
-// router.use(requireKioskAuth);
+// resolveKioskOutlet reads outletId from the QR code's URL (query param on
+// GET, body field on writes) — see the comment in kiosk.middleware.js for
+// why this can't come from a staff-style session. Applied to every route
+// below except the webhook above, which Razorpay calls directly and can't
+// be expected to know or send our outletId — it resolves the outlet
+// implicitly via the order the payment reference points back to instead.
+router.use(resolveKioskOutlet);
 
 // ---------- Menu (read-only, customer-facing) ----------
 router.get("/menu", controller.getMenu);

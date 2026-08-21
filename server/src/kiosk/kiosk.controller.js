@@ -24,7 +24,7 @@ const handleError = (res, err) => {
 
 export const getMenu = async (req, res) => {
   try {
-    const menu = await service.getKioskMenu();
+    const menu = await service.getKioskMenu(req.tenant.outletId);
     res.json({ success: true, data: menu });
   } catch (err) {
     handleError(res, err);
@@ -33,7 +33,10 @@ export const getMenu = async (req, res) => {
 
 export const getAddOnsForItem = async (req, res) => {
   try {
-    const addOns = await service.getAddOnsForMenuItem(req.params.menuItemId);
+    const addOns = await service.getAddOnsForMenuItem(
+      req.params.menuItemId,
+      req.tenant.outletId,
+    );
     res.json({ success: true, data: addOns });
   } catch (err) {
     handleError(res, err);
@@ -44,7 +47,7 @@ export const getAddOnsForItem = async (req, res) => {
 
 export const getTables = async (req, res) => {
   try {
-    const tables = await service.getAvailableTables(req.query.store);
+    const tables = await service.getAvailableTables(req.tenant.outletId);
     res.json({ success: true, data: tables });
   } catch (err) {
     handleError(res, err);
@@ -58,7 +61,7 @@ export const createOrder = async (req, res) => {
     const errors = validateOrderInput(req.body);
     if (errors.length) return res.status(400).json({ success: false, errors });
 
-    const order = await service.createOrder(req.body);
+    const order = await service.createOrder(req.body, req.tenant.outletId);
     res.status(201).json({ success: true, data: order });
   } catch (err) {
     handleError(res, err);
@@ -67,7 +70,7 @@ export const createOrder = async (req, res) => {
 
 export const getOrder = async (req, res) => {
   try {
-    const order = await service.getOrder(req.params.id);
+    const order = await service.getOrder(req.params.id, req.tenant.outletId);
     res.json({ success: true, data: order });
   } catch (err) {
     handleError(res, err);
@@ -76,7 +79,7 @@ export const getOrder = async (req, res) => {
 
 export const cancelOrder = async (req, res) => {
   try {
-    const order = await service.cancelOrder(req.params.id);
+    const order = await service.cancelOrder(req.params.id, req.tenant.outletId);
     res.json({ success: true, data: order });
   } catch (err) {
     handleError(res, err);
@@ -90,7 +93,7 @@ export const payOrder = async (req, res) => {
     const errors = validatePaymentInput(req.body);
     if (errors.length) return res.status(400).json({ success: false, errors });
 
-    const order = await service.confirmPayment(req.params.id, req.body);
+    const order = await service.confirmPayment(req.params.id, req.body, req.tenant.outletId);
     res.json({ success: true, data: order });
   } catch (err) {
     handleError(res, err);
@@ -101,7 +104,7 @@ export const payOrder = async (req, res) => {
 
 export const getUpiQr = async (req, res) => {
   try {
-    const qr = await service.getUpiQr(req.params.id);
+    const qr = await service.getUpiQr(req.params.id, req.tenant.outletId);
     res.json({ success: true, data: qr });
   } catch (err) {
     handleError(res, err);
@@ -111,7 +114,7 @@ export const getUpiQr = async (req, res) => {
 // Polled by the kiosk while the QR is on screen.
 export const checkQrPaymentStatus = async (req, res) => {
   try {
-    const result = await service.checkQrPaymentStatus(req.params.id);
+    const result = await service.checkQrPaymentStatus(req.params.id, req.tenant.outletId);
     res.json({ success: true, data: result });
   } catch (err) {
     handleError(res, err);
@@ -122,7 +125,7 @@ export const checkQrPaymentStatus = async (req, res) => {
 
 export const createCardOrder = async (req, res) => {
   try {
-    const data = await service.createRazorpayOrderForCard(req.params.id);
+    const data = await service.createRazorpayOrderForCard(req.params.id, req.tenant.outletId);
     res.json({ success: true, data });
   } catch (err) {
     handleError(res, err);
@@ -134,6 +137,7 @@ export const verifyCardPayment = async (req, res) => {
     const order = await service.verifyRazorpayCardPayment(
       req.params.id,
       req.body,
+      req.tenant.outletId,
     );
     res.json({ success: true, data: order });
   } catch (err) {
@@ -143,8 +147,10 @@ export const verifyCardPayment = async (req, res) => {
 
 // ---------- Razorpay Webhook ----------
 // Not customer-facing — Razorpay's servers call this directly, so it
-// bypasses the kiosk device-key auth entirely (see kiosk.routes.js, this
-// route is registered before requireKioskAuth is applied).
+// bypasses the kiosk device-key auth AND resolveKioskOutlet entirely (see
+// kiosk.routes.js — this route is registered before either middleware is
+// applied). No req.tenant is available here; the service resolves the
+// outlet itself from the order the payment reference points back to.
 export const razorpayWebhook = async (req, res) => {
   try {
     const signature = req.header("x-razorpay-signature");

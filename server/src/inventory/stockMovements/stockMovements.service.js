@@ -4,8 +4,8 @@ import prisma from "../../config/prisma.js";
 // Movements are never created directly through this module — they're a
 // byproduct of purchase entries, adjustments, wastage, and sales. This is
 // purely the read side (the "show me everything that happened" screen).
-export const listMovements = ({ ingredientId, type, limit }) => {
-  const where = {};
+export const listMovements = ({ ingredientId, type, limit }, outletId) => {
+  const where = { outletId };
   if (ingredientId) where.ingredientId = ingredientId;
   if (type) where.type = type;
 
@@ -19,9 +19,9 @@ export const listMovements = ({ ingredientId, type, limit }) => {
   });
 };
 
-export const getMovementById = (id) =>
-  prisma.stockMovement.findUnique({
-    where: { id },
+export const getMovementById = (id, outletId) =>
+  prisma.stockMovement.findFirst({
+    where: { id, outletId },
     include: {
       ingredient: { select: { name: true, itemCode: true, consumptionUnit: true } },
     },
