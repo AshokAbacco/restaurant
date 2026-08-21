@@ -1,10 +1,12 @@
 // client/src/menu/pages/AddOns.jsx
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiTag } from "react-icons/fi";
+import { WifiOff } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { ui, rowItem } from "../menuTheme";
 import { Spinner, ErrorBanner } from "../MenuUI";
 import { fetchAddOns, createAddOn, updateAddOn, deleteAddOn } from "../menuApi";
+import { fetchWithOfflineFallbackResult } from "../../offline/offlineCache";
 
 const AddOns = () => {
   const { canManageMenu, canDeleteMenuItems } = useAuth();
@@ -20,25 +22,40 @@ const AddOns = () => {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
+  // FEATURE: read-only offline browsing — this list falls back to the
+  // last-synced copy if the network fails. Create/update/delete below are
+  // deliberately NOT offline-capable: editing add-ons mid-outage isn't a
+  // real scenario worth the conflict-resolution complexity (see the
+  // scoping discussion this was built from).
   const loadData = async () => {
     setLoading(true);
     setError("");
-    const result = await fetchAddOns();
-    if (result.ok) {
-      setAddOns(result.data.data || []);
-    } else {
-      setError(result.data?.message || "Failed to load add-ons");
+    try {
+      const { data: result, fromCache } = await fetchWithOfflineFallbackResult(
+        "menuAdmin:addons",
+        fetchAddOns,
+      );
+      setIsOffline(fromCache);
+      setAddOns(result.data || []);
+    } catch (err) {
+      setError(err.message || "Failed to load add-ons");
     }
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleAdd = async () => {
     if (!name.trim() || price === "") return;
     setSaving(true);
-    const result = await createAddOn({ name: name.trim(), price: Number(price) });
+    const result = await createAddOn({
+      name: name.trim(),
+      price: Number(price),
+    });
     setSaving(false);
     if (!result.ok) {
       alert(result.data?.message || "Failed to add");
@@ -50,7 +67,10 @@ const AddOns = () => {
   };
 
   const handleUpdate = async (id) => {
-    const result = await updateAddOn(id, { name: editName.trim(), price: Number(editPrice) });
+    const result = await updateAddOn(id, {
+      name: editName.trim(),
+      price: Number(editPrice),
+    });
     if (!result.ok) {
       alert(result.data?.message || "Failed to update");
       return;
@@ -87,13 +107,24 @@ const AddOns = () => {
             placeholder="Price (₹)"
             className={`w-full sm:w-32 ${ui.input}`}
           />
-          <button onClick={handleAdd} disabled={saving} className={ui.btnPrimary}>
+          <button
+            onClick={handleAdd}
+            disabled={saving}
+            className={ui.btnPrimary}
+          >
             <FiPlus /> Add
           </button>
         </div>
       )}
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      {isOffline && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <WifiOff className="h-3.5 w-3.5" />
+          Offline — showing last-synced add-ons. Adding/editing needs a
+          connection.
+        </div>
+      )}
 
       <div className={`${ui.card} overflow-hidden`}>
         {loading ? (
@@ -124,20 +155,34 @@ const AddOns = () => {
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <span className={`font-medium ${ui.heading}`}>{addOn.name}</span>
-                    <span className={`text-sm ${ui.muted}`}>₹{Number(addOn.price).toFixed(2)}</span>
+                    <span className={`font-medium ${ui.heading}`}>
+                      {addOn.name}
+                    </span>
+                    <span className={`text-sm ${ui.muted}`}>
+                      ₹{Number(addOn.price).toFixed(2)}
+                    </span>
                     {!addOn.isEnabled && (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ui.badgeGray}`}>Disabled</span>
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${ui.badgeGray}`}
+                      >
+                        Disabled
+                      </span>
                     )}
                   </div>
                 )}
                 <div className="flex gap-3 flex-shrink-0">
                   {editingId === addOn.id ? (
                     <>
-                      <button onClick={() => handleUpdate(addOn.id)} className={`${ui.linkEdit} text-xs`}>
+                      <button
+                        onClick={() => handleUpdate(addOn.id)}
+                        className={`${ui.linkEdit} text-xs`}
+                      >
                         Save
                       </button>
-                      <button onClick={() => setEditingId(null)} className={`${ui.muted} text-xs font-medium hover:opacity-80`}>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className={`${ui.muted} text-xs font-medium hover:opacity-80`}
+                      >
                         Cancel
                       </button>
                     </>
@@ -145,14 +190,21 @@ const AddOns = () => {
                     <>
                       {canManage && (
                         <button
-                          onClick={() => { setEditingId(addOn.id); setEditName(addOn.name); setEditPrice(addOn.price); }}
+                          onClick={() => {
+                            setEditingId(addOn.id);
+                            setEditName(addOn.name);
+                            setEditPrice(addOn.price);
+                          }}
                           className={ui.linkEdit}
                         >
                           Edit
                         </button>
                       )}
                       {canDelete && (
-                        <button onClick={() => handleDelete(addOn)} className={ui.linkDanger}>
+                        <button
+                          onClick={() => handleDelete(addOn)}
+                          className={ui.linkDanger}
+                        >
                           Delete
                         </button>
                       )}

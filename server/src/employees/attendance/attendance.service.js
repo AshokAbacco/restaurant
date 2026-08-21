@@ -14,14 +14,29 @@ function startOfDay(dateInput) {
   return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
 }
 
-export async function checkIn(employeeId, { ipAddress, device } = {}) {
+// FIX: none of checkIn/checkOut/recordBreak/markStatus below previously
+// verified employeeId belonged to this outlet before writing attendance
+// against it — in practice this is normally an employee acting on their
+// own id, but the id still comes from the request and was never checked.
+async function assertEmployeeInOutlet(employeeId, outletId) {
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, outletId },
+  });
+  if (!employee) {
+    throw new Error("Employee not found");
+  }
+}
+
+export async function checkIn(employeeId, { ipAddress, device } = {}, outletId) {
+  await assertEmployeeInOutlet(employeeId, outletId);
+
   const date = startOfDay();
   const now = new Date();
 
   const [attendance] = await prisma.$transaction([
     prisma.attendance.upsert({
       where: { employeeId_date: { employeeId, date } },
-      create: { employeeId, date, clockIn: now, status: "PRESENT" },
+      create: { outletId, employeeId, date, clockIn: now, status: "PRESENT" },
       update: { clockIn: now, status: "PRESENT" },
     }),
     prisma.attendanceLog.create({
@@ -36,12 +51,14 @@ export async function checkIn(employeeId, { ipAddress, device } = {}) {
     action: "Checked in",
     ipAddress,
     device,
-  });
+  }, outletId);
 
   return attendance;
 }
 
-export async function checkOut(employeeId, { ipAddress, device } = {}) {
+export async function checkOut(employeeId, { ipAddress, device } = {}, outletId) {
+  await assertEmployeeInOutlet(employeeId, outletId);
+
   const date = startOfDay();
   const now = new Date();
 
@@ -76,7 +93,7 @@ export async function checkOut(employeeId, { ipAddress, device } = {}) {
     action: `Checked out (worked ${attendance.workingHours ?? "—"} hrs)`,
     ipAddress,
     device,
-  });
+  }, outletId);
 
   return attendance;
 }
@@ -85,7 +102,9 @@ export async function recordBreak(
   employeeId,
   type,
   { ipAddress, device } = {},
+  outletId,
 ) {
+  await assertEmployeeInOutlet(employeeId, outletId);
   // type: "BREAK_START" | "BREAK_END"
   return prisma.attendanceLog.create({
     data: { employeeId, eventType: type, ipAddress, device },
@@ -99,8 +118,9 @@ export async function listAttendance({
   status,
   page = 1,
   limit = 30,
-}) {
+}, outletId) {
   const where = {
+    outletId,
     ...(employeeId ? { employeeId } : {}),
     ...(status ? { status } : {}),
     ...(from || to
@@ -127,7 +147,11 @@ export async function listAttendance({
   return { data, total, page: Number(page), limit: Number(limit) };
 }
 
-export async function getEmployeeAttendanceLogs(employeeId, { from, to } = {}) {
+export async function getEmployeeAttendanceLogs(employeeId, { from, to } = {}, outletId) {
+  // AttendanceLog has no outletId of its own (child row — scope comes from
+  // its parent Employee, same pattern as elsewhere in this codebase).
+  await assertEmployeeInOutlet(employeeId, outletId);
+
   return prisma.attendanceLog.findMany({
     where: {
       employeeId,
@@ -144,32 +168,38 @@ export async function getEmployeeAttendanceLogs(employeeId, { from, to } = {}) {
   });
 }
 
-export async function markStatus(employeeId, date, status) {
+export async function markStatus(employeeId, date, status, outletId) {
+  await assertEmployeeInOutlet(employeeId, outletId);
+
   return prisma.attendance.upsert({
     where: { employeeId_date: { employeeId, date: startOfDay(date) } },
-    create: { employeeId, date: startOfDay(date), status },
+    create: { outletId, employeeId, date: startOfDay(date), status },
     update: { status },
   });
 }
 
-// CHANGED: "close the day" — for every ACTIVE employee who does NOT already
-// have an attendance row for the given date, create one with status ABSENT.
-// Employees who checked in already have PRESENT (or HALF_DAY), and employees
-// whose leave was approved already have LEAVE written in by
-// leaves.service#decideLeaveRequest — this only fills in the remaining gap:
-// "nothing recorded at all" => treated as an unmarked absence.
+// CHANGED: "close the day" — for every ACTIVE employee in this outlet who
+// does NOT already have an attendance row for the given date, create one
+// with status ABSENT. Employees who checked in already have PRESENT (or
+// HALF_DAY), and employees whose leave was approved already have LEAVE
+// written in by leaves.service#decideLeaveRequest — this only fills in the
+// remaining gap: "nothing recorded at all" => treated as an unmarked absence.
 // Intended to be called once per day (e.g. via a scheduled job just after
 // midnight, or manually by an Owner from the UI) for the day that just ended.
-export async function markAbsentees(dateInput) {
+//
+// IMPORTANT if/when a scheduled job calls this: it must loop over every
+// active Outlet and call this once per outlet, same as alerts.service.js's
+// generateAlerts — a single global call no longer makes sense.
+export async function markAbsentees(dateInput, outletId) {
   const date = startOfDay(dateInput);
 
   const [alreadyMarked, activeEmployees] = await Promise.all([
     prisma.attendance.findMany({
-      where: { date },
+      where: { date, outletId },
       select: { employeeId: true },
     }),
     prisma.employee.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", outletId },
       select: { id: true },
     }),
   ]);
@@ -184,7 +214,7 @@ export async function markAbsentees(dateInput) {
   await prisma.$transaction(
     toMark.map((e) =>
       prisma.attendance.create({
-        data: { employeeId: e.id, date, status: "ABSENT" },
+        data: { outletId, employeeId: e.id, date, status: "ABSENT" },
       }),
     ),
   );

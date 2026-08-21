@@ -17,6 +17,8 @@ import {
   FiMoon,
   FiAlertCircle,
   FiX,
+  FiMapPin,
+  FiChevronRight,
 } from "react-icons/fi";
 
 // Small self-contained error toast for this screen. Deliberately separate
@@ -98,9 +100,16 @@ const Login = () => {
 
   const navigate = useNavigate();
 
-  const { login } = useAuth();
+  const { login, selectOutlet, pendingOutletSelection } = useAuth();
 
   const { theme, toggleTheme } = useTheme();
+
+  // FEATURE (multi-tenancy): outlet-selection step. selectingOutletId
+  // tracks which outlet button is mid-request (for its own spinner) —
+  // separate from the form's `loading`, since this screen replaces the
+  // form entirely rather than sharing its submit button.
+  const [selectingOutletId, setSelectingOutletId] = useState(null);
+  const [outletError, setOutletError] = useState("");
 
   // ==========================
   // FEATURES LIST
@@ -195,6 +204,14 @@ const Login = () => {
         return;
       }
 
+      // FEATURE (multi-tenancy): password was correct but this account has
+      // more than one outlet — AuthContext has stashed the pending
+      // selection and this component will re-render showing the outlet
+      // picker below instead of the form. Don't navigate yet.
+      if (result.requiresOutletSelection) {
+        return;
+      }
+
       navigate("/dashboard", { replace: true });
     } catch (err) {
       const message = err?.message || "Something went wrong. Please try again.";
@@ -202,6 +219,30 @@ const Login = () => {
       setToastMessage(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ==========================
+  // SELECT OUTLET (second step, multi-outlet accounts only)
+  // ==========================
+
+  const handleSelectOutlet = async (outletId) => {
+    setSelectingOutletId(outletId);
+    setOutletError("");
+
+    try {
+      const result = await selectOutlet(outletId);
+
+      if (!result.success) {
+        setOutletError(result.message || "Unable to select that outlet.");
+        return;
+      }
+
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      setOutletError(err?.message || "Something went wrong. Please try again.");
+    } finally {
+      setSelectingOutletId(null);
     }
   };
   // ==========================
@@ -304,10 +345,67 @@ const Login = () => {
               </h2>
 
               <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0]">
-                Sign in to continue
+                {pendingOutletSelection
+                  ? "Your account has access to more than one outlet — pick one to continue."
+                  : "Sign in to continue"}
               </p>
             </div>
 
+            {pendingOutletSelection ? (
+              // ==========================
+              // OUTLET PICKER (multi-outlet accounts, second login step)
+              // ==========================
+              <div className="mt-10 space-y-3">
+                {outletError && (
+                  <p className="text-[#EF5350] text-sm text-center mb-2">
+                    {outletError}
+                  </p>
+                )}
+
+                {pendingOutletSelection.outlets.map((outlet) => (
+                  <button
+                    key={outlet.id}
+                    type="button"
+                    disabled={selectingOutletId !== null}
+                    onClick={() => handleSelectOutlet(outlet.id)}
+                    className="w-full flex items-center justify-between gap-3 px-5 py-4 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] hover:border-[#3FA34D] dark:hover:border-[#43B75A] disabled:opacity-50 transition-all text-left"
+                  >
+                    <span className="flex items-center gap-3 min-w-0">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3FA34D]/10 dark:bg-[#43B75A]/10">
+                        <FiMapPin className="text-[#3FA34D] dark:text-[#43B75A]" />
+                      </span>
+                      <span className="font-semibold text-[#1F2937] dark:text-white truncate">
+                        {outlet.name}
+                      </span>
+                    </span>
+                    {selectingOutletId === outlet.id ? (
+                      <svg
+                        className="animate-spin h-5 w-5 text-[#3FA34D] dark:text-[#43B75A] shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          opacity="0.25"
+                        />
+                        <path
+                          d="M22 12a10 10 0 00-10-10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    ) : (
+                      <FiChevronRight className="text-[#9CA3AF] dark:text-[#6B7280] shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
             <form onSubmit={handleLogin} className="mt-10 space-y-6">
               {/* Email */}
 
@@ -437,6 +535,7 @@ const Login = () => {
                 )}
               </button>
             </form>
+            )}
 
             {/* Footer */}
 

@@ -5,7 +5,8 @@ import TableStrip from "./components/TableStrip";
 import MenuBrowser from "./components/MenuBrowser";
 import OrderTicket from "./components/OrderTicket";
 import SuccessToast from "./components/SuccessToast";
-import { createOrder, sendToKitchen } from "./api/posApi";
+import { createOrder } from "./api/posApi";
+import { placeDineInOrder } from "../offline/offlineQueue";
 
 export default function PosOrderScreen() {
   const navigate = useNavigate();
@@ -32,7 +33,8 @@ export default function PosOrderScreen() {
   // two lines can share a menuItemId once add-ons make them distinct). Use
   // crypto.randomUUID when it's available and fall back to a manual id.
   function makeCartLineId() {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    if (typeof crypto !== "undefined" && crypto.randomUUID)
+      return crypto.randomUUID();
     return `line_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
@@ -40,10 +42,14 @@ export default function PosOrderScreen() {
     setCart((prev) => {
       // Only merge into an existing plain line (no add-ons yet) — once a
       // line has add-ons it's no longer interchangeable with a fresh tap.
-      const existing = prev.find((i) => i.menuItemId === menuItem.id && (i.addOns || []).length === 0);
+      const existing = prev.find(
+        (i) => i.menuItemId === menuItem.id && (i.addOns || []).length === 0,
+      );
       if (existing) {
         return prev.map((i) =>
-          i.cartLineId === existing.cartLineId ? { ...i, quantity: i.quantity + 1 } : i
+          i.cartLineId === existing.cartLineId
+            ? { ...i, quantity: i.quantity + 1 }
+            : i,
         );
       }
       return [
@@ -54,6 +60,14 @@ export default function PosOrderScreen() {
           name: menuItem.name,
           sellingPrice: Number(menuItem.sellingPrice),
           gstPercent: Number(menuItem.gstPercent || 0),
+          // Kept only for the offline Kitchen Display preview ticket (see
+          // getQueuedKots() in offline/offlineQueue.js) — never sent to
+          // the server, which derives the section itself from the
+          // MenuItem record. menuItem.kitchenSection comes from the
+          // backend's `include: { kitchenSection: true }` on GET /menu.
+          kitchenSectionId:
+            menuItem.kitchenSectionId || menuItem.kitchenSection?.id || null,
+          kitchenSectionName: menuItem.kitchenSection?.name || null,
           quantity: 1,
           notes: "",
           addOns: [],
@@ -63,14 +77,20 @@ export default function PosOrderScreen() {
   }
 
   function increment(cartLineId) {
-    setCart((prev) => prev.map((i) => (i.cartLineId === cartLineId ? { ...i, quantity: i.quantity + 1 } : i)));
+    setCart((prev) =>
+      prev.map((i) =>
+        i.cartLineId === cartLineId ? { ...i, quantity: i.quantity + 1 } : i,
+      ),
+    );
   }
 
   function decrement(cartLineId) {
     setCart((prev) =>
       prev
-        .map((i) => (i.cartLineId === cartLineId ? { ...i, quantity: i.quantity - 1 } : i))
-        .filter((i) => i.quantity > 0)
+        .map((i) =>
+          i.cartLineId === cartLineId ? { ...i, quantity: i.quantity - 1 } : i,
+        )
+        .filter((i) => i.quantity > 0),
     );
   }
 
@@ -79,11 +99,15 @@ export default function PosOrderScreen() {
   }
 
   function setNote(cartLineId, notes) {
-    setCart((prev) => prev.map((i) => (i.cartLineId === cartLineId ? { ...i, notes } : i)));
+    setCart((prev) =>
+      prev.map((i) => (i.cartLineId === cartLineId ? { ...i, notes } : i)),
+    );
   }
 
   function editAddOns(cartLineId, addOns) {
-    setCart((prev) => prev.map((i) => (i.cartLineId === cartLineId ? { ...i, addOns } : i)));
+    setCart((prev) =>
+      prev.map((i) => (i.cartLineId === cartLineId ? { ...i, addOns } : i)),
+    );
   }
 
   async function placeOrder() {
@@ -91,38 +115,74 @@ export default function PosOrderScreen() {
     submittingRef.current = true;
     setError(null);
     setPlacing(true);
-    try {
-      const order = await createOrder({
-        orderType,
-        tableId: orderType === "DINE_IN" ? tableId : undefined,
-        store: "Main Store",
-        items: cart.map((i) => ({
-          menuItemId: i.menuItemId,
-          quantity: i.quantity,
-          notes: i.notes || undefined,
-          ...(i.addOns && i.addOns.length
-            ? { addOns: i.addOns.map((a) => ({ addOnId: a.addOnId, quantity: a.quantity })) }
-            : {}),
-        })),
-      });
 
+    const items = cart.map((i) => ({
+      menuItemId: i.menuItemId,
+      quantity: i.quantity,
+      notes: i.notes || undefined,
+      ...(i.addOns && i.addOns.length
+        ? {
+            addOns: i.addOns.map((a) => ({
+              addOnId: a.addOnId,
+              quantity: a.quantity,
+            })),
+          }
+        : {}),
+    }));
+
+    try {
       if (orderType === "TAKEAWAY") {
-        // Takeaway orders bill before they cook: hand off to the Billing
-        // page now, and the order only gets fired to the kitchen there,
-        // once payment has actually gone through.
+        // Takeaway/delivery are NOT offline-capable (see offlineQueue.js's
+        // file header) — billing needs live payment-gateway state, and
+        // this hands off to Billing immediately either way, so it always
+        // goes straight to the network as before.
+        const order = await createOrder({
+          orderType,
+          store: "Main Store",
+          items,
+        });
         setCart([]);
         navigate(`/billing?orderId=${order.id}`);
         return;
       }
 
-      // Dine-in: fire every item straight to the kitchen on placement, as before.
-      const orderItemIds = order.items.map((i) => i.id);
-      if (orderItemIds.length) {
-        await sendToKitchen(order.id, orderItemIds);
-      }
+      // Display-only metadata for the Kitchen Display Screen to render a
+      // "this order exists, still syncing" ticket while offline — never
+      // sent to the server (see placeDineInOrder's ticketMeta param and
+      // getQueuedKots() in offline/offlineQueue.js).
+      const ticketMeta = {
+        orderType,
+        tableName: selectedTable?.name || null,
+        items: cart.map((i) => ({
+          name: i.name,
+          quantity: i.quantity,
+          notes: i.notes || null,
+          sellingPrice: i.sellingPrice,
+          kitchenSectionId: i.kitchenSectionId,
+          kitchenSectionName: i.kitchenSectionName,
+        })),
+      };
+
+      // Dine-in: goes through the offline queue. placeDineInOrder tries the
+      // real network call first (the same atomic create+send-to-kitchen
+      // endpoint as before, just as one call instead of two) and only
+      // falls back to the local IndexedDB queue on a genuine connectivity
+      // failure — see offlineQueue.js.
+      const { order, queuedOffline } = await placeDineInOrder(
+        {
+          orderType,
+          tableId,
+          store: "Main Store",
+          items,
+        },
+        ticketMeta,
+      );
 
       setLastOrder(order);
       setShowSuccessToast(true);
+      if (queuedOffline) {
+        setError(null); // this isn't an error state — just informational, shown via the toast message
+      }
       setCart([]);
       setSelectedTable(null);
     } catch (err) {
@@ -136,12 +196,25 @@ export default function PosOrderScreen() {
   return (
     <div className="flex h-screen flex-col bg-stone-50">
       <header className="border-b border-stone-200 bg-white px-6 py-3">
-        <h1 className="font-mono text-lg font-bold text-stone-900">POS · New Order</h1>
+        <h1 className="font-mono text-lg font-bold text-stone-900">
+          POS · New Order
+        </h1>
       </header>
 
       <SuccessToast
         show={showSuccessToast}
-        message={lastOrder ? `Order ${lastOrder.orderNumber}` : undefined}
+        title={
+          lastOrder?.status === "QUEUED_OFFLINE"
+            ? "Order saved on this device"
+            : undefined
+        }
+        message={
+          lastOrder?.status === "QUEUED_OFFLINE"
+            ? "No connection — it'll sync to the kitchen automatically once you're back online."
+            : lastOrder
+              ? `Order ${lastOrder.orderNumber}`
+              : undefined
+        }
         onClose={() => setShowSuccessToast(false)}
       />
 

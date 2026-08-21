@@ -1,16 +1,29 @@
 // server/src/employees/employees.service.js
 import bcrypt from "bcryptjs";
 import prisma from "../config/prisma.js";
+import { writeAuditLog } from "../lib/auditLog.service.js";
 
 /**
  * Generates the next sequential employee code, e.g. EMP-0001, EMP-0002.
- * NOTE: simple count-based approach — fine for single-writer admin usage.
- * If concurrent creation becomes an issue, switch to a DB sequence.
+ * FIX: was count()+1, which collides with an existing employeeCode once any
+ * employee has ever been hard-deleted (or, for this model specifically,
+ * once one is ever removed from the DB directly) — same class of bug fixed
+ * in pos.service.js's generateOrderNumber and kot.service.js's
+ * generateKotNumber. Basing it on the highest code actually seen removes
+ * that possibility; lexicographic DESC sort matches numeric order here
+ * because every employeeCode is zero-padded to the same width. Scoped per
+ * outlet now too, since employeeCode is @@unique([outletId, employeeCode]).
  */
-async function generateEmployeeCode() {
-  const count = await prisma.employee.count();
-  const next = count + 1;
-  return `EMP-${String(next).padStart(4, "0")}`;
+async function generateEmployeeCode(outletId) {
+  const last = await prisma.employee.findFirst({
+    where: { outletId },
+    orderBy: { employeeCode: "desc" },
+    select: { employeeCode: true },
+  });
+  const lastNum = last
+    ? parseInt(last.employeeCode.replace("EMP-", ""), 10) || 0
+    : 0;
+  return `EMP-${String(lastNum + 1).padStart(4, "0")}`;
 }
 
 // FIX: <input type="date"> sends a date-only string like "2026-07-21".
@@ -60,8 +73,9 @@ export async function listEmployees({
   status,
   page = 1,
   limit = 20,
-}) {
+}, outletId) {
   const where = {
+    outletId,
     // CHANGED: when no status filter is supplied, hide TERMINATED (soft-deleted)
     // employees by default instead of showing every record ever created.
     // Callers can still pass status=TERMINATED explicitly to see them.
@@ -99,9 +113,9 @@ export async function listEmployees({
   return { data, total, page: Number(page), limit: Number(limit) };
 }
 
-export async function getEmployeeById(id) {
-  return prisma.employee.findUnique({
-    where: { id },
+export async function getEmployeeById(id, outletId) {
+  return prisma.employee.findFirst({
+    where: { id, outletId },
     include: {
       address: true,
       userAccount: {
@@ -117,15 +131,16 @@ export async function getEmployeeById(id) {
   });
 }
 
-export async function createEmployee(payload) {
+export async function createEmployee(payload, outletId) {
   const { address, ...rest } = payload;
   const employeeData = normalizeEmployeeDates(rest);
-  const employeeCode = await generateEmployeeCode();
+  const employeeCode = await generateEmployeeCode(outletId);
 
   try {
     return await prisma.employee.create({
       data: {
         ...employeeData,
+        outletId,
         employeeCode,
         ...(address
           ? {
@@ -146,7 +161,12 @@ export async function createEmployee(payload) {
   }
 }
 
-export async function updateEmployee(id, payload) {
+export async function updateEmployee(id, payload, outletId) {
+  const existing = await prisma.employee.findFirst({ where: { id, outletId } });
+  if (!existing) {
+    throw new Error("Employee not found.");
+  }
+
   const { address, ...rest } = payload;
   const employeeData = normalizeEmployeeDates(rest);
 
@@ -180,13 +200,33 @@ export async function updateEmployee(id, payload) {
   }
 }
 
-export async function deleteEmployee(id) {
+export async function deleteEmployee(id, actor, outletId) {
   // Soft-delete preferred over hard delete so history (attendance, salary, etc.) isn't orphaned.
+  const existing = await prisma.employee.findFirst({ where: { id, outletId } });
+  if (!existing) {
+    throw new Error("Employee not found.");
+  }
+
   try {
-    return await prisma.employee.update({
+    const terminated = await prisma.employee.update({
       where: { id },
       data: { status: "TERMINATED" },
     });
+
+    await writeAuditLog({
+      outletId,
+      action: "EMPLOYEE_TERMINATED",
+      entityType: "Employee",
+      entityId: id,
+      performedById: actor?.employeeId ?? actor?.id ?? null,
+      performedByRole: actor?.role ?? null,
+      metadata: {
+        employeeCode: terminated.employeeCode,
+        fullName: terminated.fullName,
+      },
+    });
+
+    return terminated;
   } catch (err) {
     if (err.code === "P2025") {
       throw new Error("Employee not found.");
@@ -198,16 +238,41 @@ export async function deleteEmployee(id) {
 export async function createLoginAccount(
   employeeId,
   { username, email, password, pin, role },
+  actor,
+  outletId,
 ) {
   if (!username || !password) {
     throw new Error("Username and password are required.");
   }
 
+  // FIX: this previously created a UserAccount with no outletId/organizationId
+  // at all — both are required fields now, so this call would fail outright
+  // (not just leak data). Deriving both from the Employee record itself,
+  // rather than trusting a separately-passed outletId, guarantees a
+  // UserAccount can never end up pinned to a different outlet than its own
+  // Employee row — that pairing has to stay consistent by construction.
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, outletId },
+    include: { outlet: { select: { organizationId: true } } },
+  });
+  if (!employee) {
+    throw new Error("Employee not found.");
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
-    return await prisma.userAccount.create({
-      data: { employeeId, username, email, passwordHash, pin, role },
+    const account = await prisma.userAccount.create({
+      data: {
+        employeeId,
+        outletId: employee.outletId,
+        organizationId: employee.outlet.organizationId,
+        username,
+        email,
+        passwordHash,
+        pin,
+        role,
+      },
       select: {
         id: true,
         username: true,
@@ -216,6 +281,18 @@ export async function createLoginAccount(
         isActive: true,
       },
     });
+
+    await writeAuditLog({
+      outletId,
+      action: "LOGIN_ACCOUNT_CREATED",
+      entityType: "UserAccount",
+      entityId: account.id,
+      performedById: actor?.employeeId ?? actor?.id ?? null,
+      performedByRole: actor?.role ?? null,
+      metadata: { employeeId, assignedRole: role, username },
+    });
+
+    return account;
   } catch (err) {
     // CHANGED: friendly message for duplicate username/email or an employee
     // that already has an account (employeeId is @unique on UserAccount),
@@ -230,7 +307,7 @@ export async function createLoginAccount(
   }
 }
 
-export async function getDashboardStats() {
+export async function getDashboardStats(outletId) {
   // CHANGED: use a UTC-anchored "today" (matching attendance.service's
   // startOfDay) instead of setHours(0,0,0,0), which uses the server's local
   // timezone and no longer matches how Attendance.date (a @db.Date column)
@@ -242,11 +319,11 @@ export async function getDashboardStats() {
 
   const [total, present, absent, onLeave, pendingLeaveRequests] =
     await Promise.all([
-      prisma.employee.count({ where: { status: "ACTIVE" } }),
-      prisma.attendance.count({ where: { date: today, status: "PRESENT" } }),
-      prisma.attendance.count({ where: { date: today, status: "ABSENT" } }),
-      prisma.attendance.count({ where: { date: today, status: "LEAVE" } }),
-      prisma.leaveRequest.count({ where: { status: "PENDING" } }),
+      prisma.employee.count({ where: { outletId, status: "ACTIVE" } }),
+      prisma.attendance.count({ where: { outletId, date: today, status: "PRESENT" } }),
+      prisma.attendance.count({ where: { outletId, date: today, status: "ABSENT" } }),
+      prisma.attendance.count({ where: { outletId, date: today, status: "LEAVE" } }),
+      prisma.leaveRequest.count({ where: { outletId, status: "PENDING" } }),
     ]);
 
   return {

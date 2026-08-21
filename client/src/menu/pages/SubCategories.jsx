@@ -1,6 +1,7 @@
 // client/src/menu/pages/SubCategories.jsx
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiX } from "react-icons/fi";
+import { WifiOff } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { ui } from "../menuTheme";
 import { Spinner, ErrorBanner } from "../MenuUI";
@@ -11,6 +12,7 @@ import {
   updateSubCategory,
   deleteSubCategory,
 } from "../menuApi";
+import { fetchWithOfflineFallbackResult } from "../../offline/offlineCache";
 
 const SubCategoryFormModal = ({ initial, categories, onClose, onSaved }) => {
   const isEdit = Boolean(initial?.id);
@@ -58,7 +60,9 @@ const SubCategoryFormModal = ({ initial, categories, onClose, onSaved }) => {
             >
               <option value="">Select category</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
           </div>
@@ -77,7 +81,11 @@ const SubCategoryFormModal = ({ initial, categories, onClose, onSaved }) => {
           <button onClick={onClose} disabled={saving} className={ui.btnCancel}>
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className={ui.btnPrimary}>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className={ui.btnPrimary}
+          >
             {saving ? "Saving..." : isEdit ? "Save changes" : "Add"}
           </button>
         </div>
@@ -97,21 +105,41 @@ const SubCategories = () => {
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
 
+  // Read-only offline browsing for both lists — create/update/delete stay
+  // online-only. Categories failing silently (no error shown) matches the
+  // original tolerant behavior; sub-categories failing does surface an error.
   const loadData = async () => {
     setLoading(true);
     setError("");
-    const [catResult, subResult] = await Promise.all([fetchCategories(), fetchSubCategories()]);
-    if (catResult.ok) setCategories(catResult.data.data || []);
-    if (subResult.ok) {
-      setSubCategories(subResult.data.data || []);
-    } else {
-      setError(subResult.data?.message || "Failed to load sub-categories");
+    const [catResult, subResult] = await Promise.allSettled([
+      fetchWithOfflineFallbackResult("menuAdmin:categories", fetchCategories),
+      fetchWithOfflineFallbackResult(
+        "menuAdmin:subcategories",
+        fetchSubCategories,
+      ),
+    ]);
+
+    let offline = false;
+    if (catResult.status === "fulfilled") {
+      setCategories(catResult.value.data.data || []);
+      if (catResult.value.fromCache) offline = true;
     }
+    if (subResult.status === "fulfilled") {
+      setSubCategories(subResult.value.data.data || []);
+      if (subResult.value.fromCache) offline = true;
+    } else {
+      setError(subResult.reason?.message || "Failed to load sub-categories");
+    }
+
+    setIsOffline(offline);
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleDelete = async (sub) => {
     if (!window.confirm(`Delete sub-category "${sub.name}"?`)) return;
@@ -133,7 +161,10 @@ const SubCategories = () => {
       <div className="flex items-center justify-end">
         {canManage && (
           <button
-            onClick={() => { setEditing(null); setFormOpen(true); }}
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
             className={ui.btnPrimary}
           >
             <FiPlus /> Add Sub Category
@@ -142,9 +173,18 @@ const SubCategories = () => {
       </div>
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      {isOffline && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <WifiOff className="h-3.5 w-3.5" />
+          Offline — showing last-synced sub-categories. Adding/editing needs a
+          connection.
+        </div>
+      )}
 
       {loading ? (
-        <div className={ui.card}><Spinner /></div>
+        <div className={ui.card}>
+          <Spinner />
+        </div>
       ) : categories.length === 0 ? (
         <div className={`${ui.card} p-10 text-center ${ui.muted}`}>
           Add a category first — sub-categories belong to a category.
@@ -153,7 +193,9 @@ const SubCategories = () => {
         <div className="space-y-4">
           {grouped.map(({ category, subs }) => (
             <div key={category.id} className={`${ui.card} p-5`}>
-              <h3 className={`font-semibold ${ui.heading} mb-3`}>{category.name}</h3>
+              <h3 className={`font-semibold ${ui.heading} mb-3`}>
+                {category.name}
+              </h3>
               {subs.length === 0 ? (
                 <p className={`text-sm ${ui.faint}`}>No sub-categories yet</p>
               ) : (
@@ -166,7 +208,10 @@ const SubCategories = () => {
                       <span className={ui.heading}>{sub.name}</span>
                       {canManage && (
                         <button
-                          onClick={() => { setEditing(sub); setFormOpen(true); }}
+                          onClick={() => {
+                            setEditing(sub);
+                            setFormOpen(true);
+                          }}
                           className={`${ui.linkEdit} text-xs`}
                         >
                           Edit
@@ -195,7 +240,10 @@ const SubCategories = () => {
           initial={editing}
           categories={categories}
           onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); loadData(); }}
+          onSaved={() => {
+            setFormOpen(false);
+            loadData();
+          }}
         />
       )}
     </div>

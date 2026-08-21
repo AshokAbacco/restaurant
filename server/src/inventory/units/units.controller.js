@@ -1,9 +1,9 @@
-// server\src\inventory\controllers\units.controller.js
+// server/src/inventory/units/units.controller.js
 import * as unitsService from "./units.service.js";
 
 export const getUnits = async (req, res) => {
   try {
-    const units = await unitsService.listUnits();
+    const units = await unitsService.listUnits(req.tenant.outletId);
     res.json(units);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch units", error: err.message });
@@ -12,7 +12,7 @@ export const getUnits = async (req, res) => {
 
 export const getUnit = async (req, res) => {
   try {
-    const unit = await unitsService.getUnitById(req.params.id);
+    const unit = await unitsService.getUnitById(req.params.id, req.tenant.outletId);
     if (!unit) return res.status(404).json({ message: "Unit not found" });
     res.json(unit);
   } catch (err) {
@@ -25,7 +25,7 @@ export const createUnit = async (req, res) => {
     const { name, abbreviation } = req.body;
     if (!name) return res.status(400).json({ message: "name is required" });
 
-    const unit = await unitsService.createUnit({ name, abbreviation });
+    const unit = await unitsService.createUnit({ name, abbreviation }, req.tenant.outletId);
     res.status(201).json(unit);
   } catch (err) {
     if (err.code === "P2002") {
@@ -38,7 +38,11 @@ export const createUnit = async (req, res) => {
 export const updateUnit = async (req, res) => {
   try {
     const { name, abbreviation } = req.body;
-    const unit = await unitsService.updateUnit(req.params.id, { name, abbreviation });
+    const unit = await unitsService.updateUnit(
+      req.params.id,
+      { name, abbreviation },
+      req.tenant.outletId,
+    );
     res.json(unit);
   } catch (err) {
     if (err.code === "P2025") {
@@ -50,7 +54,7 @@ export const updateUnit = async (req, res) => {
 
 export const deleteUnit = async (req, res) => {
   try {
-    await unitsService.deleteUnit(req.params.id);
+    await unitsService.deleteUnit(req.params.id, req.tenant.outletId);
     res.status(204).send();
   } catch (err) {
     if (err.code === "P2025") {

@@ -1,15 +1,18 @@
-// server\src\inventory\controllers\ingredients.controller.js
+// server/src/inventory/ingredients/ingredients.controller.js
 import * as ingredientsService from "./ingredients.service.js";
 
 export const getIngredients = async (req, res) => {
   try {
     const { search, categoryId, lowStock, outOfStock } = req.query;
-    const ingredients = await ingredientsService.listIngredients({
-      search,
-      categoryId,
-      lowStock: lowStock === "true",
-      outOfStock: outOfStock === "true",
-    });
+    const ingredients = await ingredientsService.listIngredients(
+      {
+        search,
+        categoryId,
+        lowStock: lowStock === "true",
+        outOfStock: outOfStock === "true",
+      },
+      req.tenant.outletId,
+    );
     res.json(ingredients);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch ingredients", error: err.message });
@@ -18,7 +21,7 @@ export const getIngredients = async (req, res) => {
 
 export const getIngredient = async (req, res) => {
   try {
-    const ingredient = await ingredientsService.getIngredientById(req.params.id);
+    const ingredient = await ingredientsService.getIngredientById(req.params.id, req.tenant.outletId);
     if (!ingredient) return res.status(404).json({ message: "Ingredient not found" });
     res.json(ingredient);
   } catch (err) {
@@ -35,7 +38,7 @@ export const createIngredient = async (req, res) => {
       return res.status(400).json({ message: `Missing required fields: ${missing.join(", ")}` });
     }
 
-    const ingredient = await ingredientsService.createIngredient(req.body);
+    const ingredient = await ingredientsService.createIngredient(req.body, req.tenant.outletId);
     res.status(201).json(ingredient);
   } catch (err) {
     if (err.code === "P2002") {
@@ -50,7 +53,11 @@ export const createIngredient = async (req, res) => {
 
 export const updateIngredient = async (req, res) => {
   try {
-    const ingredient = await ingredientsService.updateIngredient(req.params.id, req.body);
+    const ingredient = await ingredientsService.updateIngredient(
+      req.params.id,
+      req.body,
+      req.tenant.outletId,
+    );
     res.json(ingredient);
   } catch (err) {
     if (err.code === "P2025") {
@@ -65,7 +72,7 @@ export const updateIngredient = async (req, res) => {
 
 export const deleteIngredient = async (req, res) => {
   try {
-    await ingredientsService.deleteIngredient(req.params.id);
+    await ingredientsService.deleteIngredient(req.params.id, req.tenant.outletId);
     res.status(204).send();
   } catch (err) {
     if (err.code === "P2025") {

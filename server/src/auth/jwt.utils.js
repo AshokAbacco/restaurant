@@ -31,6 +31,36 @@ export const verifyAccessToken = (token) => {
 };
 
 // ==============================================
+// PRE-AUTH TOKEN (outlet-selection step)
+// Issued after a password check succeeds for an account that can access
+// more than one outlet (see auth.service.js's login()), instead of a full
+// session. Short-lived and single-purpose — it's only good for calling
+// POST /api/auth/select-outlet, never accepted by requireAuth. Signed with
+// the same secret as the access token (no session state to store), scoped
+// with `purpose` so it can't be replayed as a normal access token even if
+// someone tried passing it as a Bearer token.
+// ==============================================
+
+const PRE_AUTH_TOKEN_TTL = "10m";
+
+export const signPreAuthToken = (payload) => {
+  return jwt.sign({ ...payload, purpose: "outlet-selection" }, ACCESS_SECRET, {
+    expiresIn: PRE_AUTH_TOKEN_TTL,
+  });
+};
+
+export const verifyPreAuthToken = (token) => {
+  const payload = jwt.verify(token, ACCESS_SECRET);
+  if (payload.purpose !== "outlet-selection") {
+    // Signed correctly but not what it claims to be — e.g. someone passed
+    // a real access token into /select-outlet. Treat exactly like a bad
+    // token rather than trusting the payload shape.
+    throw new Error("Not a valid outlet-selection token.");
+  }
+  return payload;
+};
+
+// ==============================================
 // REFRESH TOKEN (long-lived, httpOnly cookie)
 // The raw token goes to the client; only its SHA-256 hash is stored in DB
 // (in the RefreshToken table) so a DB leak alone doesn't leak usable tokens.

@@ -1,9 +1,11 @@
 // client/src/menu/pages/Categories.jsx
 import React, { useEffect, useState } from "react";
 import { FiPlus } from "react-icons/fi";
+import { WifiOff } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { ui } from "../menuTheme";
 import { Spinner, ErrorBanner, EmptyState, Toggle } from "../MenuUI";
+import { fetchWithOfflineFallbackResult } from "../../offline/offlineCache";
 import {
   fetchCategories,
   createCategory,
@@ -86,7 +88,10 @@ const CategoryFormModal = ({ initial, onClose, onSaved }) => {
           <h2 className={`text-lg font-semibold ${ui.heading}`}>
             {isEdit ? "Edit Category" : "Add Category"}
           </h2>
-          <button onClick={onClose} className={`${ui.faint} hover:text-[#1F2937] dark:hover:text-white text-xl leading-none`}>
+          <button
+            onClick={onClose}
+            className={`${ui.faint} hover:text-[#1F2937] dark:hover:text-white text-xl leading-none`}
+          >
             ×
           </button>
         </div>
@@ -100,7 +105,11 @@ const CategoryFormModal = ({ initial, onClose, onSaved }) => {
             <div className="flex items-center gap-3">
               <div className="w-16 h-16 rounded-xl bg-[#F3F5EE] dark:bg-[#1E241C] overflow-hidden flex items-center justify-center flex-shrink-0">
                 {imagePreview ? (
-                  <img src={imagePreview} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={imagePreview}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <span className={`${ui.faint} text-2xl`}>🖼️</span>
                 )}
@@ -153,7 +162,12 @@ const CategoryFormModal = ({ initial, onClose, onSaved }) => {
             {/* Enabled toggle */}
             <div className="flex-1">
               <label className={ui.label}>Status</label>
-              <Toggle label={isEnabled ? "Enabled" : "Disabled"} value={isEnabled} onChange={setIsEnabled} tone="green" />
+              <Toggle
+                label={isEnabled ? "Enabled" : "Disabled"}
+                value={isEnabled}
+                onChange={setIsEnabled}
+                tone="green"
+              />
             </div>
           </div>
         </div>
@@ -162,7 +176,11 @@ const CategoryFormModal = ({ initial, onClose, onSaved }) => {
           <button onClick={onClose} disabled={saving} className={ui.btnCancel}>
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className={ui.btnPrimary}>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className={ui.btnPrimary}
+          >
             {saving ? "Saving..." : isEdit ? "Save changes" : "Add category"}
           </button>
         </div>
@@ -194,17 +212,27 @@ const DeleteConfirmModal = ({ category, onClose, onConfirmed }) => {
   return (
     <div className={ui.modalOverlay}>
       <div className={`${ui.modalCard} max-w-sm p-6`}>
-        <h2 className={`text-lg font-semibold ${ui.heading}`}>Delete category?</h2>
+        <h2 className={`text-lg font-semibold ${ui.heading}`}>
+          Delete category?
+        </h2>
         <p className={`${ui.muted} text-sm mt-2`}>
-          "{category.name}" will be permanently removed. Menu items inside it will
-          need a new category.
+          "{category.name}" will be permanently removed. Menu items inside it
+          will need a new category.
         </p>
         {error && <div className={`${ui.errorBanner} mt-3 mb-0`}>{error}</div>}
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} disabled={deleting} className={ui.btnCancel}>
+          <button
+            onClick={onClose}
+            disabled={deleting}
+            className={ui.btnCancel}
+          >
             Cancel
           </button>
-          <button onClick={handleDelete} disabled={deleting} className={ui.btnDanger}>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className={ui.btnDanger}
+          >
             {deleting ? "Deleting..." : "Delete"}
           </button>
         </div>
@@ -227,7 +255,9 @@ const CategoryCard = ({ category, canManage, canDelete, onEdit, onDelete }) => (
           className="w-full h-full object-cover"
         />
       ) : (
-        <div className={`w-full h-full flex items-center justify-center text-4xl ${ui.faint}`}>
+        <div
+          className={`w-full h-full flex items-center justify-center text-4xl ${ui.faint}`}
+        >
           🍽️
         </div>
       )}
@@ -265,7 +295,10 @@ const CategoryCard = ({ category, canManage, canDelete, onEdit, onDelete }) => (
               </button>
             )}
             {canDelete && (
-              <button onClick={() => onDelete(category)} className={ui.linkDanger}>
+              <button
+                onClick={() => onDelete(category)}
+                className={ui.linkDanger}
+              >
                 Delete
               </button>
             )}
@@ -290,18 +323,26 @@ const Categories = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [deletingCategory, setDeletingCategory] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   const canManage = canManageMenu();
   const canDelete = canDeleteMenuItems();
 
+  // Read-only offline browsing — create/update/delete stay online-only.
+  // Shares the "menuAdmin:categories" cache key with SubCategories.jsx, so
+  // browsing either page while online warms the fallback for both.
   const loadCategories = async () => {
     setLoading(true);
     setError("");
-    const result = await fetchCategories();
-    if (result.ok) {
-      setCategories(result.data.data || []);
-    } else {
-      setError(result.data?.message || "Failed to load categories");
+    try {
+      const { data: result, fromCache } = await fetchWithOfflineFallbackResult(
+        "menuAdmin:categories",
+        fetchCategories,
+      );
+      setIsOffline(fromCache);
+      setCategories(result.data || []);
+    } catch (err) {
+      setError(err.message || "Failed to load categories");
     }
     setLoading(false);
   };
@@ -342,9 +383,18 @@ const Categories = () => {
       </div>
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      {isOffline && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <WifiOff className="h-3.5 w-3.5" />
+          Offline — showing last-synced categories. Adding/editing needs a
+          connection.
+        </div>
+      )}
 
       {loading ? (
-        <div className={ui.card}><Spinner /></div>
+        <div className={ui.card}>
+          <Spinner />
+        </div>
       ) : categories.length === 0 ? (
         <div className={ui.card}>
           <EmptyState

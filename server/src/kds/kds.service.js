@@ -1,5 +1,10 @@
 // server/src/kds/kds.service.js
 import prisma from "../config/prisma.js";
+// Shared with pos/kot/kot.service.js — this used to be an independent
+// duplicate of the same numbering logic, which is exactly how the
+// count()-based collision bug got fixed in one copy and missed in the
+// other. One implementation now, imported here.
+import { generateKotNumber } from "../pos/kot/kot.service.js";
 
 const DEFAULT_TARGET_PREP_MINUTES = 15;
 
@@ -43,12 +48,13 @@ function startOfToday() {
   return d;
 }
 
-async function generateKotNumber() {
-  const count = await prisma.kitchenOrder.count();
-  return `KOT-${String(count + 1).padStart(6, "0")}`;
-}
-
-async function logStatusChange(kitchenOrderId, fromStatus, toStatus, changedById, reason) {
+async function logStatusChange(
+  kitchenOrderId,
+  fromStatus,
+  toStatus,
+  changedById,
+  reason,
+) {
   return prisma.kitchenOrderStatusLog.create({
     data: { kitchenOrderId, fromStatus, toStatus, changedById, reason },
   });
@@ -65,9 +71,10 @@ function derivePriority(order) {
 // Finds active tickets whose elapsed time has passed their target prep time
 // and flips isDelayed on. Called before every read so the flag stays fresh
 // without needing a separate cron job for now.
-async function flagDelayedOrders() {
+async function flagDelayedOrders(outletId) {
   const active = await prisma.kitchenOrder.findMany({
     where: {
+      outletId,
       status: { in: ["ACCEPTED", "PREPARING"] },
       isDelayed: false,
       acceptedAt: { not: null },
@@ -78,12 +85,19 @@ async function flagDelayedOrders() {
 
   const now = Date.now();
   const delayedIds = active
-    .filter((k) => now - new Date(k.acceptedAt).getTime() > k.targetPrepMinutes * 60000)
+    .filter(
+      (k) =>
+        now - new Date(k.acceptedAt).getTime() > k.targetPrepMinutes * 60000,
+    )
     .map((k) => k.id);
 
   if (delayedIds.length) {
+    // Scoped by outletId too, even though ids are already outlet-specific
+    // (they came from the outlet-scoped query above) — consistent with
+    // every other updateMany in this codebase rather than the one
+    // exception that trusts ids alone.
     await prisma.kitchenOrder.updateMany({
-      where: { id: { in: delayedIds } },
+      where: { id: { in: delayedIds }, outletId },
       data: { isDelayed: true },
     });
   }
@@ -99,9 +113,9 @@ async function flagDelayedOrders() {
  * Items whose MenuItem has no kitchenSectionId configured are skipped —
  * configure a station on the menu item to route it to a kitchen screen.
  */
-export async function createKitchenOrdersForOrder(orderId) {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
+export async function createKitchenOrdersForOrder(orderId, outletId) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, outletId },
     include: {
       items: {
         include: {
@@ -115,7 +129,9 @@ export async function createKitchenOrdersForOrder(orderId) {
 
   // Safe to call again after items are added mid-order: only items that
   // don't already have a KitchenOrderItem get grouped/ticketed here.
-  const unticketedItems = order.items.filter((item) => item.kitchenOrderItems.length === 0);
+  const unticketedItems = order.items.filter(
+    (item) => item.kitchenOrderItems.length === 0,
+  );
 
   const groups = new Map();
   for (const item of unticketedItems) {
@@ -129,20 +145,28 @@ export async function createKitchenOrdersForOrder(orderId) {
   const createdTickets = [];
 
   for (const [kitchenSectionId, items] of groups) {
-    const prepTimes = items.map((i) => i.menuItem.prepTimeMinutes || 0).filter(Boolean);
-    const targetPrepMinutes = prepTimes.length ? Math.max(...prepTimes) : DEFAULT_TARGET_PREP_MINUTES;
+    const prepTimes = items
+      .map((i) => i.menuItem.prepTimeMinutes || 0)
+      .filter(Boolean);
+    const targetPrepMinutes = prepTimes.length
+      ? Math.max(...prepTimes)
+      : DEFAULT_TARGET_PREP_MINUTES;
 
-    const kotNumber = await generateKotNumber();
+    const kotNumber = await generateKotNumber(outletId);
 
     const kitchenOrder = await prisma.kitchenOrder.create({
       data: {
+        outletId,
         orderId: order.id,
         kitchenSectionId,
         kotNumber,
         targetPrepMinutes,
         priority,
         items: {
-          create: items.map((i) => ({ orderItemId: i.id, quantity: i.quantity })),
+          create: items.map((i) => ({
+            orderItemId: i.id,
+            quantity: i.quantity,
+          })),
         },
       },
       include: KITCHEN_ORDER_INCLUDE,
@@ -159,22 +183,31 @@ export async function createKitchenOrdersForOrder(orderId) {
 // READ
 // ─────────────────────────────────────────────
 
-export async function listKitchenOrders(filters = {}) {
-  const { status, kitchenSectionId, chefId, priority, delayedOnly, orderType, search, store } = filters;
+export async function listKitchenOrders(filters = {}, outletId) {
+  const {
+    status,
+    kitchenSectionId,
+    chefId,
+    priority,
+    delayedOnly,
+    orderType,
+    search,
+  } = filters;
 
-  await flagDelayedOrders();
+  await flagDelayedOrders(outletId);
 
-  const where = {};
+  const where = { outletId };
   if (status) where.status = status;
   if (kitchenSectionId) where.kitchenSectionId = kitchenSectionId;
   if (chefId) where.chefId = chefId;
   if (priority) where.priority = priority;
   if (delayedOnly === "true" || delayedOnly === true) where.isDelayed = true;
 
-  const orderFilter = {};
-  if (store) orderFilter.store = store;
-  if (orderType) orderFilter.orderType = orderType;
-  if (Object.keys(orderFilter).length) where.order = orderFilter;
+  // orderType still has to filter through the order relation — it lives on
+  // Order, not KitchenOrder. (The old free-text `store` filter that used to
+  // sit alongside this is gone — outletId above is the real version of
+  // what that was trying to do.)
+  if (orderType) where.order = { orderType };
 
   if (search) {
     where.OR = [
@@ -191,13 +224,18 @@ export async function listKitchenOrders(filters = {}) {
   });
 
   // Stable sort: priority first (VIP/Express etc. float to top), then FIFO.
-  return tickets.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+  return tickets.sort(
+    (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority],
+  );
 }
 
-export async function getKitchenOrderById(id) {
-  const ticket = await prisma.kitchenOrder.findUnique({
-    where: { id },
-    include: { ...KITCHEN_ORDER_INCLUDE, statusLogs: { orderBy: { createdAt: "asc" } } },
+export async function getKitchenOrderById(id, outletId) {
+  const ticket = await prisma.kitchenOrder.findFirst({
+    where: { id, outletId },
+    include: {
+      ...KITCHEN_ORDER_INCLUDE,
+      statusLogs: { orderBy: { createdAt: "asc" } },
+    },
   });
   if (!ticket) throw new Error("Kitchen order not found");
   return ticket;
@@ -207,8 +245,15 @@ export async function getKitchenOrderById(id) {
 // STATUS TRANSITIONS
 // ─────────────────────────────────────────────
 
-export async function updateKitchenOrderStatus(id, toStatus, { employeeId, reason } = {}) {
-  const existing = await prisma.kitchenOrder.findUnique({ where: { id } });
+export async function updateKitchenOrderStatus(
+  id,
+  toStatus,
+  { employeeId, reason } = {},
+  outletId,
+) {
+  const existing = await prisma.kitchenOrder.findFirst({
+    where: { id, outletId },
+  });
   if (!existing) throw new Error("Kitchen order not found");
 
   const data = { status: toStatus };
@@ -234,65 +279,130 @@ export async function updateKitchenOrderStatus(id, toStatus, { employeeId, reaso
   return updated;
 }
 
-export async function acceptKitchenOrder(id, { chefId, employeeId } = {}) {
+export async function acceptKitchenOrder(id, { chefId, employeeId } = {}, outletId) {
   if (chefId) {
+    // FIX: this update had no ownership check at all — a stray/guessed id
+    // from another outlet would silently assign a chef to it.
+    const existing = await prisma.kitchenOrder.findFirst({
+      where: { id, outletId },
+    });
+    if (!existing) throw new Error("Kitchen order not found");
     await prisma.kitchenOrder.update({ where: { id }, data: { chefId } });
   }
-  return updateKitchenOrderStatus(id, "ACCEPTED", {
-    employeeId: employeeId || chefId,
-    reason: "Accepted by chef",
-  });
+  return updateKitchenOrderStatus(
+    id,
+    "ACCEPTED",
+    { employeeId: employeeId || chefId, reason: "Accepted by chef" },
+    outletId,
+  );
 }
 
 // Explicit "chef starts cooking" step (Accepted -> Preparing in the spec's
 // workflow). acceptedAt (set on ACCEPTED) remains the timer anchor.
-export async function startPreparingKitchenOrder(id, { employeeId } = {}) {
-  return updateKitchenOrderStatus(id, "PREPARING", { employeeId, reason: "Preparation started" });
+export async function startPreparingKitchenOrder(id, { employeeId } = {}, outletId) {
+  return updateKitchenOrderStatus(
+    id,
+    "PREPARING",
+    { employeeId, reason: "Preparation started" },
+    outletId,
+  );
 }
 
-export async function markKitchenOrderReady(id, { employeeId } = {}) {
-  return updateKitchenOrderStatus(id, "READY", { employeeId, reason: "Marked ready" });
+export async function markKitchenOrderReady(id, { employeeId } = {}, outletId) {
+  return updateKitchenOrderStatus(
+    id,
+    "READY",
+    { employeeId, reason: "Marked ready" },
+    outletId,
+  );
 }
 
-export async function markKitchenOrderServed(id, { employeeId } = {}) {
-  return updateKitchenOrderStatus(id, "SERVED", { employeeId, reason: "Served to table" });
+export async function markKitchenOrderServed(id, { employeeId } = {}, outletId) {
+  return updateKitchenOrderStatus(
+    id,
+    "SERVED",
+    { employeeId, reason: "Served to table" },
+    outletId,
+  );
 }
 
-export async function completeKitchenOrder(id, { employeeId } = {}) {
-  return updateKitchenOrderStatus(id, "COMPLETED", { employeeId, reason: "Completed" });
+export async function completeKitchenOrder(id, { employeeId } = {}, outletId) {
+  return updateKitchenOrderStatus(
+    id,
+    "COMPLETED",
+    { employeeId, reason: "Completed" },
+    outletId,
+  );
 }
 
-export async function cancelKitchenOrder(id, { employeeId, reason } = {}) {
-  return updateKitchenOrderStatus(id, "CANCELLED", { employeeId, reason: reason || "Cancelled" });
+export async function cancelKitchenOrder(id, { employeeId, reason } = {}, outletId) {
+  return updateKitchenOrderStatus(
+    id,
+    "CANCELLED",
+    { employeeId, reason: reason || "Cancelled" },
+    outletId,
+  );
 }
 
-export async function recallKitchenOrder(id, { employeeId, reason } = {}) {
-  return updateKitchenOrderStatus(id, "RECALLED", {
-    employeeId,
-    reason: reason || "Recalled by waiter",
+export async function recallKitchenOrder(id, { employeeId, reason } = {}, outletId) {
+  return updateKitchenOrderStatus(
+    id,
+    "RECALLED",
+    { employeeId, reason: reason || "Recalled by waiter" },
+    outletId,
+  );
+}
+
+export async function bulkUpdateKitchenOrderStatus(
+  ids,
+  toStatus,
+  { employeeId, reason } = {},
+  outletId,
+) {
+  return Promise.all(
+    ids.map((id) =>
+      updateKitchenOrderStatus(id, toStatus, { employeeId, reason }, outletId),
+    ),
+  );
+}
+
+export async function updateKitchenOrderPriority(id, priority, outletId) {
+  // FIX: previously updated by id alone with no ownership check.
+  const existing = await prisma.kitchenOrder.findFirst({
+    where: { id, outletId },
   });
-}
+  if (!existing) throw new Error("Kitchen order not found");
 
-export async function bulkUpdateKitchenOrderStatus(ids, toStatus, { employeeId, reason } = {}) {
-  return Promise.all(ids.map((id) => updateKitchenOrderStatus(id, toStatus, { employeeId, reason })));
-}
-
-export async function updateKitchenOrderPriority(id, priority) {
-  return prisma.kitchenOrder.update({ where: { id }, data: { priority }, include: KITCHEN_ORDER_INCLUDE });
+  return prisma.kitchenOrder.update({
+    where: { id },
+    data: { priority },
+    include: KITCHEN_ORDER_INCLUDE,
+  });
 }
 
 // ─────────────────────────────────────────────
 // NOTES
 // ─────────────────────────────────────────────
 
-export async function addKitchenNote(kitchenOrderId, { chefId, note }) {
+export async function addKitchenNote(kitchenOrderId, { chefId, note }, outletId) {
   if (!note || !note.trim()) throw new Error("Note text is required");
+
+  // FIX: previously created a KitchenNote against kitchenOrderId with no
+  // check it even existed, let alone belonged to this outlet.
+  const existing = await prisma.kitchenOrder.findFirst({
+    where: { id: kitchenOrderId, outletId },
+  });
+  if (!existing) throw new Error("Kitchen order not found");
+
   return prisma.kitchenNote.create({ data: { kitchenOrderId, chefId, note } });
 }
 
-export async function listKitchenNotes(kitchenOrderId) {
+export async function listKitchenNotes(kitchenOrderId, outletId) {
+  // KitchenNote has no outletId of its own — scope comes from its parent
+  // KitchenOrder, same pattern as pos/kot/kot.service.js's identical
+  // function (this really is the duplicate — see file header note).
   return prisma.kitchenNote.findMany({
-    where: { kitchenOrderId },
+    where: { kitchenOrderId, kitchenOrder: { outletId } },
     orderBy: { createdAt: "desc" },
     include: { chef: true },
   });
@@ -304,31 +414,51 @@ export async function listKitchenNotes(kitchenOrderId) {
 
 async function getAveragePrepTimeMinutes(where) {
   const completed = await prisma.kitchenOrder.findMany({
-    where: { ...where, status: "COMPLETED", completedAt: { gte: startOfToday() }, acceptedAt: { not: null } },
+    where: {
+      ...where,
+      status: "COMPLETED",
+      completedAt: { gte: startOfToday() },
+      acceptedAt: { not: null },
+    },
     select: { acceptedAt: true, completedAt: true },
   });
   if (!completed.length) return null;
 
   const totalMinutes = completed.reduce(
-    (sum, k) => sum + (new Date(k.completedAt) - new Date(k.acceptedAt)) / 60000,
-    0
+    (sum, k) =>
+      sum + (new Date(k.completedAt) - new Date(k.acceptedAt)) / 60000,
+    0,
   );
   return Math.round((totalMinutes / completed.length) * 10) / 10;
 }
 
-export async function getKitchenDashboard(store) {
-  await flagDelayedOrders();
+export async function getKitchenDashboard(outletId) {
+  await flagDelayedOrders(outletId);
 
-  const where = store ? { order: { store } } : {};
+  const where = { outletId };
 
-  const [preparingCount, readyCount, delayedCount, completedTodayCount, activeCount] = await Promise.all([
-    prisma.kitchenOrder.count({ where: { ...where, status: { in: ["ACCEPTED", "PREPARING"] } } }),
+  const [
+    preparingCount,
+    readyCount,
+    delayedCount,
+    completedTodayCount,
+    activeCount,
+  ] = await Promise.all([
+    prisma.kitchenOrder.count({
+      where: { ...where, status: { in: ["ACCEPTED", "PREPARING"] } },
+    }),
     prisma.kitchenOrder.count({ where: { ...where, status: "READY" } }),
     prisma.kitchenOrder.count({ where: { ...where, isDelayed: true } }),
     prisma.kitchenOrder.count({
-      where: { ...where, status: "COMPLETED", completedAt: { gte: startOfToday() } },
+      where: {
+        ...where,
+        status: "COMPLETED",
+        completedAt: { gte: startOfToday() },
+      },
     }),
-    prisma.kitchenOrder.count({ where: { ...where, status: { notIn: ["COMPLETED", "CANCELLED"] } } }),
+    prisma.kitchenOrder.count({
+      where: { ...where, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+    }),
   ]);
 
   return {
@@ -352,14 +482,14 @@ function dateRangeFilter(from, to) {
   return Object.keys(range).length ? range : undefined;
 }
 
-async function dailyKitchenReport({ date } = {}) {
+async function dailyKitchenReport({ date } = {}, outletId) {
   const day = date ? new Date(date) : new Date();
   day.setHours(0, 0, 0, 0);
   const nextDay = new Date(day);
   nextDay.setDate(nextDay.getDate() + 1);
 
   const tickets = await prisma.kitchenOrder.findMany({
-    where: { createdAt: { gte: day, lt: nextDay } },
+    where: { outletId, createdAt: { gte: day, lt: nextDay } },
     select: { status: true },
   });
 
@@ -368,12 +498,17 @@ async function dailyKitchenReport({ date } = {}) {
     return acc;
   }, {});
 
-  return { date: day.toISOString().slice(0, 10), totalOrders: tickets.length, byStatus };
+  return {
+    date: day.toISOString().slice(0, 10),
+    totalOrders: tickets.length,
+    byStatus,
+  };
 }
 
-async function prepTimeReport({ from, to } = {}) {
+async function prepTimeReport({ from, to } = {}, outletId) {
   const completed = await prisma.kitchenOrder.findMany({
     where: {
+      outletId,
       status: "COMPLETED",
       completedAt: dateRangeFilter(from, to),
       acceptedAt: { not: null },
@@ -390,16 +525,19 @@ async function prepTimeReport({ from, to } = {}) {
     byStation[name].count += 1;
   }
 
-  return Object.entries(byStation).map(([station, { totalMinutes, count }]) => ({
-    station,
-    ordersCompleted: count,
-    averagePrepMinutes: Math.round((totalMinutes / count) * 10) / 10,
-  }));
+  return Object.entries(byStation).map(
+    ([station, { totalMinutes, count }]) => ({
+      station,
+      ordersCompleted: count,
+      averagePrepMinutes: Math.round((totalMinutes / count) * 10) / 10,
+    }),
+  );
 }
 
-async function delayedOrdersReport({ from, to } = {}) {
+async function delayedOrdersReport({ from, to } = {}, outletId) {
   return prisma.kitchenOrder.findMany({
     where: {
+      outletId,
       OR: [{ isDelayed: true }, { status: "CANCELLED", isDelayed: true }],
       createdAt: dateRangeFilter(from, to),
     },
@@ -408,9 +546,10 @@ async function delayedOrdersReport({ from, to } = {}) {
   });
 }
 
-async function chefPerformanceReport({ from, to } = {}) {
+async function chefPerformanceReport({ from, to } = {}, outletId) {
   const completed = await prisma.kitchenOrder.findMany({
     where: {
+      outletId,
       status: "COMPLETED",
       completedAt: dateRangeFilter(from, to),
       chefId: { not: null },
@@ -423,7 +562,13 @@ async function chefPerformanceReport({ from, to } = {}) {
   for (const k of completed) {
     const key = k.chefId;
     const minutes = (new Date(k.completedAt) - new Date(k.acceptedAt)) / 60000;
-    if (!byChef[key]) byChef[key] = { chefName: k.chef.fullName, ordersCompleted: 0, totalMinutes: 0, delayedCount: 0 };
+    if (!byChef[key])
+      byChef[key] = {
+        chefName: k.chef.fullName,
+        ordersCompleted: 0,
+        totalMinutes: 0,
+        delayedCount: 0,
+      };
     byChef[key].ordersCompleted += 1;
     byChef[key].totalMinutes += minutes;
     if (k.isDelayed) byChef[key].delayedCount += 1;
@@ -433,13 +578,14 @@ async function chefPerformanceReport({ from, to } = {}) {
     chefName: c.chefName,
     ordersCompleted: c.ordersCompleted,
     delayedCount: c.delayedCount,
-    averagePrepMinutes: Math.round((c.totalMinutes / c.ordersCompleted) * 10) / 10,
+    averagePrepMinutes:
+      Math.round((c.totalMinutes / c.ordersCompleted) * 10) / 10,
   }));
 }
 
-async function stationLoadReport({ from, to } = {}) {
+async function stationLoadReport({ from, to } = {}, outletId) {
   const tickets = await prisma.kitchenOrder.findMany({
-    where: { createdAt: dateRangeFilter(from, to) },
+    where: { outletId, createdAt: dateRangeFilter(from, to) },
     include: { kitchenSection: true },
   });
 
@@ -449,16 +595,23 @@ async function stationLoadReport({ from, to } = {}) {
     byStation[name] = (byStation[name] || 0) + 1;
   }
 
-  return Object.entries(byStation).map(([station, totalOrders]) => ({ station, totalOrders }));
+  return Object.entries(byStation).map(([station, totalOrders]) => ({
+    station,
+    totalOrders,
+  }));
 }
 
-async function cancelledOrdersReport({ from, to } = {}) {
+async function cancelledOrdersReport({ from, to } = {}, outletId) {
   return prisma.kitchenOrder.findMany({
-    where: { status: "CANCELLED", updatedAt: dateRangeFilter(from, to) },
+    where: { outletId, status: "CANCELLED", updatedAt: dateRangeFilter(from, to) },
     include: {
       order: true,
       kitchenSection: true,
-      statusLogs: { where: { toStatus: "CANCELLED" }, orderBy: { createdAt: "desc" }, take: 1 },
+      statusLogs: {
+        where: { toStatus: "CANCELLED" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -473,10 +626,12 @@ const REPORT_HANDLERS = {
   cancelled: cancelledOrdersReport,
 };
 
-export async function getKitchenReports(type, filters = {}) {
+export async function getKitchenReports(type, filters = {}, outletId) {
   const handler = REPORT_HANDLERS[type];
   if (!handler) {
-    throw new Error(`Unknown report type "${type}". Valid types: ${Object.keys(REPORT_HANDLERS).join(", ")}`);
+    throw new Error(
+      `Unknown report type "${type}". Valid types: ${Object.keys(REPORT_HANDLERS).join(", ")}`,
+    );
   }
-  return handler(filters);
+  return handler(filters, outletId);
 }

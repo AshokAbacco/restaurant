@@ -4,7 +4,7 @@ import * as wastageService from "./wastage.service.js";
 export const getWastageRecords = async (req, res) => {
   try {
     const { ingredientId } = req.query;
-    const records = await wastageService.listWastage({ ingredientId });
+    const records = await wastageService.listWastage({ ingredientId }, req.tenant.outletId);
     res.json(records);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch wastage records", error: err.message });
@@ -13,7 +13,7 @@ export const getWastageRecords = async (req, res) => {
 
 export const getWastageRecord = async (req, res) => {
   try {
-    const record = await wastageService.getWastageById(req.params.id);
+    const record = await wastageService.getWastageById(req.params.id, req.tenant.outletId);
     if (!record) return res.status(404).json({ message: "Wastage record not found" });
     res.json(record);
   } catch (err) {
@@ -31,7 +31,17 @@ export const createWastageRecord = async (req, res) => {
       return res.status(400).json({ message: "quantity must be greater than 0" });
     }
 
-    const record = await wastageService.createWastage(req.body);
+    // FIX: same userId gap as purchaseEntries/adjustments — also defaults
+    // employeeId (who wasted it) to the logged-in user if the request
+    // didn't specify a different employee explicitly.
+    const record = await wastageService.createWastage(
+      {
+        ...req.body,
+        userId: req.user?.employeeId,
+        employeeId: req.body.employeeId || req.user?.employeeId,
+      },
+      req.tenant.outletId,
+    );
     res.status(201).json(record);
   } catch (err) {
     if (err.code === "P2025") {

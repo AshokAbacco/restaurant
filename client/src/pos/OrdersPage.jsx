@@ -1,8 +1,29 @@
 // src/pos/OrdersPage.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import TableOrderCard, { deriveTableCategory, CATEGORY_RANK } from "./components/TableOrderCard";
-import { getTablesBoard, getOrders, updateOrderStatus } from "./api/posApi";
+import { WifiOff } from "lucide-react";
+import TableOrderCard, {
+  deriveTableCategory,
+  CATEGORY_RANK,
+} from "./components/TableOrderCard";
+import { getTablesBoard, getOrders } from "./api/posApi";
+import { fetchWithOfflineFallback } from "../offline/offlineCache";
+import {
+  markOrderDeliveredOffline,
+  getPendingOrderIds,
+  subscribeToOrdersQueue,
+} from "../offline/ordersQueue";
+// FIX: an order queued offline patches the cached tables board (see
+// patchCachedTableAfterOfflineOrder in offlineCache.js) but this page only
+// re-reads that cache on its own poll/mount — subscribe so a newly placed
+// offline order (or one that just synced) shows up here immediately too.
+import { subscribeToQueue } from "../offline/offlineQueue";
+// FIX: a Ready/Served tap on the Kitchen Display changes this table's
+// kitchenStatus badge here too, but only the KDS itself was told about
+// it (via load() in its own handler) — this board just polled every 8s
+// blind to it. Subscribing means the badge updates immediately instead
+// of lagging behind the kitchen by up to POLL_INTERVAL_MS.
+import { subscribeToKdsQueue } from "../offline/kdsQueue";
 
 const POLL_INTERVAL_MS = 8000;
 
@@ -58,19 +79,38 @@ export default function OrdersPage() {
   const [completedTakeaway, setCompletedTakeaway] = useState([]);
   const [completedLoading, setCompletedLoading] = useState(false);
   const [completedError, setCompletedError] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
+  // orderIds with a "delivered" update queued but not yet synced.
+  const [pendingOrderIds, setPendingOrderIds] = useState(new Set());
 
   const loadTables = useCallback(async () => {
-    return getTablesBoard();
+    const { data, fromCache } = await fetchWithOfflineFallback(
+      "orders:tables-board",
+      getTablesBoard,
+    );
+    if (fromCache) setIsOffline(true);
+    return data;
   }, []);
 
   const loadTakeaway = useCallback(async () => {
-    const data = await getOrders({ orderType: "TAKEAWAY", limit: 100 });
-    const list = data?.data || [];
-    return list.filter((o) => ACTIVE_TAKEAWAY_STATUSES.includes(o.status));
+    const { data, fromCache } = await fetchWithOfflineFallback(
+      "orders:takeaway",
+      async () => {
+        const res = await getOrders({ orderType: "TAKEAWAY", limit: 100 });
+        return (res?.data || []).filter((o) =>
+          ACTIVE_TAKEAWAY_STATUSES.includes(o.status),
+        );
+      },
+    );
+    if (fromCache) setIsOffline(true);
+    return data;
   }, []);
 
   const load = useCallback(async () => {
-    const [tablesResult, takeawayResult] = await Promise.allSettled([loadTables(), loadTakeaway()]);
+    const [tablesResult, takeawayResult] = await Promise.allSettled([
+      loadTables(),
+      loadTakeaway(),
+    ]);
 
     if (tablesResult.status === "fulfilled") {
       setTables(tablesResult.value);
@@ -79,22 +119,41 @@ export default function OrdersPage() {
       setTakeawayOrders(takeawayResult.value);
     }
 
-    const failure = [tablesResult, takeawayResult].find((r) => r.status === "rejected");
+    const failure = [tablesResult, takeawayResult].find(
+      (r) => r.status === "rejected",
+    );
     setError(failure ? failure.reason.message : null);
     setLoading(false);
   }, [loadTables, loadTakeaway]);
 
+  const refreshPendingIds = useCallback(async () => {
+    setPendingOrderIds(await getPendingOrderIds());
+  }, []);
+
   useEffect(() => {
     load();
+    refreshPendingIds();
     const id = setInterval(load, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [load]);
+    const unsubscribe = subscribeToOrdersQueue(refreshPendingIds);
+    const unsubscribeOrdersOutbox = subscribeToQueue(load);
+    const unsubscribeKds = subscribeToKdsQueue(load);
+    return () => {
+      clearInterval(id);
+      unsubscribe();
+      unsubscribeOrdersOutbox();
+      unsubscribeKds();
+    };
+  }, [load, refreshPendingIds]);
 
   const loadCompletedTakeaway = useCallback(async () => {
     setCompletedLoading(true);
     setCompletedError(null);
     try {
-      const data = await getOrders({ orderType: "TAKEAWAY", status: "COMPLETED", limit: 20 });
+      const data = await getOrders({
+        orderType: "TAKEAWAY",
+        status: "COMPLETED",
+        limit: 20,
+      });
       setCompletedTakeaway(data?.data || []);
     } catch (err) {
       setCompletedError(err.message);
@@ -117,14 +176,18 @@ export default function OrdersPage() {
 
   // Takeaway only: already billed and paid up front (see Billings.jsx), so
   // "delivered" just closes the order out directly — no billing step.
+  // markOrderDeliveredOffline tries the network first and only falls back
+  // to the local queue (+ an optimistic cache patch) on a genuine
+  // connectivity failure — see ordersQueue.js.
   async function handleOrderDelivered(orderId) {
     setCompletingOrderId(orderId);
     try {
-      await updateOrderStatus(orderId, "COMPLETED");
+      await markOrderDeliveredOffline(orderId);
       // Drop it from the active takeaway list immediately rather than
       // waiting up to POLL_INTERVAL_MS for the next poll.
       setTakeawayOrders((prev) => prev.filter((o) => o.id !== orderId));
       if (showCompletedTakeaway) loadCompletedTakeaway();
+      await refreshPendingIds();
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -141,11 +204,18 @@ export default function OrdersPage() {
     if (filter === "TAKEAWAY") return takeawayItems;
 
     const combined = [...tables, ...takeawayItems];
-    const filtered = filter === "ALL" ? combined : combined.filter((t) => deriveTableCategory(t) === filter);
+    const filtered =
+      filter === "ALL"
+        ? combined
+        : combined.filter((t) => deriveTableCategory(t) === filter);
 
     return filtered
       .slice()
-      .sort((a, b) => CATEGORY_RANK[deriveTableCategory(a)] - CATEGORY_RANK[deriveTableCategory(b)]);
+      .sort(
+        (a, b) =>
+          CATEGORY_RANK[deriveTableCategory(a)] -
+          CATEGORY_RANK[deriveTableCategory(b)],
+      );
   }, [tables, takeawayOrders, filter]);
 
   const isTakeawayTab = filter === "TAKEAWAY";
@@ -156,7 +226,11 @@ export default function OrdersPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
-              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-blue-600">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="h-5 w-5 text-blue-600"
+              >
                 <path
                   d="M4 6h16M4 12h16M4 18h7"
                   stroke="currentColor"
@@ -169,13 +243,23 @@ export default function OrdersPage() {
             <div>
               <h1 className="text-lg font-bold text-slate-900">Orders</h1>
               <p className="text-xs text-slate-400">
-                {occupiedTableCount} active table{occupiedTableCount === 1 ? "" : "s"} of {tables.length} ·{" "}
-                {takeawayOrders.length} active takeaway order{takeawayOrders.length === 1 ? "" : "s"}
+                {occupiedTableCount} active table
+                {occupiedTableCount === 1 ? "" : "s"} of {tables.length} ·{" "}
+                {takeawayOrders.length} active takeaway order
+                {takeawayOrders.length === 1 ? "" : "s"}
               </p>
             </div>
           </div>
           {error && <p className="text-sm font-medium text-red-600">{error}</p>}
         </div>
+
+        {isOffline && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+            <WifiOff className="h-3.5 w-3.5" />
+            Offline — showing last-synced orders. "Order Delivered" will sync
+            automatically once back online.
+          </div>
+        )}
 
         <div className="mt-3 flex gap-2">
           {FILTERS.map((f) => (
@@ -183,7 +267,9 @@ export default function OrdersPage() {
               key={f.key}
               onClick={() => setFilter(f.key)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                filter === f.key ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                filter === f.key
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               {f.label}
@@ -198,7 +284,9 @@ export default function OrdersPage() {
         ) : visibleItems.length === 0 ? (
           <div className="flex h-40 items-center justify-center">
             <p className="text-slate-400">
-              {isTakeawayTab ? "No active takeaway orders." : "No tables match this filter."}
+              {isTakeawayTab
+                ? "No active takeaway orders."
+                : "No tables match this filter."}
             </p>
           </div>
         ) : (
@@ -212,6 +300,9 @@ export default function OrdersPage() {
                   onCompleteService={handleCompleteService}
                   onOrderDelivered={handleOrderDelivered}
                   completing={completingOrderId === item.order?.id}
+                  pendingSync={
+                    isTakeawayCard && pendingOrderIds.has(item.order?.id)
+                  }
                 />
               );
             })}
@@ -224,7 +315,9 @@ export default function OrdersPage() {
               onClick={toggleCompletedTakeaway}
               className="text-sm font-semibold text-blue-600 hover:underline"
             >
-              {showCompletedTakeaway ? "Hide completed orders" : "Show completed orders"}
+              {showCompletedTakeaway
+                ? "Hide completed orders"
+                : "Show completed orders"}
             </button>
 
             {showCompletedTakeaway && (
@@ -237,16 +330,27 @@ export default function OrdersPage() {
                 {completedLoading ? (
                   <p className="p-4 text-sm text-slate-400">Loading…</p>
                 ) : completedError ? (
-                  <p className="p-4 text-sm font-medium text-red-600">{completedError}</p>
+                  <p className="p-4 text-sm font-medium text-red-600">
+                    {completedError}
+                  </p>
                 ) : completedTakeaway.length === 0 ? (
-                  <p className="p-4 text-sm text-slate-400">No completed takeaway orders yet.</p>
+                  <p className="p-4 text-sm text-slate-400">
+                    No completed takeaway orders yet.
+                  </p>
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {completedTakeaway.map((order) => (
-                      <li key={order.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                      <li
+                        key={order.id}
+                        className="flex items-center justify-between px-4 py-3 text-sm"
+                      >
                         <div>
-                          <p className="font-mono text-xs font-medium text-slate-500">{order.orderNumber}</p>
-                          <p className="font-medium text-slate-800">{order.customerName || "Walk-in"}</p>
+                          <p className="font-mono text-xs font-medium text-slate-500">
+                            {order.orderNumber}
+                          </p>
+                          <p className="font-medium text-slate-800">
+                            {order.customerName || "Walk-in"}
+                          </p>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
