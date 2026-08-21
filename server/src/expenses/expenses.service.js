@@ -4,9 +4,11 @@ import ExcelJS from "exceljs";
 // FIX: was count()+1 — collides with an existing expenseNumber once any
 // expense row is ever deleted. Same bug/fix as pos.service.js's
 // generateOrderNumber; basing it on the highest number actually seen
-// removes the collision.
-async function generateExpenseNumber() {
+// removes the collision. Scoped per outlet now too, since expenseNumber is
+// @@unique([outletId, expenseNumber]).
+async function generateExpenseNumber(outletId) {
   const last = await prisma.expense.findFirst({
+    where: { outletId },
     orderBy: { expenseNumber: "desc" },
     select: { expenseNumber: true },
   });
@@ -19,11 +21,18 @@ async function generateExpenseNumber() {
 // ==============================================
 // EXCEL IMPORT
 // ==============================================
+//
+// FIX: "Store" used to be a required column here, matched against a
+// free-text `Expense.store` field. That field doesn't exist anymore (see
+// schema.prisma section 0.1) — which outlet an imported expense belongs to
+// is no longer something a spreadsheet cell decides, it's simply the
+// outlet of whoever is logged in and doing the import. Removed the column
+// entirely rather than quietly ignoring it, so the template/instructions
+// don't ask for something that no longer means anything.
 
 const IMPORT_COLUMNS = [
   { header: "Title", key: "title", required: true },
   { header: "Category", key: "categoryName", required: true },
-  { header: "Store", key: "store", required: true },
   { header: "Expense Date (YYYY-MM-DD)", key: "expenseDate", required: true },
   { header: "Amount", key: "amount", required: true },
   { header: "GST Amount", key: "gstAmount", required: false },
@@ -71,11 +80,11 @@ const REQUIRED_FONT_COLOR = { argb: "FF7A2E0E" };
 //    row-by-row breakdown of every column (with the real, current category
 //    names so people don't have to guess).
 //  - a hidden Lists sheet that just backs the Category dropdown.
-export const generateImportTemplate = async () => {
+export const generateImportTemplate = async (outletId) => {
   const workbook = new ExcelJS.Workbook();
 
   const categories = await prisma.expenseCategory.findMany({
-    where: { isEnabled: true },
+    where: { outletId, isEnabled: true },
     orderBy: { name: "asc" },
   });
   const categoryNames =
@@ -106,7 +115,6 @@ export const generateImportTemplate = async () => {
   data.addRow({
     title: "Example: June Electricity Bill",
     categoryName: categories[0]?.name || "Utilities",
-    store: "Main Store",
     expenseDate: "2026-06-05",
     amount: 4500,
     gstAmount: 0,
@@ -214,10 +222,6 @@ export const generateImportTemplate = async () => {
       help: `Pick from the dropdown. Available: ${categoryNames}`,
     },
     {
-      required: "Store *",
-      help: "Store/branch name exactly as it appears under Stores.",
-    },
-    {
       required: "Expense Date *",
       help: "Format: YYYY-MM-DD, e.g. 2026-07-09.",
     },
@@ -270,14 +274,14 @@ const parseExcelDate = (value) => {
 
 // Reads an uploaded file and validates every row WITHOUT touching the DB.
 // Returns { validRows, errorRows } for the frontend preview step.
-export const parseImportFile = async (fileBuffer) => {
+export const parseImportFile = async (fileBuffer, outletId) => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer);
 
   const sheet = workbook.getWorksheet("Data") || workbook.worksheets[0];
   if (!sheet) throw new Error("Could not find a 'Data' sheet in this file");
 
-  const categories = await prisma.expenseCategory.findMany();
+  const categories = await prisma.expenseCategory.findMany({ where: { outletId } });
   const categoryByName = Object.fromEntries(
     categories.map((c) => [c.name.trim().toLowerCase(), c]),
   );
@@ -318,9 +322,6 @@ export const parseImportFile = async (fileBuffer) => {
         `Category "${record.categoryName}" was not found — check spelling against the Instructions sheet`,
       );
     }
-
-    if (!record.store || !String(record.store).trim())
-      errors.push("Store is required");
 
     const expenseDate = parseExcelDate(record.expenseDate);
     if (!expenseDate)
@@ -375,7 +376,6 @@ export const parseImportFile = async (fileBuffer) => {
       title: String(record.title).trim(),
       categoryId: categoryMatch.id,
       categoryName: categoryMatch.name,
-      store: String(record.store).trim(),
       expenseDate: expenseDate.toISOString(),
       amount,
       gstAmount,
@@ -402,14 +402,13 @@ export const parseImportFile = async (fileBuffer) => {
 // Actually creates the expenses. Sequential (not Promise.all) because
 // generateExpenseNumber() counts rows — parallel creates would race and
 // could hand out duplicate expense numbers.
-export const bulkCreateExpenses = async (rows, userId) => {
+export const bulkCreateExpenses = async (rows, userId, outletId) => {
   const created = [];
   for (const row of rows) {
     const expense = await createExpense(
       {
         title: row.title,
         categoryId: row.categoryId,
-        store: row.store,
         expenseDate: row.expenseDate,
         amount: row.amount,
         gstAmount: row.gstAmount,
@@ -423,6 +422,7 @@ export const bulkCreateExpenses = async (rows, userId) => {
         description: row.description,
       },
       userId,
+      outletId,
     );
     created.push(expense);
   }
@@ -432,8 +432,8 @@ export const bulkCreateExpenses = async (rows, userId) => {
 // Called when the user clicks "Confirm Import". Re-checks the rows the
 // client already validated (categories/amounts could theoretically have
 // changed since the preview) before actually writing anything.
-export const confirmImportRows = async (rows, userId) => {
-  const categories = await prisma.expenseCategory.findMany();
+export const confirmImportRows = async (rows, userId, outletId) => {
+  const categories = await prisma.expenseCategory.findMany({ where: { outletId } });
   const categoryIds = new Set(categories.map((c) => c.id));
 
   const toCreate = [];
@@ -456,7 +456,7 @@ export const confirmImportRows = async (rows, userId) => {
     toCreate.push(row);
   }
 
-  const created = await bulkCreateExpenses(toCreate, userId);
+  const created = await bulkCreateExpenses(toCreate, userId, outletId);
   return { created, skipped };
 };
 
@@ -464,8 +464,8 @@ export const confirmImportRows = async (rows, userId) => {
 // EXCEL EXPORT
 // ==============================================
 
-export const exportExpensesToExcel = async (filters = {}) => {
-  const expenses = await getAllExpenses(filters);
+export const exportExpensesToExcel = async (filters = {}, outletId) => {
+  const expenses = await getAllExpenses(filters, outletId);
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Expenses");
@@ -474,7 +474,6 @@ export const exportExpensesToExcel = async (filters = {}) => {
     { header: "Expense Number", key: "expenseNumber", width: 16 },
     { header: "Title", key: "title", width: 30 },
     { header: "Category", key: "category", width: 20 },
-    { header: "Store", key: "store", width: 18 },
     { header: "Expense Date", key: "expenseDate", width: 14 },
     { header: "Amount", key: "amount", width: 12 },
     { header: "GST Amount", key: "gstAmount", width: 12 },
@@ -498,7 +497,6 @@ export const exportExpensesToExcel = async (filters = {}) => {
       expenseNumber: e.expenseNumber,
       title: e.title,
       category: e.category?.name || "",
-      store: e.store,
       expenseDate: e.expenseDate
         ? new Date(e.expenseDate).toLocaleDateString("en-IN")
         : "",
@@ -519,13 +517,12 @@ export const exportExpensesToExcel = async (filters = {}) => {
   return workbook.xlsx.writeBuffer();
 };
 
-export const getAllExpenses = async (filters = {}) => {
-  const { category, status, store, from, to, search } = filters;
-  const where = {};
+export const getAllExpenses = async (filters = {}, outletId) => {
+  const { category, status, from, to, search } = filters;
+  const where = { outletId };
 
   if (category) where.categoryId = category;
   if (status) where.status = status;
-  if (store) where.store = store;
   if (from || to) {
     where.expenseDate = {};
     if (from) where.expenseDate.gte = new Date(from);
@@ -546,9 +543,9 @@ export const getAllExpenses = async (filters = {}) => {
   });
 };
 
-export const getExpenseById = (id) =>
-  prisma.expense.findUnique({
-    where: { id },
+export const getExpenseById = (id, outletId) =>
+  prisma.expense.findFirst({
+    where: { id, outletId },
     include: {
       category: true,
       supplier: true,
@@ -558,12 +555,13 @@ export const getExpenseById = (id) =>
     },
   });
 
-export const createExpense = async (data, userId) => {
-  const expenseNumber = await generateExpenseNumber();
+export const createExpense = async (data, userId, outletId) => {
+  const expenseNumber = await generateExpenseNumber(outletId);
 
   const expense = await prisma.expense.create({
     data: {
       ...data,
+      outletId,
       expenseDate: new Date(data.expenseDate),
       paymentDate: data.paymentDate ? new Date(data.paymentDate) : null,
       supplierId: data.supplierId || null,
@@ -588,8 +586,8 @@ export const createExpense = async (data, userId) => {
   return expense;
 };
 
-export const updateExpense = async (id, data, userId) => {
-  const existing = await prisma.expense.findUnique({ where: { id } });
+export const updateExpense = async (id, data, userId, outletId) => {
+  const existing = await prisma.expense.findFirst({ where: { id, outletId } });
   if (!existing) return null;
 
   const updated = await prisma.expense.update({ where: { id }, data });
@@ -607,8 +605,8 @@ export const updateExpense = async (id, data, userId) => {
   return updated;
 };
 
-export const deleteExpense = async (id, userId) => {
-  const existing = await prisma.expense.findUnique({ where: { id } });
+export const deleteExpense = async (id, userId, outletId) => {
+  const existing = await prisma.expense.findFirst({ where: { id, outletId } });
   if (!existing) return null;
 
   if (["APPROVED", "PAID"].includes(existing.status)) {
@@ -630,8 +628,9 @@ export const deleteExpense = async (id, userId) => {
 export const approveExpense = async (
   id,
   { action, level, approverId, comment },
+  outletId,
 ) => {
-  const expense = await prisma.expense.findUnique({ where: { id } });
+  const expense = await prisma.expense.findFirst({ where: { id, outletId } });
   if (!expense) return null;
 
   await prisma.expenseApproval.create({
@@ -661,7 +660,7 @@ export const approveExpense = async (
   return updated;
 };
 
-export const getDashboard = async (store) => {
+export const getDashboard = async (outletId) => {
   const now = new Date();
   const startOfToday = new Date(
     now.getFullYear(),
@@ -672,7 +671,7 @@ export const getDashboard = async (store) => {
   endOfToday.setDate(endOfToday.getDate() + 1);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const baseWhere = store ? { store } : {};
+  const baseWhere = { outletId };
 
   const [
     todayAgg,
@@ -714,7 +713,7 @@ export const getDashboard = async (store) => {
       where: baseWhere,
       _sum: { totalPaid: true },
     }),
-    prisma.expenseCategory.findMany(),
+    prisma.expenseCategory.findMany({ where: { outletId } }),
   ]);
 
   const categoryMap = Object.fromEntries(categories.map((c) => [c.id, c.name]));
@@ -732,8 +731,8 @@ export const getDashboard = async (store) => {
   };
 };
 
-export const getReports = async ({ from, to, groupBy }) => {
-  const where = {};
+export const getReports = async ({ from, to, groupBy }, outletId) => {
+  const where = { outletId };
   if (from || to) {
     where.expenseDate = {};
     if (from) where.expenseDate.gte = new Date(from);
@@ -747,7 +746,7 @@ export const getReports = async ({ from, to, groupBy }) => {
       _sum: { totalPaid: true },
       _count: { id: true },
     });
-    const categories = await prisma.expenseCategory.findMany();
+    const categories = await prisma.expenseCategory.findMany({ where: { outletId } });
     const categoryMap = Object.fromEntries(
       categories.map((c) => [c.id, c.name]),
     );

@@ -2,107 +2,209 @@
 // prisma/seed.js
 // Run with: node prisma/seed.js
 // ==============================================
+//
+// Seeds TWO organizations, on purpose:
+//
+// 1. "Mehfil Arabic Restaurant" — has TWO outlets ("Main Branch" and
+//    "Second Branch"). Its OWNER account can log in and switch between
+//    them (see auth.service.js's login()/selectOutlet() — this is exactly
+//    the multi-outlet flow built in section 0.2). Manager/Cashier/Kitchen
+//    are pinned to Main Branch only, like real staff would be.
+//
+// 2. "Demo Org Two" — a single-outlet, completely separate organization
+//    with its own owner. It exists so you can manually verify tenant
+//    isolation: log in as this owner and confirm you can never see
+//    Mehfil's menu items, orders, employees, etc. — even if you copy an
+//    id straight out of Mehfil's data and try to fetch it directly. That
+//    manual check is worth doing once yourself before section 0.7 turns
+//    it into an automated test.
 
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
-const SEED_USERS = [
+const ORGANIZATIONS = [
   {
-    fullName: "Restaurant Owner",
-    department: "Management",
-    designation: "Owner",
-    username: "owner",
-    email: "owner@gmail.com",
-    password: "123456",
-    role: "OWNER",
+    name: "Mehfil Arabic Restaurant",
+    ownerEmail: "owner@gmail.com",
+    outlets: ["Main Branch", "Second Branch"],
+    users: [
+      {
+        fullName: "Restaurant Owner",
+        department: "Management",
+        designation: "Owner",
+        username: "owner",
+        email: "owner@gmail.com",
+        password: "123456",
+        role: "OWNER",
+        outlet: "Main Branch", // their "home" outlet — OWNER role still gets access to every outlet in the org, this is just where their Employee record lives
+      },
+      {
+        fullName: "Restaurant Manager",
+        department: "Management",
+        designation: "Manager",
+        username: "manager",
+        email: "manager@gmail.com",
+        password: "123456",
+        role: "MANAGER",
+        outlet: "Main Branch",
+      },
+      {
+        fullName: "POS Cashier",
+        department: "Service",
+        designation: "Cashier",
+        username: "cashier",
+        email: "cashier@gmail.com",
+        password: "123456",
+        role: "CASHIER",
+        outlet: "Main Branch",
+      },
+      {
+        fullName: "Kitchen Staff",
+        department: "Kitchen",
+        designation: "Chef",
+        username: "kitchen",
+        email: "kitchen@gmail.com",
+        password: "123456",
+        role: "KITCHEN",
+        outlet: "Main Branch",
+      },
+      // {
+      //   fullName: "Waiter Staff",
+      //   department: "Service",
+      //   designation: "Waiter",
+      //   username: "waiter",
+      //   email: "waiter@gmail.com",
+      //   password: "123456",
+      //   role: "WAITER",
+      //   outlet: "Main Branch",
+      // },
+    ],
   },
   {
-    fullName: "Restaurant Manager",
-    department: "Management",
-    designation: "Manager",
-    username: "manager",
-    email: "manager@gmail.com",
-    password: "123456",
-    role: "MANAGER",
+    name: "Demo Org Two",
+    ownerEmail: "owner2@gmail.com",
+    outlets: ["Other Restaurant"],
+    users: [
+      {
+        fullName: "Second Org Owner",
+        department: "Management",
+        designation: "Owner",
+        username: "owner",
+        // Deliberately reuses the username "owner" — this is exactly the
+        // case auth.service.js's findAccountByIdentifier() has to handle
+        // now that username is unique per-organization, not globally.
+        // Logging in with "owner" (no @) should be rejected as ambiguous;
+        // logging in with the email below should work fine.
+        email: "owner2@gmail.com",
+        password: "123456",
+        role: "OWNER",
+        outlet: "Other Restaurant",
+      },
+    ],
   },
-  {
-    fullName: "POS Cashier",
-    department: "Service",
-    designation: "Cashier",
-    username: "cashier",
-    email: "cashier@gmail.com",
-    password: "123456",
-    role: "CASHIER",
-  },
-  {
-    fullName: "Kitchen Staff",
-    department: "Kitchen",
-    designation: "Chef",
-    username: "kitchen",
-    email: "kitchen@gmail.com",
-    password: "123456",
-    role: "KITCHEN",
-  },
-  // {
-  //   fullName: "Waiter Staff",
-  //   department: "Service",
-  //   designation: "Waiter",
-  //   username: "waiter",
-  //   email: "waiter@gmail.com",
-  //   password: "123456",
-  //   role: "WAITER",
-  // },
 ];
 
-async function main() {
-  // Base the employee code on how many employees already exist in the DB,
-  // instead of the array index — so it works no matter which users above
-  // are commented in/out, and never collides with already-seeded rows.
-  const employeeCount = await prisma.employee.count();
-  let nextCodeNumber = employeeCount + 1;
+async function findOrCreateOrganization(org) {
+  const existing = await prisma.organization.findUnique({
+    where: { ownerEmail: org.ownerEmail },
+  });
+  if (existing) {
+    console.log(`Organization "${org.name}" already exists — reusing it.`);
+    return existing;
+  }
+  const created = await prisma.organization.create({
+    data: { name: org.name, ownerEmail: org.ownerEmail },
+  });
+  console.log(`Created organization "${org.name}"`);
+  return created;
+}
 
-  for (let i = 0; i < SEED_USERS.length; i++) {
-    const seedUser = SEED_USERS[i];
-
-    const existing = await prisma.userAccount.findUnique({
-      where: { email: seedUser.email },
+async function findOrCreateOutlets(organizationId, outletNames) {
+  const outletsByName = {};
+  for (const name of outletNames) {
+    const existing = await prisma.outlet.findFirst({
+      where: { organizationId, name },
     });
-
     if (existing) {
-      console.log(`Skipping ${seedUser.email} — already exists.`);
+      outletsByName[name] = existing;
+      console.log(`  Outlet "${name}" already exists — reusing it.`);
       continue;
     }
+    const created = await prisma.outlet.create({
+      data: { organizationId, name },
+    });
+    outletsByName[name] = created;
+    console.log(`  Created outlet "${name}"`);
+  }
+  return outletsByName;
+}
 
-    const passwordHash = await bcrypt.hash(seedUser.password, 12);
+async function main() {
+  for (const org of ORGANIZATIONS) {
+    const organization = await findOrCreateOrganization(org);
+    const outletsByName = await findOrCreateOutlets(organization.id, org.outlets);
 
-    const employeeCode = `EMP-${String(nextCodeNumber).padStart(4, "0")}`;
-    nextCodeNumber++;
+    for (const seedUser of org.users) {
+      const existing = await prisma.userAccount.findUnique({
+        where: { email: seedUser.email },
+      });
 
-    await prisma.employee.create({
-      data: {
-        employeeCode,
-        fullName: seedUser.fullName,
-        department: seedUser.department,
-        designation: seedUser.designation,
-        joiningDate: new Date(),
-        email: seedUser.email,
-        userAccount: {
-          create: {
-            username: seedUser.username,
-            email: seedUser.email,
-            passwordHash,
-            role: seedUser.role,
+      if (existing) {
+        console.log(`  Skipping ${seedUser.email} — already exists.`);
+        continue;
+      }
+
+      const outlet = outletsByName[seedUser.outlet];
+      if (!outlet) {
+        throw new Error(
+          `Seed data error: "${seedUser.outlet}" isn't in ${org.name}'s outlets list.`,
+        );
+      }
+
+      // employeeCode is now @@unique([outletId, employeeCode]) — base the
+      // next number on how many employees already exist in THIS outlet,
+      // not a global count, so two outlets can each have an EMP-0001.
+      const employeeCountInOutlet = await prisma.employee.count({
+        where: { outletId: outlet.id },
+      });
+      const employeeCode = `EMP-${String(employeeCountInOutlet + 1).padStart(4, "0")}`;
+
+      const passwordHash = await bcrypt.hash(seedUser.password, 12);
+
+      await prisma.employee.create({
+        data: {
+          outletId: outlet.id,
+          employeeCode,
+          fullName: seedUser.fullName,
+          department: seedUser.department,
+          designation: seedUser.designation,
+          joiningDate: new Date(),
+          email: seedUser.email,
+          userAccount: {
+            create: {
+              outletId: outlet.id,
+              organizationId: organization.id,
+              username: seedUser.username,
+              email: seedUser.email,
+              passwordHash,
+              role: seedUser.role,
+            },
           },
         },
-      },
-    });
+      });
 
-    console.log(
-      `Created ${seedUser.role} -> ${seedUser.email} / ${seedUser.password}`,
-    );
+      console.log(
+        `  Created ${seedUser.role} -> ${seedUser.email} / ${seedUser.password} (outlet: ${seedUser.outlet})`,
+      );
+    }
   }
+
+  console.log("\nDone. Try logging in as:");
+  console.log("  owner@gmail.com / 123456   (Mehfil — 2 outlets, will prompt for outlet selection)");
+  console.log("  manager@gmail.com / 123456 (Mehfil — Main Branch only, logs straight in)");
+  console.log("  owner2@gmail.com / 123456  (Demo Org Two — separate tenant, logs straight in)");
 }
 
 main()

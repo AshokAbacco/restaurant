@@ -1,8 +1,9 @@
 // server/src/employees/payroll/payroll.service.js
 import prisma from "../../config/prisma.js";
 
-export async function listPayroll({ employeeId, month, status, page = 1, limit = 20 }) {
+export async function listPayroll({ employeeId, month, status, page = 1, limit = 20 }, outletId) {
   const where = {
+    outletId,
     ...(employeeId ? { employeeId } : {}),
     ...(month ? { month } : {}),
     ...(status ? { status } : {}),
@@ -22,21 +23,27 @@ export async function listPayroll({ employeeId, month, status, page = 1, limit =
   return { data, total, page: Number(page), limit: Number(limit) };
 }
 
-export async function generatePayroll(payload) {
+export async function generatePayroll(payload, outletId) {
   const { employeeId, month, basicSalary, allowances = 0, bonus = 0, overtimePay = 0, deductions = 0 } = payload;
+
+  // FIX: previously trusted employeeId outright with no ownership check —
+  // a stray id from another outlet could have payroll generated against it.
+  const employee = await prisma.employee.findFirst({ where: { id: employeeId, outletId } });
+  if (!employee) throw new Error("Employee not found");
+
   const netSalary = Number(basicSalary) + Number(allowances) + Number(bonus) + Number(overtimePay) - Number(deductions);
 
   return prisma.payrollRecord.upsert({
     where: { employeeId_month: { employeeId, month } },
-    create: { employeeId, month, basicSalary, allowances, bonus, overtimePay, deductions, netSalary },
+    create: { outletId, employeeId, month, basicSalary, allowances, bonus, overtimePay, deductions, netSalary },
     update: { basicSalary, allowances, bonus, overtimePay, deductions, netSalary },
   });
 }
 
 // Marks a payroll record as paid and creates the linked accounting-side SalaryExpense row
-export async function markAsPaid(id) {
-  const payroll = await prisma.payrollRecord.findUnique({
-    where: { id },
+export async function markAsPaid(id, outletId) {
+  const payroll = await prisma.payrollRecord.findFirst({
+    where: { id, outletId },
     include: { employee: true },
   });
   if (!payroll) throw new Error("Payroll record not found");
@@ -44,6 +51,7 @@ export async function markAsPaid(id) {
 
   const salaryExpense = await prisma.salaryExpense.create({
     data: {
+      outletId,
       employeeName: payroll.employee.fullName,
       employeeId: payroll.employeeId,
       salaryMonth: new Date(`${payroll.month}-01`),
@@ -55,7 +63,6 @@ export async function markAsPaid(id) {
       netSalary: payroll.netSalary,
       paymentStatus: "PAID",
       paymentDate: new Date(),
-      store: payroll.employee.store,
     },
   });
 

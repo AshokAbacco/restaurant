@@ -8,6 +8,15 @@ import { apiRequest, setAccessToken, getAccessToken } from "../api/apiClient";
 
 // ==============================================
 // LOGIN
+// FEATURE (multi-tenancy): the backend now supports two shapes here.
+// Most logins (single-outlet staff) get the old shape straight back:
+// { success: true, accessToken, user }. An OWNER/ADMIN on a
+// multi-outlet organization instead gets
+// { success: true, requiresOutletSelection: true, preAuthToken, outlets }
+// — no accessToken yet, since there's no real session until an outlet is
+// picked. Callers (AuthContext.login) need to check for
+// requiresOutletSelection and route to the picker instead of navigating
+// straight to the dashboard.
 // ==============================================
 
 const login = async (identifier, password) => {
@@ -20,6 +29,40 @@ const login = async (identifier, password) => {
     return {
       success: false,
       message: data?.message || "Invalid email or password",
+    };
+  }
+
+  if (data.requiresOutletSelection) {
+    return {
+      success: true,
+      requiresOutletSelection: true,
+      preAuthToken: data.preAuthToken,
+      outlets: data.outlets,
+    };
+  }
+
+  setAccessToken(data.accessToken);
+
+  return { success: true, token: data.accessToken, user: data.user };
+};
+
+// ==============================================
+// SELECT OUTLET
+// Second step of login, only called when login() above returned
+// requiresOutletSelection: true. Finishes the session exactly like a
+// normal login once an outlet is chosen.
+// ==============================================
+
+const selectOutlet = async (preAuthToken, outletId) => {
+  const { ok, data } = await apiRequest("/auth/select-outlet", {
+    method: "POST",
+    body: JSON.stringify({ preAuthToken, outletId }),
+  });
+
+  if (!ok || !data?.success) {
+    return {
+      success: false,
+      message: data?.message || "Unable to select that outlet.",
     };
   }
 
@@ -74,12 +117,18 @@ const restoreSession = async () => {
       return null;
     }
 
-    return data.user;
+    // FEATURE (multi-tenancy): /auth/me now also returns the account's
+    // full outlet list (for the switcher) alongside the user — see
+    // auth.service.js's getCurrentUser. Callers that only care about the
+    // user (most of them) can keep destructuring { user } and ignore
+    // outlets; AuthContext uses both.
+    return { user: data.user, outlets: data.outlets || [] };
   } catch (err) {
     // fetch() itself threw — no connectivity, not a server rejection.
     // Don't log the user out just because we can't reach the server
     // right now; fall back to what the token itself already tells us.
-    return decodeAccessTokenOffline();
+    const user = decodeAccessTokenOffline();
+    return user ? { user, outlets: [] } : null;
   }
 };
 
@@ -119,6 +168,33 @@ function decodeAccessTokenOffline() {
     return null;
   }
 }
+// ==============================================
+// SWITCH OUTLET
+// Used from an already-authenticated session (the header switcher), as
+// opposed to selectOutlet() above which is only for the login-time picker
+// (it needs a preAuthToken since no real session exists yet at that
+// point). This hits a separate endpoint that authenticates normally via
+// the existing access token instead.
+// ==============================================
+
+const switchOutlet = async (outletId) => {
+  const { ok, data } = await apiRequest("/auth/switch-outlet", {
+    method: "POST",
+    body: JSON.stringify({ outletId }),
+  });
+
+  if (!ok || !data?.success) {
+    return {
+      success: false,
+      message: data?.message || "Unable to switch outlet.",
+    };
+  }
+
+  setAccessToken(data.accessToken);
+
+  return { success: true, token: data.accessToken, user: data.user };
+};
+
 // ==============================================
 // CURRENT USER / TOKEN (in-memory only)
 // ==============================================
@@ -217,6 +293,8 @@ const resetPassword = async (token, password) => {
 
 const authService = {
   login,
+  selectOutlet,
+  switchOutlet,
   logout,
   restoreSession,
   getToken,

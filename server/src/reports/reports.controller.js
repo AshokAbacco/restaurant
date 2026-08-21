@@ -16,7 +16,7 @@ const VALID_PERIODS = ["today", "thisweek", "thismonth", "thisyear"];
  */
 async function getDashboard(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
 
     if (
       req.query.period &&
@@ -48,10 +48,10 @@ async function getDashboard(req, res) {
  */
 async function getSalesSummary(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const [summary, inventoryValue] = await Promise.all([
       reportsService.getSalesSummary(filters),
-      reportsService.getInventoryValue(),
+      reportsService.getInventoryValue(req.tenant.outletId),
     ]);
     return res.status(200).json({
       success: true,
@@ -70,7 +70,7 @@ async function getSalesSummary(req, res) {
  */
 async function getSalesTrend(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getSalesTrend(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -86,7 +86,7 @@ async function getSalesTrend(req, res) {
  */
 async function getOrderTypeBreakdown(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getOrderTypeBreakdown(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -105,7 +105,7 @@ async function getOrderTypeBreakdown(req, res) {
  */
 async function getCategoryPerformance(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getCategoryPerformance(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -124,7 +124,7 @@ async function getCategoryPerformance(req, res) {
  */
 async function getPaymentDistribution(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getPaymentDistribution(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -143,7 +143,7 @@ async function getPaymentDistribution(req, res) {
  */
 async function getTopSellingItems(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getTopSellingItems(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -159,7 +159,7 @@ async function getTopSellingItems(req, res) {
  */
 async function getExpenseBreakdown(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getExpenseBreakdown(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -175,7 +175,7 @@ async function getExpenseBreakdown(req, res) {
  */
 async function getEmployeePerformance(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getEmployeePerformance(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -194,7 +194,7 @@ async function getEmployeePerformance(req, res) {
  */
 async function getCustomerAnalytics(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getCustomerAnalytics(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -214,7 +214,7 @@ async function getInventoryAlerts(req, res) {
       200,
       Math.max(1, parseInt(req.query.limit, 10) || 20),
     );
-    const data = await reportsService.getInventoryAlerts(limit);
+    const data = await reportsService.getInventoryAlerts(limit, req.tenant.outletId);
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("[reports.controller] getInventoryAlerts failed:", error);
@@ -229,7 +229,7 @@ async function getInventoryAlerts(req, res) {
  */
 async function getKitchenPerformance(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getKitchenPerformance(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -246,7 +246,7 @@ async function getKitchenPerformance(req, res) {
  */
 async function getRecentTransactions(req, res) {
   try {
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
     const data = await reportsService.getRecentTransactions(filters);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -268,7 +268,7 @@ async function exportReport(req, res) {
   try {
     const { reportType } = req.params;
     const format = String(req.query.format || "csv").toLowerCase();
-    const filters = reportsService.parseFilters(req.query);
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
 
     const rows = await reportsService.getExportData(reportType, filters);
     const filename = `${reportType}-${new Date().toISOString().slice(0, 10)}`;

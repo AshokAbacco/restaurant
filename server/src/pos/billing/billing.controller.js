@@ -3,7 +3,10 @@ import * as billingService from "./billing.service.js";
 
 export async function getBillingSummary(req, res) {
   try {
-    const summary = await billingService.getBillingSummary(req.params.orderId);
+    const summary = await billingService.getBillingSummary(
+      req.params.orderId,
+      req.tenant.outletId,
+    );
     res.json(summary);
   } catch (err) {
     res.status(400).json({ message: "Failed to fetch billing summary", error: err.message });
@@ -12,7 +15,11 @@ export async function getBillingSummary(req, res) {
 
 export async function completeBilling(req, res) {
   try {
-    const result = await billingService.completeBilling(req.params.orderId, req.body);
+    const result = await billingService.completeBilling(
+      req.params.orderId,
+      req.body,
+      req.tenant.outletId,
+    );
     res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ message: "Failed to complete billing", error: err.message });

@@ -5,6 +5,10 @@
 // plus order/payment writes. It talks to the same Prisma models — no
 // schema changes needed — but never reuses menu.repository's staff-facing
 // queries directly, so the two modules can evolve independently.
+//
+// FIX: every function here now takes outletId and applies it — previously
+// none of them did (see kiosk.middleware.js's resolveKioskOutlet for why
+// that's now required on every kiosk request).
 
 import prisma from "../config/prisma.js";
 
@@ -12,17 +16,18 @@ import prisma from "../config/prisma.js";
 // MENU (read-only, customer-facing)
 // ==================================================
 
-export const findKioskCategories = () =>
+export const findKioskCategories = (outletId) =>
   prisma.category.findMany({
-    where: { isEnabled: true },
+    where: { outletId, isEnabled: true },
     orderBy: { displayOrder: "asc" },
   });
 
 // Only items that should actually be sold at the kiosk:
 // ACTIVE + available + not hidden from POS/self-order screens.
-export const findKioskMenuItems = () =>
+export const findKioskMenuItems = (outletId) =>
   prisma.menuItem.findMany({
     where: {
+      outletId,
       status: "ACTIVE",
       isAvailable: true,
       isHiddenFromPOS: false,
@@ -35,43 +40,47 @@ export const findKioskMenuItems = () =>
     orderBy: { name: "asc" },
   });
 
-export const findKioskMenuItemsByIds = (ids) =>
+export const findKioskMenuItemsByIds = (ids, outletId) =>
   prisma.menuItem.findMany({
-    where: { id: { in: ids } },
+    where: { id: { in: ids }, outletId },
     include: { category: true, variants: true },
   });
 
-export const findAddOnsForMenuItem = (menuItemId) =>
+export const findAddOnsForMenuItem = (menuItemId, outletId) =>
   prisma.menuItemAddOn.findMany({
-    where: { menuItemId, addOn: { isEnabled: true } },
+    where: { menuItemId, addOn: { isEnabled: true, outletId } },
     include: { addOn: true },
   });
 
-export const findAddOnsByIds = (ids) =>
-  prisma.addOn.findMany({ where: { id: { in: ids }, isEnabled: true } });
+export const findAddOnsByIds = (ids, outletId) =>
+  prisma.addOn.findMany({ where: { id: { in: ids }, isEnabled: true, outletId } });
 
 // ==================================================
 // TABLES
 // ==================================================
 
-export const findFreeTables = (store = "Main Store") =>
+export const findFreeTables = (outletId) =>
   prisma.restaurantTable.findMany({
-    where: { store, status: "FREE" },
+    where: { outletId, status: "FREE" },
     orderBy: { name: "asc" },
   });
 
-export const findTableById = (id) =>
-  prisma.restaurantTable.findUnique({ where: { id } });
+export const findTableById = (id, outletId) =>
+  prisma.restaurantTable.findFirst({ where: { id, outletId } });
 
 // ==================================================
 // CUSTOMER (optional, matched by mobile number)
 // ==================================================
 
-export const findOrCreateCustomer = async ({ name, phone }) => {
+export const findOrCreateCustomer = async ({ name, phone }, outletId) => {
   if (!phone) return null;
 
-  const existing = await prisma.customer.findUnique({
-    where: { mobile: phone },
+  // FIX: Customer.mobile is @@unique([outletId, mobile]) now, not globally
+  // unique — findUnique({ where: { mobile: phone } }) no longer matches
+  // Prisma's generated unique input shape, and would be wrong anyway since
+  // the same phone number can legitimately order at two different outlets.
+  const existing = await prisma.customer.findFirst({
+    where: { mobile: phone, outletId },
   });
   if (existing) {
     if (name && name.trim() && existing.name !== name.trim()) {
@@ -84,7 +93,7 @@ export const findOrCreateCustomer = async ({ name, phone }) => {
   }
 
   return prisma.customer.create({
-    data: { name: name?.trim() || "Kiosk Guest", mobile: phone },
+    data: { outletId, name: name?.trim() || "Kiosk Guest", mobile: phone },
   });
 };
 
@@ -97,17 +106,17 @@ export const findOrCreateCustomer = async ({ name, phone }) => {
 // the caller in a retry loop (see kiosk.service.js) so a race between two
 // kiosks landing on the same sequence number is resolved by retrying on
 // the unique-constraint error rather than by locking the table.
-export const countOrdersCreatedToday = async () => {
+export const countOrdersCreatedToday = async (outletId) => {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
   return prisma.order.count({
-    where: { createdAt: { gte: startOfDay } },
+    where: { outletId, createdAt: { gte: startOfDay } },
   });
 };
 
-export const findOrderByOrderNumber = (orderNumber) =>
-  prisma.order.findUnique({ where: { orderNumber } });
+export const findOrderByOrderNumber = (orderNumber, outletId) =>
+  prisma.order.findFirst({ where: { orderNumber, outletId } });
 
 // ==================================================
 // ORDER CREATION
@@ -116,12 +125,12 @@ export const findOrderByOrderNumber = (orderNumber) =>
 // All writes happen in a single transaction: if anything fails
 // (bad item, table just got taken, etc.) nothing is left half-created.
 export const createOrderWithItems = ({
+  outletId,
   orderNumber,
   orderType,
   tableId,
   customerId,
   notes,
-  store,
   pricedItems, // [{ menuItemId, quantity, unitPrice, totalPrice, notes, addOns: [{addOnId, unitPrice, quantity, totalPrice}] }]
   subtotal,
   gstAmount,
@@ -131,13 +140,13 @@ export const createOrderWithItems = ({
   prisma.$transaction(async (tx) => {
     const order = await tx.order.create({
       data: {
+        outletId,
         orderNumber,
         orderType,
         status: "NEW",
         tableId: tableId || null,
         customerId: customerId || null,
         notes: notes || null,
-        store: store || "Main Store",
         subtotal,
         gstAmount,
         serviceChargeAmount,
@@ -199,9 +208,9 @@ export const createOrderWithItems = ({
 // ORDER READ / STATUS
 // ==================================================
 
-export const findOrderById = (id) =>
-  prisma.order.findUnique({
-    where: { id },
+export const findOrderById = (id, outletId) =>
+  prisma.order.findFirst({
+    where: { id, outletId },
     include: {
       items: {
         include: { menuItem: true, addOns: { include: { addOn: true } } },
@@ -212,11 +221,15 @@ export const findOrderById = (id) =>
     },
   });
 
-export const updateOrderStatus = (id, status) =>
-  prisma.order.update({ where: { id }, data: { status } });
+export const updateOrderStatus = async (id, status, outletId) => {
+  // FIX: previously updated by id alone with no ownership check.
+  const existing = await prisma.order.findFirst({ where: { id, outletId } });
+  if (!existing) throw new Error("Order not found");
+  return prisma.order.update({ where: { id }, data: { status } });
+};
 
-export const freeTableForOrder = async (orderId) => {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+export const freeTableForOrder = async (orderId, outletId) => {
+  const order = await prisma.order.findFirst({ where: { id: orderId, outletId } });
   if (order?.tableId) {
     await prisma.restaurantTable.update({
       where: { id: order.tableId },
@@ -229,21 +242,40 @@ export const freeTableForOrder = async (orderId) => {
 // PAYMENT
 // ==================================================
 
-export const findLatestPaymentForOrder = (orderId) =>
+export const findLatestPaymentForOrder = (orderId, outletId) =>
   prisma.payment.findFirst({
-    where: { orderId },
+    where: { orderId, order: { outletId } },
     orderBy: { createdAt: "desc" },
   });
 
-export const updatePayment = (id, data) =>
-  prisma.payment.update({ where: { id }, data });
+export const updatePayment = async (id, data, outletId) => {
+  // FIX: previously updated by id alone with no ownership check.
+  const existing = await prisma.payment.findFirst({
+    where: { id, order: { outletId } },
+  });
+  if (!existing) throw new Error("Payment not found");
+  return prisma.payment.update({ where: { id }, data });
+};
 
-export const createPayment = (data) => prisma.payment.create({ data });
+export const createPayment = (data, outletId) => {
+  // Payment has no outletId column of its own (scope comes from its
+  // parent Order) — outletId is accepted here for signature consistency
+  // with every other function in this file, not because it's written
+  // anywhere; kept as a parameter so a future caller can't forget it.
+  return prisma.payment.create({ data });
+};
 
 // Used by the Razorpay webhook: we store the Razorpay QR code id (for UPI)
 // or the Razorpay order id (for Card) in Payment.transactionReference when
 // we create it, so an incoming webhook event — which only gives us *their*
 // ids — can be traced back to our kiosk Order.
+//
+// NOT outlet-scoped by parameter, deliberately: Razorpay's webhook payload
+// has no concept of our outletId, only the reference we gave it at
+// creation time — this lookup is exactly how the webhook (and only the
+// webhook) resolves which outlet a payment belongs to, from a reference
+// that's already unique across the whole system. Every other function in
+// this file requires outletId; this is the one legitimate exception.
 export const findOrderByPaymentReference = async (reference) => {
   if (!reference) return null;
   const payment = await prisma.payment.findFirst({

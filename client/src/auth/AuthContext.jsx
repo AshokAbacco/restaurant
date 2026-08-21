@@ -32,6 +32,19 @@ export const ROLES = {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
+  // FEATURE (multi-tenancy): the full list of outlets this account can
+  // access (populated from /auth/me and from login()/selectOutlet()'s
+  // responses) — powers the outlet switcher in the header. Empty array for
+  // single-outlet accounts (nothing to switch between) and for anyone not
+  // yet authenticated.
+  const [outlets, setOutlets] = useState([]);
+
+  // FEATURE (multi-tenancy): set only during the brief window between
+  // "password verified" and "outlet chosen" for a multi-outlet account —
+  // see login() below. Login.jsx checks this to know whether to show the
+  // outlet-picker screen instead of navigating to the dashboard.
+  const [pendingOutletSelection, setPendingOutletSelection] = useState(null);
+
   // FIX: `loading` gates the provider's render below (`{!loading &&
   // children}`) — while it's true, the ENTIRE app (everything under
   // AuthProvider, including whatever page is currently mounted) renders
@@ -78,12 +91,13 @@ export const AuthProvider = ({ children }) => {
 
     (async () => {
       try {
-        const restoredUser = await authService.restoreSession();
+        const restored = await authService.restoreSession();
 
         if (cancelled) return;
 
-        if (restoredUser) {
-          setUser(restoredUser);
+        if (restored) {
+          setUser(restored.user);
+          setOutlets(restored.outlets || []);
           setIsAuthenticated(true);
         }
       } catch (err) {
@@ -112,10 +126,74 @@ export const AuthProvider = ({ children }) => {
       return result;
     }
 
+    // FEATURE (multi-tenancy): password was correct, but this account has
+    // more than one outlet — no real session exists yet. Stash the
+    // pre-auth token + outlet list and tell the caller (Login.jsx) to show
+    // the picker instead of treating this as a completed login.
+    if (result.requiresOutletSelection) {
+      setPendingOutletSelection({
+        preAuthToken: result.preAuthToken,
+        outlets: result.outlets,
+      });
+      return { success: true, requiresOutletSelection: true, outlets: result.outlets };
+    }
+
     setUser(result.user);
+    setOutlets(result.user?.outlet ? [result.user.outlet] : []);
     setIsAuthenticated(true);
 
     return { success: true, user: result.user };
+  };
+
+  // ==========================================
+  // SELECT OUTLET
+  // Second step of login, only relevant when login() above returned
+  // requiresOutletSelection: true.
+  // ==========================================
+
+  const selectOutlet = async (outletId) => {
+    if (!pendingOutletSelection) {
+      return { success: false, message: "No pending login to complete." };
+    }
+
+    const result = await authService.selectOutlet(
+      pendingOutletSelection.preAuthToken,
+      outletId,
+    );
+
+    if (!result.success) {
+      return result;
+    }
+
+    setUser(result.user);
+    setOutlets(pendingOutletSelection.outlets || []);
+    setIsAuthenticated(true);
+    setPendingOutletSelection(null);
+
+    return { success: true, user: result.user };
+  };
+
+  // ==========================================
+  // SWITCH OUTLET
+  // Used AFTER a full session already exists (the header switcher) — an
+  // OWNER/ADMIN picking a different outlet than the one they're currently
+  // on. Reuses the same backend endpoint as the login-time picker, just
+  // triggered from a different UI moment; the server doesn't distinguish
+  // between the two.
+  //
+  // A full page reload after the token updates is the simplest correct way
+  // to make every already-mounted page (which may have already fetched
+  // outlet-scoped data under the OLD outlet) refetch under the new one,
+  // rather than trying to track down and invalidate every data hook in the
+  // app individually.
+  // ==========================================
+
+  const switchOutlet = async (outletId) => {
+    const result = await authService.switchOutlet(outletId);
+    if (!result.success) return result;
+
+    window.location.reload();
+    return { success: true };
   };
 
   // ==========================================
@@ -214,11 +292,19 @@ export const AuthProvider = ({ children }) => {
     () => ({
       user,
 
+      outlets,
+
+      pendingOutletSelection,
+
       loading,
 
       isAuthenticated,
 
       login,
+
+      selectOutlet,
+
+      switchOutlet,
 
       logout,
 
@@ -258,7 +344,7 @@ export const AuthProvider = ({ children }) => {
 
       canViewProfit,
     }),
-    [user, loading, isAuthenticated],
+    [user, outlets, pendingOutletSelection, loading, isAuthenticated],
   );
   // ==========================================
   // PROVIDER

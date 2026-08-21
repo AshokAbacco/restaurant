@@ -8,8 +8,9 @@ import prisma from "../../config/prisma.js";
 // Basing it on the highest kotNumber actually seen removes that
 // possibility — lexicographic DESC sort matches numeric order here because
 // every kotNumber is zero-padded to the same width.
-export async function generateKotNumber(client = prisma) {
+export async function generateKotNumber(outletId, client = prisma) {
   const last = await client.kitchenOrder.findFirst({
+    where: { outletId },
     orderBy: { kotNumber: "desc" },
     select: { kotNumber: true },
   });
@@ -27,7 +28,17 @@ export async function generateKotNumber(client = prisma) {
 // Accepts an optional `client` — pass a Prisma transaction client (tx) to run
 // this as part of a larger atomic operation (see pos.service.js's
 // createOrderAndSendToKitchen), otherwise it uses the regular global client.
-export async function sendToKitchen(orderId, orderItemIds, client = prisma) {
+export async function sendToKitchen(orderId, orderItemIds, outletId, client = prisma) {
+  // This is also reachable as its own standalone route (POST
+  // /pos/kot/:orderId), not just via pos.service.js's
+  // createOrderAndSendToKitchen — so it needs its own ownership check
+  // rather than trusting the caller already verified orderId.
+  const order = await client.order.findFirst({
+    where: { id: orderId, outletId },
+    select: { id: true },
+  });
+  if (!order) throw new Error("Order not found");
+
   const orderItems = await client.orderItem.findMany({
     where: { id: { in: orderItemIds }, orderId },
     include: {
@@ -71,7 +82,7 @@ export async function sendToKitchen(orderId, orderItemIds, client = prisma) {
   const createdKots = [];
 
   for (const [kitchenSectionId, items] of bySection) {
-    const kotNumber = await generateKotNumber(client);
+    const kotNumber = await generateKotNumber(outletId, client);
     const targetPrepMinutes = items.reduce(
       (sum, i) => sum + (i.menuItem.prepTimeMinutes || 0) * i.quantity,
       0,
@@ -79,6 +90,7 @@ export async function sendToKitchen(orderId, orderItemIds, client = prisma) {
 
     const kitchenOrder = await client.kitchenOrder.create({
       data: {
+        outletId,
         order: { connect: { id: orderId } },
         kotNumber,
         status: "NEW",
@@ -119,9 +131,9 @@ export async function sendToKitchen(orderId, orderItemIds, client = prisma) {
   return createdKots.length === 1 ? createdKots[0] : createdKots;
 }
 
-export async function listKotsForOrder(orderId) {
+export async function listKotsForOrder(orderId, outletId) {
   return prisma.kitchenOrder.findMany({
-    where: { orderId },
+    where: { orderId, outletId },
     include: {
       kitchenSection: true,
       chef: { select: { fullName: true, employeeCode: true } },
@@ -137,9 +149,10 @@ export async function listKotsForOrder(orderId) {
 
 // Kitchen display screen — everything not finished, oldest first.
 // Pass kitchenSectionId to scope this to one station's screen (grill, dessert, etc.).
-export async function getActiveKitchenDisplay(kitchenSectionId) {
+export async function getActiveKitchenDisplay(kitchenSectionId, outletId) {
   return prisma.kitchenOrder.findMany({
     where: {
+      outletId,
       status: { notIn: ["COMPLETED", "CANCELLED"] },
       ...(kitchenSectionId ? { kitchenSectionId } : {}),
     },
@@ -207,8 +220,11 @@ export async function updateKotStatus(
   id,
   status,
   { changedById, reason } = {},
+  outletId,
 ) {
-  const existing = await prisma.kitchenOrder.findUnique({ where: { id } });
+  const existing = await prisma.kitchenOrder.findFirst({
+    where: { id, outletId },
+  });
   if (!existing) throw new Error("Kitchen order not found");
 
   // See KOT_STAGE_RANK above — a replayed offline update that's already
@@ -260,12 +276,12 @@ export async function updateKotStatus(
 // chefId comes from the logged-in kitchen user's employeeId — optional
 // because req.user.employeeId may not be set for every role that can reach
 // this endpoint (falls back to an anonymous note rather than failing).
-export async function addKitchenNote(kitchenOrderId, chefId, note) {
+export async function addKitchenNote(kitchenOrderId, chefId, note, outletId) {
   const trimmed = (note || "").trim();
   if (!trimmed) throw new Error("Note text is required");
 
-  const kitchenOrder = await prisma.kitchenOrder.findUnique({
-    where: { id: kitchenOrderId },
+  const kitchenOrder = await prisma.kitchenOrder.findFirst({
+    where: { id: kitchenOrderId, outletId },
   });
   if (!kitchenOrder) throw new Error("Kitchen order not found");
 
@@ -279,9 +295,12 @@ export async function addKitchenNote(kitchenOrderId, chefId, note) {
   });
 }
 
-export async function listKitchenNotes(kitchenOrderId) {
+export async function listKitchenNotes(kitchenOrderId, outletId) {
+  // KitchenNote itself has no outletId (it's a child row — scope comes from
+  // its parent KitchenOrder, same pattern as OrderItem under Order), so
+  // scoping happens through the relation filter here.
   return prisma.kitchenNote.findMany({
-    where: { kitchenOrderId },
+    where: { kitchenOrderId, kitchenOrder: { outletId } },
     include: { chef: { select: { fullName: true, employeeCode: true } } },
     orderBy: { createdAt: "asc" },
   });
@@ -290,8 +309,9 @@ export async function listKitchenNotes(kitchenOrderId) {
 // Feed of every note across recent tickets, newest first — powers a
 // dedicated "Kitchen Notes" log page so owner/manager can review kitchen
 // communication without opening each ticket individually.
-export async function listRecentKitchenNotes(limit = 50) {
+export async function listRecentKitchenNotes(limit = 50, outletId) {
   return prisma.kitchenNote.findMany({
+    where: { kitchenOrder: { outletId } },
     take: limit,
     orderBy: { createdAt: "desc" },
     include: {

@@ -2,8 +2,8 @@
 import prisma from "../../config/prisma.js";
 import { decrementExpiryBatchesFefo } from "../_shared/decrementExpiryBatchesFefo.js";
 
-export const listAdjustments = ({ ingredientId }) => {
-  const where = {};
+export const listAdjustments = ({ ingredientId }, outletId) => {
+  const where = { outletId };
   if (ingredientId) where.ingredientId = ingredientId;
 
   return prisma.stockAdjustment.findMany({
@@ -13,9 +13,9 @@ export const listAdjustments = ({ ingredientId }) => {
   });
 };
 
-export const getAdjustmentById = (id) =>
-  prisma.stockAdjustment.findUnique({
-    where: { id },
+export const getAdjustmentById = (id, outletId) =>
+  prisma.stockAdjustment.findFirst({
+    where: { id, outletId },
     include: { ingredient: { select: { name: true, itemCode: true, consumptionUnit: true } } },
   });
 
@@ -27,8 +27,20 @@ export const getAdjustmentById = (id) =>
  *
  * data: { ingredientId, type: "INCREASE"|"DECREASE", quantity, reason, approvedBy?, notes?, userId? }
  */
-export const createAdjustment = (data) =>
+export const createAdjustment = (data, outletId) =>
   prisma.$transaction(async (tx) => {
+    // FIX: previously looked up stock by ingredientId alone with no outlet
+    // check — a stray/guessed ingredientId from another outlet would have
+    // adjusted ITS stock while being logged under this outlet.
+    const ingredient = await tx.ingredient.findFirst({
+      where: { id: data.ingredientId, outletId },
+    });
+    if (!ingredient) {
+      const err = new Error("Ingredient not found");
+      err.code = "P2025";
+      throw err;
+    }
+
     const stock = await tx.inventoryStock.findUnique({ where: { ingredientId: data.ingredientId } });
     if (!stock) {
       const err = new Error("No stock record found for this ingredient");
@@ -55,6 +67,7 @@ export const createAdjustment = (data) =>
 
     const adjustment = await tx.stockAdjustment.create({
       data: {
+        outletId,
         ingredientId: data.ingredientId,
         type: data.type,
         quantity: adjQty,
@@ -73,11 +86,12 @@ export const createAdjustment = (data) =>
     // An INCREASE (e.g. "found extra stock during count") has no batch/expiry
     // to attach to, so it's left untracked at the batch level.
     if (data.type === "DECREASE") {
-      await decrementExpiryBatchesFefo(tx, data.ingredientId, adjQty);
+      await decrementExpiryBatchesFefo(tx, data.ingredientId, adjQty, outletId);
     }
 
     await tx.stockMovement.create({
       data: {
+        outletId,
         ingredientId: data.ingredientId,
         type: "ADJUSTMENT",
         quantity: signedQty,
@@ -86,7 +100,6 @@ export const createAdjustment = (data) =>
         reason: data.reason,
         referenceId: adjustment.id,
         userId: data.userId || null,
-        store: data.store || "Main Store",
       },
     });
 

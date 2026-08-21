@@ -5,6 +5,8 @@
 import { Router } from "express";
 import {
   loginHandler,
+  selectOutletHandler,
+  switchOutletHandler,
   refreshHandler,
   logoutHandler,
   meHandler,
@@ -22,6 +24,8 @@ import {
 } from "../middleware/rateLimiters.js";
 import {
   loginSchema,
+  selectOutletSchema,
+  switchOutletSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
@@ -32,6 +36,15 @@ const router = Router();
 
 // Public — rate limiting + validation added; previously had neither.
 router.post("/login", loginRateLimiter, validate(loginSchema), loginHandler);
+// Same rate limiter as /login — this is still the login flow, just its
+// second step, and carries the same brute-force risk (guessing outletId
+// against a stolen/guessed preAuthToken).
+router.post(
+  "/select-outlet",
+  loginRateLimiter,
+  validate(selectOutletSchema),
+  selectOutletHandler,
+);
 router.post("/refresh", refreshHandler);
 router.post("/logout", logoutHandler);
 router.post(
@@ -49,6 +62,14 @@ router.post(
 
 // Protected
 router.get("/me", requireAuth, meHandler);
+// Header outlet-switcher — requires a real, already-valid session, unlike
+// /select-outlet above which is only for the login-time picker.
+router.post(
+  "/switch-outlet",
+  requireAuth,
+  validate(switchOutletSchema),
+  switchOutletHandler,
+);
 router.put(
   "/me",
   requireAuth,

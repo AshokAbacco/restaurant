@@ -6,6 +6,8 @@ import bcrypt from "bcrypt";
 import prisma from "../../prisma/client.js";
 import {
   signAccessToken,
+  signPreAuthToken,
+  verifyPreAuthToken,
   generateRefreshToken,
   hashToken,
   REFRESH_TOKEN_TTL_MS,
@@ -19,9 +21,21 @@ const MAX_FAILED_ATTEMPTS = 15;
 // const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 const LOCK_DURATION_MS = 30 * 1000; // 30 seconds
 
-// Employee include shared by every lookup that needs to build a publicUser()
-// — always pulls address along, since the Profile page shows/edits it.
-const EMPLOYEE_INCLUDE = { employee: { include: { address: true } } };
+// Roles that manage across the whole organization rather than one physical
+// branch — these are the only accounts that ever see an outlet switcher.
+// Everyone else's Employee row is pinned to one outlet (see schema.prisma's
+// Employee.outletId, required) and that's simply their session's outlet —
+// there's nothing to choose between.
+const CROSS_OUTLET_ROLES = ["OWNER", "ADMIN"];
+const isCrossOutletRole = (role) => CROSS_OUTLET_ROLES.includes(role);
+
+// Account include shared by every lookup that needs to build a publicUser()
+// — pulls the employee's address (Profile page shows/edits it), the
+// employee's home outlet, and the account's organization.
+const ACCOUNT_INCLUDE = {
+  employee: { include: { address: true, outlet: true } },
+  organization: true,
+};
 
 // ==============================================
 // SHARED HELPERS
@@ -31,10 +45,16 @@ const EMPLOYEE_INCLUDE = { employee: { include: { address: true } } };
 // carry everything the Profile page shows — personal details, employment
 // info (read-only there), and address. Every place that previously did
 // `include: { employee: true }` now needs `include: { employee: { include:
-// { address: true } } }` (see EMPLOYEE_INCLUDE above) for `emp.address` to
-// exist here.
-const publicUser = (userAccount) => {
+// { address: true, outlet: true } } }` (see ACCOUNT_INCLUDE above) for
+// `emp.address`/`emp.outlet` to exist here.
+// activeOutlet is the outlet this particular SESSION is scoped to — for a
+// cross-outlet OWNER/ADMIN this can be any outlet in their organization
+// (whichever they picked at login/switch), not necessarily their employee
+// record's home outlet, so it's passed in separately rather than always
+// read off emp.outlet.
+const publicUser = (userAccount, activeOutlet) => {
   const emp = userAccount.employee;
+  const outlet = activeOutlet || emp.outlet || null;
 
   return {
     id: emp.id,
@@ -57,7 +77,14 @@ const publicUser = (userAccount) => {
     designation: emp.designation,
     joiningDate: emp.joiningDate,
     employmentType: emp.employmentType || "",
-    store: emp.store,
+
+    // Multi-tenancy — organization is fixed for the account; outlet is
+    // this session's active outlet (see client/src outlet switcher, built
+    // in section 0.6).
+    organization: userAccount.organization
+      ? { id: userAccount.organization.id, name: userAccount.organization.name }
+      : null,
+    outlet: outlet ? { id: outlet.id, name: outlet.name } : null,
 
     // Address — editable via updateProfile() below
     address: emp.address
@@ -72,16 +99,75 @@ const publicUser = (userAccount) => {
   };
 };
 
+// username is only unique WITHIN an organization now (schema.prisma:
+// @@unique([organizationId, username])) — the same username can legitimately
+// exist in two different restaurants' organizations. email stays globally
+// unique, so it's the unambiguous path; username needs a disambiguation
+// check since more than one account can now match.
 const findAccountByIdentifier = async (identifier) => {
-  return prisma.userAccount.findFirst({
-    where: {
-      OR: [
-        { email: identifier.toLowerCase() },
-        { username: identifier.toLowerCase() },
-      ],
-    },
-    include: EMPLOYEE_INCLUDE,
+  const value = identifier.toLowerCase();
+
+  if (value.includes("@")) {
+    return prisma.userAccount.findUnique({
+      where: { email: value },
+      include: ACCOUNT_INCLUDE,
+    });
+  }
+
+  const matches = await prisma.userAccount.findMany({
+    where: { username: value },
+    include: ACCOUNT_INCLUDE,
   });
+
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+  // Same username exists in more than one organization — caller must
+  // disambiguate with email instead of us silently picking one.
+  return { ambiguousUsername: true };
+};
+
+// Resolve which outlet(s) an already-authenticated account may open a
+// session against. OWNER/ADMIN can pick any active outlet in their
+// organization; everyone else is pinned to their Employee record's outlet.
+const resolveAccessibleOutlets = async (account) => {
+  if (isCrossOutletRole(account.role)) {
+    return prisma.outlet.findMany({
+      where: { organizationId: account.organizationId, isActive: true },
+      orderBy: { name: "asc" },
+    });
+  }
+  return account.employee.outlet ? [account.employee.outlet] : [];
+};
+
+// Shared by login() (when there's only one accessible outlet, so no
+// selection step is needed) and selectOutlet() (after a selection step) —
+// issues the real session: access token + persisted refresh token.
+const finalizeLogin = async (account, outlet) => {
+  const accessToken = signAccessToken({
+    sub: account.id,
+    employeeId: account.employeeId,
+    organizationId: account.organizationId,
+    outletId: outlet.id,
+    role: account.role,
+  });
+
+  const rawRefreshToken = generateRefreshToken();
+
+  await prisma.refreshToken.create({
+    data: {
+      userAccountId: account.id,
+      outletId: outlet.id,
+      tokenHash: hashToken(rawRefreshToken),
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    },
+  });
+
+  return {
+    success: true,
+    user: publicUser(account, outlet),
+    accessToken,
+    refreshToken: rawRefreshToken,
+  };
 };
 
 // ==============================================
@@ -101,6 +187,15 @@ export const login = async (identifier, password) => {
 
   if (!account) {
     return { success: false, status: 401, message: "Invalid credentials." };
+  }
+
+  if (account.ambiguousUsername) {
+    return {
+      success: false,
+      status: 409,
+      message:
+        "This username exists in more than one organization. Please log in with your email instead.",
+    };
   }
 
   if (account.lockedUntil && account.lockedUntil > new Date()) {
@@ -148,25 +243,88 @@ export const login = async (identifier, password) => {
     },
   });
 
-  const user = publicUser(account);
+  const accessibleOutlets = await resolveAccessibleOutlets(account);
 
-  const accessToken = signAccessToken({
-    sub: account.id,
-    employeeId: account.employeeId,
-    role: account.role,
+  if (accessibleOutlets.length === 0) {
+    return {
+      success: false,
+      status: 403,
+      message:
+        "No active outlet is available for this account. Contact your organization owner.",
+    };
+  }
+
+  // Single accessible outlet — most staff, and single-outlet organizations
+  // — skip the selection step entirely and log straight in, same shape as
+  // before this change.
+  if (accessibleOutlets.length === 1) {
+    return finalizeLogin(account, accessibleOutlets[0]);
+  }
+
+  // More than one outlet (an OWNER/ADMIN on a multi-outlet organization) —
+  // don't issue a full session yet. Hand back a short-lived pre-auth token
+  // and the outlet list; the frontend must call POST /api/auth/select-outlet
+  // before a real accessToken/refreshToken pair exists. No refresh cookie
+  // is set at this point (see auth.controller.js's loginHandler).
+  return {
+    success: true,
+    requiresOutletSelection: true,
+    preAuthToken: signPreAuthToken({ sub: account.id }),
+    outlets: accessibleOutlets.map((o) => ({ id: o.id, name: o.name })),
+  };
+};
+
+// ==============================================
+// SELECT OUTLET (second step of login, only when login() returned
+// requiresOutletSelection: true)
+// ==============================================
+
+export const selectOutlet = async (rawPreAuthToken, outletId) => {
+  if (!rawPreAuthToken || !outletId) {
+    return {
+      success: false,
+      status: 400,
+      message: "Session token and outlet are required.",
+    };
+  }
+
+  let payload;
+  try {
+    payload = verifyPreAuthToken(rawPreAuthToken);
+  } catch {
+    return {
+      success: false,
+      status: 401,
+      message: "Outlet selection session expired. Please log in again.",
+    };
+  }
+
+  const account = await prisma.userAccount.findUnique({
+    where: { id: payload.sub },
+    include: ACCOUNT_INCLUDE,
   });
 
-  const rawRefreshToken = generateRefreshToken();
+  if (!account || !account.isActive) {
+    return { success: false, status: 401, message: "Session invalid." };
+  }
 
-  await prisma.refreshToken.create({
-    data: {
-      userAccountId: account.id,
-      tokenHash: hashToken(rawRefreshToken),
-      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
-    },
+  const accessibleOutlets = await resolveAccessibleOutlets(account);
+  const outlet = accessibleOutlets.find((o) => o.id === outletId);
+
+  if (!outlet) {
+    return {
+      success: false,
+      status: 403,
+      message: "You don't have access to that outlet.",
+    };
+  }
+
+  await prisma.userAccount.update({
+    where: { id: account.id },
+    data: { lastLoginAt: new Date() },
   });
 
-  return { success: true, user, accessToken, refreshToken: rawRefreshToken };
+  return finalizeLogin(account, outlet);
 };
 
 // ==============================================
@@ -186,7 +344,10 @@ export const refreshAccessToken = async (rawRefreshToken) => {
 
   const stored = await prisma.refreshToken.findUnique({
     where: { tokenHash },
-    include: { userAccount: { include: EMPLOYEE_INCLUDE } },
+    include: {
+      userAccount: { include: ACCOUNT_INCLUDE },
+      outlet: true,
+    },
   });
 
   if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
@@ -207,13 +368,31 @@ export const refreshAccessToken = async (rawRefreshToken) => {
     };
   }
 
+  // The outlet this specific session was scoped to at login/select-outlet
+  // time (see finalizeLogin) — re-verify it's still active rather than
+  // trusting the stored row forever, since an owner can deactivate an
+  // outlet out from under an existing session.
+  if (!stored.outlet.isActive) {
+    return {
+      success: false,
+      status: 403,
+      message: "This outlet is no longer active. Please log in again.",
+    };
+  }
+
   const accessToken = signAccessToken({
     sub: account.id,
     employeeId: account.employeeId,
+    organizationId: account.organizationId,
+    outletId: stored.outlet.id,
     role: account.role,
   });
 
-  return { success: true, accessToken, user: publicUser(account) };
+  return {
+    success: true,
+    accessToken,
+    user: publicUser(account, stored.outlet),
+  };
 };
 
 // ==============================================
@@ -236,27 +415,77 @@ export const logout = async (rawRefreshToken) => {
 };
 
 // ==============================================
-// GET CURRENT USER (session restore)
+// SWITCH OUTLET (already-authenticated session — the header switcher)
+// Distinct from selectOutlet() above, which is only for the login-time
+// picker and requires a preAuthToken since no real session exists yet at
+// that point. This is called with a normal, already-valid access token —
+// the account is read from userAccountId (req.user.id, set by requireAuth)
+// rather than from a token payload we have to verify separately.
 // ==============================================
 
-export const getCurrentUser = async (userAccountId) => {
+export const switchOutlet = async (userAccountId, outletId) => {
   const account = await prisma.userAccount.findUnique({
     where: { id: userAccountId },
-    include: EMPLOYEE_INCLUDE,
+    include: ACCOUNT_INCLUDE,
   });
 
   if (!account || !account.isActive) {
     return { success: false, status: 401, message: "Session invalid." };
   }
 
-  return { success: true, user: publicUser(account) };
+  const accessibleOutlets = await resolveAccessibleOutlets(account);
+  const outlet = accessibleOutlets.find((o) => o.id === outletId);
+
+  if (!outlet) {
+    return {
+      success: false,
+      status: 403,
+      message: "You don't have access to that outlet.",
+    };
+  }
+
+  // Deliberately does NOT revoke the account's other refresh tokens —
+  // switching outlets in one tab/device shouldn't kill a session an
+  // OWNER/ADMIN may have open on a different outlet elsewhere (see the
+  // comment on RefreshToken.outletId in schema.prisma).
+  return finalizeLogin(account, outlet);
+};
+
+// ==============================================
+// GET CURRENT USER (session restore)
+// activeOutletId comes from the verified access token (req.user.outletId,
+// see auth.middleware.js) — this also returns the full list of outlets the
+// account can switch between, for the outlet-switcher UI (section 0.6).
+// ==============================================
+
+export const getCurrentUser = async (userAccountId, activeOutletId) => {
+  const account = await prisma.userAccount.findUnique({
+    where: { id: userAccountId },
+    include: ACCOUNT_INCLUDE,
+  });
+
+  if (!account || !account.isActive) {
+    return { success: false, status: 401, message: "Session invalid." };
+  }
+
+  const accessibleOutlets = await resolveAccessibleOutlets(account);
+  const activeOutlet =
+    accessibleOutlets.find((o) => o.id === activeOutletId) ||
+    accessibleOutlets[0] ||
+    null;
+
+  return {
+    success: true,
+    user: publicUser(account, activeOutlet),
+    outlets: accessibleOutlets.map((o) => ({ id: o.id, name: o.name })),
+  };
 };
 
 // ==============================================
 // UPDATE MY PROFILE (self-service)
 // FEATURE: powers the Profile page's Edit mode. Deliberately scoped to a
 // small allow-list of Employee fields — name/personal-details/address —
-// NOT role, department, designation, employeeCode, status, or store, which
+// NOT role, department, designation, employeeCode, status, or outlet, which
 // stay admin-managed via the Employees module. Email/username also aren't
 // editable here since they double as login identifiers.
 // ==============================================
@@ -269,7 +498,7 @@ const EDITABLE_EMPLOYEE_FIELDS = [
   "photoUrl",
 ];
 
-export const updateProfile = async (userAccountId, payload = {}) => {
+export const updateProfile = async (userAccountId, payload = {}, activeOutletId) => {
   const account = await prisma.userAccount.findUnique({
     where: { id: userAccountId },
     select: { employeeId: true },
@@ -331,10 +560,16 @@ export const updateProfile = async (userAccountId, payload = {}) => {
 
   const updatedAccount = await prisma.userAccount.findUnique({
     where: { id: userAccountId },
-    include: EMPLOYEE_INCLUDE,
+    include: ACCOUNT_INCLUDE,
   });
 
-  return { success: true, user: publicUser(updatedAccount) };
+  const accessibleOutlets = await resolveAccessibleOutlets(updatedAccount);
+  const activeOutlet =
+    accessibleOutlets.find((o) => o.id === activeOutletId) ||
+    accessibleOutlets[0] ||
+    null;
+
+  return { success: true, user: publicUser(updatedAccount, activeOutlet) };
 };
 
 // ==============================================

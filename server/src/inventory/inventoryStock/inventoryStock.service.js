@@ -1,11 +1,12 @@
-// server\src\inventory\service\inventoryStock.service.js
+// server/src/inventory/inventoryStock/inventoryStock.service.js
 // Read model over current on-hand stock. Quantities are only ever changed via
 // StockMovement-producing actions (purchase entries, adjustments, wastage,
 // recipe consumption) added in later phases — this module is read-only for now.
 import prisma from "../../config/prisma.js";
 
-export const listStock = () =>
+export const listStock = (outletId) =>
   prisma.inventoryStock.findMany({
+    where: { outletId },
     include: {
       ingredient: {
         include: { category: true, consumptionUnit: true },
@@ -14,9 +15,13 @@ export const listStock = () =>
     orderBy: { ingredient: { name: "asc" } },
   });
 
-export const getStockByIngredientId = (ingredientId) =>
-  prisma.inventoryStock.findUnique({
-    where: { ingredientId },
+// ingredientId alone is still the unique lookup key on InventoryStock (1:1
+// with Ingredient) — outletId is added as a defense-in-depth filter, not
+// because the lookup would otherwise be ambiguous, same reasoning as the
+// FEFO helper's outletId param.
+export const getStockByIngredientId = (ingredientId, outletId) =>
+  prisma.inventoryStock.findFirst({
+    where: { ingredientId, outletId },
     include: {
       ingredient: {
         include: { category: true, consumptionUnit: true },
@@ -24,8 +29,9 @@ export const getStockByIngredientId = (ingredientId) =>
     },
   });
 
-export const getDashboardSummary = async () => {
+export const getDashboardSummary = async (outletId) => {
   const stock = await prisma.inventoryStock.findMany({
+    where: { outletId },
     include: { ingredient: true },
   });
 

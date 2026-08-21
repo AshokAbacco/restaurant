@@ -29,10 +29,10 @@ const toPaise = (rupees) => Math.round(Number(rupees) * 100);
 
 // Shapes DB rows into exactly what the kiosk UI needs — never leak
 // costPrice, sku, barcode, kitchenSectionId etc. to a customer-facing screen.
-export const getKioskMenu = async () => {
+export const getKioskMenu = async (outletId) => {
   const [categories, items] = await Promise.all([
-    repo.findKioskCategories(),
-    repo.findKioskMenuItems(),
+    repo.findKioskCategories(outletId),
+    repo.findKioskMenuItems(outletId),
   ]);
 
   const menuItems = items.map((item) => ({
@@ -65,8 +65,8 @@ export const getKioskMenu = async () => {
   };
 };
 
-export const getAddOnsForMenuItem = async (menuItemId) => {
-  const links = await repo.findAddOnsForMenuItem(menuItemId);
+export const getAddOnsForMenuItem = async (menuItemId, outletId) => {
+  const links = await repo.findAddOnsForMenuItem(menuItemId, outletId);
   return links.map((link) => ({
     id: link.addOn.id,
     name: link.addOn.name,
@@ -78,8 +78,8 @@ export const getAddOnsForMenuItem = async (menuItemId) => {
 // TABLES
 // ==================================================
 
-export const getAvailableTables = async (store) => {
-  const tables = await repo.findFreeTables(store);
+export const getAvailableTables = async (outletId) => {
+  const tables = await repo.findFreeTables(outletId);
   return tables.map((t) => ({
     id: t.id,
     name: t.name,
@@ -104,11 +104,11 @@ const buildOrderNumber = (seq) => {
 
 // Retries on a unique-constraint collision instead of locking the table —
 // safe under kiosk-scale concurrency (a handful of devices, not thousands).
-const generateOrderNumber = async () => {
+const generateOrderNumber = async (outletId) => {
   for (let attempt = 0; attempt < 5; attempt++) {
-    const countToday = await repo.countOrdersCreatedToday();
+    const countToday = await repo.countOrdersCreatedToday(outletId);
     const candidate = buildOrderNumber(countToday + 1 + attempt);
-    const existing = await repo.findOrderByOrderNumber(candidate);
+    const existing = await repo.findOrderByOrderNumber(candidate, outletId);
     if (!existing) return candidate;
   }
   // Extremely unlikely fallback: timestamp-based, guaranteed unique.
@@ -122,13 +122,13 @@ const generateOrderNumber = async () => {
 const normalizeOrderType = (orderType) =>
   orderType === "TAKE_AWAY" ? "TAKEAWAY" : orderType;
 
-export const createOrder = async (payload) => {
+export const createOrder = async (payload, outletId) => {
   const orderType = normalizeOrderType(payload.orderType);
 
   // ---- Table validation (only if a tableId was actually sent) ----
   let table = null;
   if (payload.tableId) {
-    table = await repo.findTableById(payload.tableId);
+    table = await repo.findTableById(payload.tableId, outletId);
     if (!table) throw new AppError("Selected table does not exist", 400);
     if (table.status !== "FREE") {
       throw new AppError(
@@ -140,14 +140,14 @@ export const createOrder = async (payload) => {
 
   // ---- Load real menu items from DB (source of truth for pricing) ----
   const menuItemIds = [...new Set(payload.items.map((i) => i.menuItemId))];
-  const menuItems = await repo.findKioskMenuItemsByIds(menuItemIds);
+  const menuItems = await repo.findKioskMenuItemsByIds(menuItemIds, outletId);
   const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));
 
   const allAddOnIds = [
     ...new Set(payload.items.flatMap((i) => i.addOnIds || [])),
   ];
   const addOns = allAddOnIds.length
-    ? await repo.findAddOnsByIds(allAddOnIds)
+    ? await repo.findAddOnsByIds(allAddOnIds, outletId)
     : [];
   const addOnMap = new Map(addOns.map((a) => [a.id, a]));
 
@@ -158,6 +158,10 @@ export const createOrder = async (payload) => {
   const pricedItems = payload.items.map((reqItem, idx) => {
     const menuItem = menuItemMap.get(reqItem.menuItemId);
     if (!menuItem) {
+      // Also covers the cross-outlet case now: an id that's real but
+      // belongs to a DIFFERENT outlet won't be in menuItemMap (the lookup
+      // above is already scoped), so it fails the same "not found" path
+      // rather than silently pricing/ordering another outlet's item.
       throw new AppError(
         `Item ${idx + 1}: menu item not found or unavailable`,
         400,
@@ -213,21 +217,21 @@ export const createOrder = async (payload) => {
   const grandTotal = round2(subtotal + gstAmount + serviceChargeAmount);
 
   const customer = payload.phone
-    ? await repo.findOrCreateCustomer({
-        name: payload.customerName,
-        phone: payload.phone,
-      })
+    ? await repo.findOrCreateCustomer(
+        { name: payload.customerName, phone: payload.phone },
+        outletId,
+      )
     : null;
 
-  const orderNumber = await generateOrderNumber();
+  const orderNumber = await generateOrderNumber(outletId);
 
   const order = await repo.createOrderWithItems({
+    outletId,
     orderNumber,
     orderType,
     tableId: payload.tableId || null,
     customerId: customer?.id || null,
     notes: payload.notes,
-    store: payload.store || "Main Store",
     pricedItems,
     subtotal,
     gstAmount,
@@ -246,8 +250,8 @@ export const createOrder = async (payload) => {
 // a payment is genuinely confirmed — mirrors the POS "bill first, then send
 // to kitchen" takeaway path. Safe to call more than once for the same order:
 // if it's already past NEW (i.e. already dispatched), this is a no-op.
-async function dispatchToKitchen(orderId) {
-  const order = await repo.findOrderById(orderId);
+async function dispatchToKitchen(orderId, outletId) {
+  const order = await repo.findOrderById(orderId, outletId);
   if (!order) throw new AppError("Order not found", 404);
 
   if (order.status !== "NEW") {
@@ -259,7 +263,15 @@ async function dispatchToKitchen(orderId) {
   const orderItemIds = order.items.map((i) => i.id);
   if (orderItemIds.length) {
     try {
-      await kotService.sendToKitchen(orderId, orderItemIds);
+      // FIX: this call was missing the outletId argument that
+      // kotService.sendToKitchen has required since the multi-tenancy
+      // retrofit (signature is now (orderId, orderItemIds, outletId,
+      // client)). Without it, outletId was `undefined` inside
+      // sendToKitchen's own ownership check — which Prisma treats as "no
+      // filter on that field" rather than "match nothing," meaning the
+      // check silently passed for ANY order regardless of outlet. A real
+      // security bypass, not just a crash — now fixed.
+      await kotService.sendToKitchen(orderId, orderItemIds, outletId);
     } catch (err) {
       // Don't let a KOT problem (e.g. a menu item missing kitchenSectionId)
       // undo a payment that's already been taken — just log it so staff
@@ -267,13 +279,13 @@ async function dispatchToKitchen(orderId) {
       console.error(
         `Kiosk order ${order.orderNumber}: payment confirmed but failed to send to kitchen — ${err.message}`,
       );
-      await repo.updateOrderStatus(orderId, "ACCEPTED");
+      await repo.updateOrderStatus(orderId, "ACCEPTED", outletId);
     }
   } else {
-    await repo.updateOrderStatus(orderId, "ACCEPTED");
+    await repo.updateOrderStatus(orderId, "ACCEPTED", outletId);
   }
 
-  return serializeOrder(await repo.findOrderById(orderId));
+  return serializeOrder(await repo.findOrderById(orderId, outletId));
 }
 
 // ==================================================
@@ -286,6 +298,7 @@ async function dispatchToKitchen(orderId) {
 export const confirmPayment = async (
   orderId,
   { method, transactionReference },
+  outletId,
 ) => {
   if (method !== "CASH") {
     // UPI/CARD are handled by the dedicated Razorpay endpoints below —
@@ -297,21 +310,21 @@ export const confirmPayment = async (
     );
   }
 
-  const order = await repo.findOrderById(orderId);
+  const order = await repo.findOrderById(orderId, outletId);
   if (!order) throw new AppError("Order not found", 404);
   if (order.status === "CANCELLED")
     throw new AppError("This order was cancelled", 409);
 
-  const payment = await repo.findLatestPaymentForOrder(orderId);
+  const payment = await repo.findLatestPaymentForOrder(orderId, outletId);
   if (!payment)
     throw new AppError("No payment record found for this order", 500);
 
   await repo.updatePayment(payment.id, {
     method: "CASH",
     status: "UNPAID",
-  });
+  }, outletId);
 
-  return dispatchToKitchen(orderId);
+  return dispatchToKitchen(orderId, outletId);
 };
 
 // ==================================================
@@ -321,8 +334,8 @@ export const confirmPayment = async (
 // Creates a fixed-amount, single-use Razorpay QR code for this order and
 // returns its hosted image so the kiosk can just <img> it. Razorpay tracks
 // payments made against this QR code id — see checkQrPaymentStatus below.
-export const getUpiQr = async (orderId) => {
-  const order = await repo.findOrderById(orderId);
+export const getUpiQr = async (orderId, outletId) => {
+  const order = await repo.findOrderById(orderId, outletId);
   if (!order) throw new AppError("Order not found", 404);
   if (order.status === "CANCELLED")
     throw new AppError("This order was cancelled", 409);
@@ -339,13 +352,13 @@ export const getUpiQr = async (orderId) => {
 
   console.log(qrCode);
 
-  const payment = await repo.findLatestPaymentForOrder(orderId);
+  const payment = await repo.findLatestPaymentForOrder(orderId, outletId);
   if (payment) {
     await repo.updatePayment(payment.id, {
       method: "UPI",
       transactionReference: qrCode.id, // Razorpay QR code id — used to reconcile
       status: "UNPAID",
-    });
+    }, outletId);
   }
 
   return {
@@ -364,8 +377,8 @@ export const getUpiQr = async (orderId) => {
 // Razorpay on every frontend poll.
 const qrStatusCache = new Map();
 
-export const checkQrPaymentStatus = async (orderId) => {
-  const order = await repo.findOrderById(orderId);
+export const checkQrPaymentStatus = async (orderId, outletId) => {
+  const order = await repo.findOrderById(orderId, outletId);
   if (!order) {
     throw new AppError("Order not found", 404);
   }
@@ -380,7 +393,7 @@ export const checkQrPaymentStatus = async (orderId) => {
   if (payment.status === "PAID") {
     return {
       paid: true,
-      order: await dispatchToKitchen(orderId),
+      order: await dispatchToKitchen(orderId, outletId),
     };
   }
 
@@ -433,11 +446,11 @@ export const checkQrPaymentStatus = async (orderId) => {
     status: "PAID",
     transactionReference: captured.id,
     paidAt: new Date(),
-  });
+  }, outletId);
 
   return {
     paid: true,
-    order: await dispatchToKitchen(orderId),
+    order: await dispatchToKitchen(orderId, outletId),
   };
 };
 
@@ -449,8 +462,8 @@ export const checkQrPaymentStatus = async (orderId) => {
 // this to open Razorpay's Checkout.js popup right on the kiosk screen (test
 // mode accepts Razorpay's published test card numbers — no physical
 // terminal needed for now).
-export const createRazorpayOrderForCard = async (orderId) => {
-  const order = await repo.findOrderById(orderId);
+export const createRazorpayOrderForCard = async (orderId, outletId) => {
+  const order = await repo.findOrderById(orderId, outletId);
   if (!order) throw new AppError("Order not found", 404);
   if (order.status === "CANCELLED")
     throw new AppError("This order was cancelled", 409);
@@ -462,13 +475,13 @@ export const createRazorpayOrderForCard = async (orderId) => {
     notes: { kioskOrderId: order.id, orderNumber: order.orderNumber },
   });
 
-  const payment = await repo.findLatestPaymentForOrder(orderId);
+  const payment = await repo.findLatestPaymentForOrder(orderId, outletId);
   if (payment) {
     await repo.updatePayment(payment.id, {
       method: "CARD",
       transactionReference: rpOrder.id, // Razorpay order id — used to reconcile
       status: "UNPAID",
-    });
+    }, outletId);
   }
 
   return {
@@ -486,12 +499,13 @@ export const createRazorpayOrderForCard = async (orderId) => {
 export const verifyRazorpayCardPayment = async (
   orderId,
   { razorpay_order_id, razorpay_payment_id, razorpay_signature },
+  outletId,
 ) => {
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     throw new AppError("Missing Razorpay payment verification fields", 400);
   }
 
-  const order = await repo.findOrderById(orderId);
+  const order = await repo.findOrderById(orderId, outletId);
   if (!order) throw new AppError("Order not found", 404);
 
   const expectedSignature = crypto
@@ -503,17 +517,17 @@ export const verifyRazorpayCardPayment = async (
     throw new AppError("Payment verification failed — signature mismatch", 400);
   }
 
-  const payment = await repo.findLatestPaymentForOrder(orderId);
+  const payment = await repo.findLatestPaymentForOrder(orderId, outletId);
   if (payment) {
     await repo.updatePayment(payment.id, {
       method: "CARD",
       status: "PAID",
       transactionReference: razorpay_payment_id,
       paidAt: new Date(),
-    });
+    }, outletId);
   }
 
-  return dispatchToKitchen(orderId);
+  return dispatchToKitchen(orderId, outletId);
 };
 
 // ==================================================
@@ -534,6 +548,13 @@ export const verifyRazorpayCardPayment = async (
 //   }));
 //
 // kiosk.controller.js's razorpayWebhook reads req.rawBody if present.
+//
+// NOTE ON TENANCY: this handler deliberately does NOT go through
+// resolveKioskOutlet (see kiosk.routes.js) — Razorpay's servers call this
+// directly and have no concept of our outletId. Instead, the outlet is
+// resolved implicitly: findOrderByPaymentReference looks up the Order by
+// the (globally-unique) Razorpay reference we gave it at creation time,
+// and everything downstream uses that order's own outletId.
 export const handleRazorpayWebhook = async (rawBody, signature) => {
   if (!RAZORPAY_WEBHOOK_SECRET) {
     // Webhook secret not configured — refuse rather than silently trusting
@@ -559,16 +580,16 @@ export const handleRazorpayWebhook = async (rawBody, signature) => {
     if (qrCodeId && rpPayment) {
       const order = await repo.findOrderByPaymentReference(qrCodeId);
       if (order) {
-        const payment = await repo.findLatestPaymentForOrder(order.id);
+        const payment = await repo.findLatestPaymentForOrder(order.id, order.outletId);
         if (payment && payment.status !== "PAID") {
           await repo.updatePayment(payment.id, {
             method: "UPI",
             status: "PAID",
             transactionReference: rpPayment.id,
             paidAt: new Date(),
-          });
+          }, order.outletId);
         }
-        await dispatchToKitchen(order.id);
+        await dispatchToKitchen(order.id, order.outletId);
       }
     }
   }
@@ -579,16 +600,16 @@ export const handleRazorpayWebhook = async (rawBody, signature) => {
     if (rpOrderId) {
       const order = await repo.findOrderByPaymentReference(rpOrderId);
       if (order) {
-        const payment = await repo.findLatestPaymentForOrder(order.id);
+        const payment = await repo.findLatestPaymentForOrder(order.id, order.outletId);
         if (payment && payment.status !== "PAID") {
           await repo.updatePayment(payment.id, {
             method: payment.method === "UPI" ? "UPI" : "CARD",
             status: "PAID",
             transactionReference: rpPayment.id,
             paidAt: new Date(),
-          });
+          }, order.outletId);
         }
-        await dispatchToKitchen(order.id);
+        await dispatchToKitchen(order.id, order.outletId);
       }
     }
   }
@@ -600,21 +621,21 @@ export const handleRazorpayWebhook = async (rawBody, signature) => {
 // ORDER STATUS / LOOKUP
 // ==================================================
 
-export const getOrder = async (id) => {
-  const order = await repo.findOrderById(id);
+export const getOrder = async (id, outletId) => {
+  const order = await repo.findOrderById(id, outletId);
   if (!order) throw new AppError("Order not found", 404);
   return serializeOrder(order);
 };
 
-export const cancelOrder = async (id) => {
-  const order = await repo.findOrderById(id);
+export const cancelOrder = async (id, outletId) => {
+  const order = await repo.findOrderById(id, outletId);
   if (!order) throw new AppError("Order not found", 404);
   if (["COMPLETED", "SERVED"].includes(order.status)) {
     throw new AppError("Completed orders cannot be cancelled", 409);
   }
-  await repo.updateOrderStatus(id, "CANCELLED");
-  await repo.freeTableForOrder(id);
-  return getOrder(id);
+  await repo.updateOrderStatus(id, "CANCELLED", outletId);
+  await repo.freeTableForOrder(id, outletId);
+  return getOrder(id, outletId);
 };
 
 // ==================================================

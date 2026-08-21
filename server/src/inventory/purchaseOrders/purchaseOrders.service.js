@@ -14,9 +14,11 @@ const includeRelations = {
 // poNumber once any PurchaseOrder is ever deleted — same bug/fix as
 // pos.service.js's generateOrderNumber. Basing it on the highest number
 // actually seen removes the collision risk from deletions (concurrent-write
-// races are a separate, lower-priority concern noted below).
-const generatePoNumber = async () => {
+// races are a separate, lower-priority concern noted below). Scoped per
+// outlet now too, since poNumber is @@unique([outletId, poNumber]).
+const generatePoNumber = async (outletId) => {
   const last = await prisma.purchaseOrder.findFirst({
+    where: { outletId },
     orderBy: { poNumber: "desc" },
     select: { poNumber: true },
   });
@@ -26,8 +28,8 @@ const generatePoNumber = async () => {
   return `PO-${String(lastNum + 1).padStart(6, "0")}`;
 };
 
-export const listPurchaseOrders = ({ supplierId, status }) => {
-  const where = {};
+export const listPurchaseOrders = ({ supplierId, status }, outletId) => {
+  const where = { outletId };
   if (supplierId) where.supplierId = supplierId;
   if (status) where.status = status;
 
@@ -38,13 +40,13 @@ export const listPurchaseOrders = ({ supplierId, status }) => {
   });
 };
 
-export const getPurchaseOrderById = (id) =>
-  prisma.purchaseOrder.findUnique({ where: { id }, include: includeRelations });
+export const getPurchaseOrderById = (id, outletId) =>
+  prisma.purchaseOrder.findFirst({ where: { id, outletId }, include: includeRelations });
 
 // items: [{ ingredientId, quantity, unitPrice, taxPercent }]
-export const createPurchaseOrder = (data) =>
+export const createPurchaseOrder = (data, outletId) =>
   prisma.$transaction(async (tx) => {
-    const poNumber = await generatePoNumber();
+    const poNumber = await generatePoNumber(outletId);
 
     const itemsWithTotals = data.items.map((item) => {
       const taxPercent = item.taxPercent ?? 0;
@@ -66,6 +68,7 @@ export const createPurchaseOrder = (data) =>
 
     const purchaseOrder = await tx.purchaseOrder.create({
       data: {
+        outletId,
         poNumber,
         supplierId: data.supplierId,
         expectedDelivery: data.expectedDelivery
@@ -83,15 +86,28 @@ export const createPurchaseOrder = (data) =>
     });
   });
 
-export const updatePurchaseOrderStatus = (id, status) =>
-  prisma.purchaseOrder.update({
+export const updatePurchaseOrderStatus = async (id, status, outletId) => {
+  const existing = await prisma.purchaseOrder.findFirst({ where: { id, outletId } });
+  if (!existing) {
+    const err = new Error("Purchase order not found");
+    err.code = "P2025";
+    throw err;
+  }
+  return prisma.purchaseOrder.update({
     where: { id },
     data: { status },
     include: includeRelations,
   });
+};
 
-export const updatePurchaseOrderDetails = (id, { expectedDelivery, notes }) =>
-  prisma.purchaseOrder.update({
+export const updatePurchaseOrderDetails = async (id, { expectedDelivery, notes }, outletId) => {
+  const existing = await prisma.purchaseOrder.findFirst({ where: { id, outletId } });
+  if (!existing) {
+    const err = new Error("Purchase order not found");
+    err.code = "P2025";
+    throw err;
+  }
+  return prisma.purchaseOrder.update({
     where: { id },
     data: {
       expectedDelivery: expectedDelivery
@@ -101,12 +117,13 @@ export const updatePurchaseOrderDetails = (id, { expectedDelivery, notes }) =>
     },
     include: includeRelations,
   });
+};
 
 // Only DRAFT orders can be deleted outright — anything ORDERED/RECEIVED has
 // real-world consequences (a supplier may already be preparing it, or stock
 // already moved) so those should be CANCELLED via status update instead.
-export const deletePurchaseOrder = async (id) => {
-  const po = await prisma.purchaseOrder.findUnique({ where: { id } });
+export const deletePurchaseOrder = async (id, outletId) => {
+  const po = await prisma.purchaseOrder.findFirst({ where: { id, outletId } });
   if (!po) {
     const err = new Error("Purchase order not found");
     err.code = "P2025";

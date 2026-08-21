@@ -9,6 +9,8 @@ import prisma from "../config/prisma.js";
 
 /**
  * @param {object} entry
+ * @param {string} entry.outletId - required now that AuditLog is
+ *   outlet-scoped (schema.prisma) — every caller must pass req.tenant.outletId
  * @param {string} entry.action - e.g. "ORDER_DELETED"
  * @param {string} entry.entityType - e.g. "Order"
  * @param {string} entry.entityId
@@ -17,6 +19,7 @@ import prisma from "../config/prisma.js";
  * @param {object} [entry.metadata] - free-form extra detail
  */
 export async function writeAuditLog({
+  outletId,
   action,
   entityType,
   entityId,
@@ -24,9 +27,23 @@ export async function writeAuditLog({
   performedByRole = null,
   metadata = null,
 }) {
+  if (!outletId) {
+    // Same "never throw" contract as the DB-failure catch below — a
+    // missing outletId is a caller bug, but audit logging must still
+    // never be the thing that blocks the real action. Log loudly instead.
+    console.error(
+      "writeAuditLog called without outletId — skipping:",
+      action,
+      entityType,
+      entityId,
+    );
+    return;
+  }
+
   try {
     await prisma.auditLog.create({
       data: {
+        outletId,
         action,
         entityType,
         entityId,
@@ -50,6 +67,7 @@ export async function writeAuditLog({
 }
 
 export async function listAuditLogs({
+  outletId,
   entityType,
   entityId,
   action,
@@ -57,6 +75,7 @@ export async function listAuditLogs({
   limit = 50,
 } = {}) {
   const where = {
+    outletId,
     ...(entityType ? { entityType } : {}),
     ...(entityId ? { entityId } : {}),
     ...(action ? { action } : {}),

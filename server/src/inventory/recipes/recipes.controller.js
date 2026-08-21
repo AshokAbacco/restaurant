@@ -3,9 +3,12 @@ import * as recipesService from "./recipes.service.js";
 
 export const getRecipe = async (req, res) => {
   try {
-    const recipe = await recipesService.getRecipeForMenuItem(req.params.menuItemId);
+    const recipe = await recipesService.getRecipeForMenuItem(req.params.menuItemId, req.tenant.outletId);
     res.json(recipe);
   } catch (err) {
+    if (err.code === "P2025") {
+      return res.status(404).json({ message: err.message });
+    }
     res.status(500).json({ message: "Failed to fetch recipe", error: err.message });
   }
 };
@@ -23,9 +26,12 @@ export const setRecipe = async (req, res) => {
         .json({ message: "Each ingredient requires ingredientId and quantity" });
     }
 
-    const recipe = await recipesService.setRecipe(req.params.menuItemId, ingredients);
+    const recipe = await recipesService.setRecipe(req.params.menuItemId, ingredients, req.tenant.outletId);
     res.json(recipe);
   } catch (err) {
+    if (err.code === "P2025") {
+      return res.status(404).json({ message: err.message });
+    }
     if (err.code === "P2003") {
       return res.status(400).json({ message: "Invalid menuItemId or ingredientId reference" });
     }
@@ -43,10 +49,14 @@ export const upsertRecipeIngredient = async (req, res) => {
     const line = await recipesService.upsertRecipeIngredient(
       req.params.menuItemId,
       ingredientId,
-      quantity
+      quantity,
+      req.tenant.outletId,
     );
     res.status(201).json(line);
   } catch (err) {
+    if (err.code === "P2025") {
+      return res.status(404).json({ message: err.message });
+    }
     if (err.code === "P2003") {
       return res.status(400).json({ message: "Invalid menuItemId or ingredientId reference" });
     }
@@ -56,7 +66,11 @@ export const upsertRecipeIngredient = async (req, res) => {
 
 export const removeRecipeIngredient = async (req, res) => {
   try {
-    await recipesService.removeRecipeIngredient(req.params.menuItemId, req.params.ingredientId);
+    await recipesService.removeRecipeIngredient(
+      req.params.menuItemId,
+      req.params.ingredientId,
+      req.tenant.outletId,
+    );
     res.status(204).send();
   } catch (err) {
     if (err.code === "P2025") {

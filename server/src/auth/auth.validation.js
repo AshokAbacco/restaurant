@@ -28,6 +28,23 @@ export const forgotPasswordSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
 });
 
+// POST /api/auth/select-outlet — second step of login when the account has
+// access to more than one outlet (see auth.service.js's login()). Both
+// fields come from the client, but preAuthToken is itself the proof of
+// having already passed the password check, not a normal Bearer token.
+export const selectOutletSchema = z.object({
+  preAuthToken: z.string().min(1, "Session token is required."),
+  outletId: z.string().min(1, "Outlet is required."),
+});
+
+// POST /api/auth/switch-outlet — the header switcher, used from an
+// already-authenticated session. No preAuthToken needed here (unlike
+// selectOutletSchema above) since requireAuth already establishes who's
+// asking; only the destination outlet needs to be specified.
+export const switchOutletSchema = z.object({
+  outletId: z.string().min(1, "Outlet is required."),
+});
+
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required."),
   password: z.string().min(8, "Password must be at least 8 characters."),
