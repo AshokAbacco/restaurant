@@ -1,4 +1,4 @@
-// server/src/pos/reservations/reservations.service.js
+// server/src/reservations/reservations.service.js
 //
 // Data-access + business rules for table reservations. Pure functions — no
 // req/res here — same pattern as tables.service.js.
@@ -11,11 +11,14 @@
 // Conflict checking below only looks at other reservations on the same
 // table (status BOOKED or SEATED) whose time window overlaps — it never
 // reads or writes RestaurantTable.status.
+//
+// Scoping: every reservation belongs to an outlet via `outletId` (the
+// TableReservation.outlet relation), matching the multi-tenant pattern used
+// across the rest of the app (req.tenant.outletId, populated by
+// requireOutletContext). There is no "store" field on this model.
 // ------------------------------------------------------------------
 
 import prisma from "../config/prisma.js";
-
-const DEFAULT_STORE = "Main Store";
 
 // Statuses that still "hold" a table slot (used for conflict checking).
 const ACTIVE_RESERVATION_STATUSES = ["BOOKED", "SEATED"];
@@ -23,7 +26,7 @@ const ACTIVE_RESERVATION_STATUSES = ["BOOKED", "SEATED"];
 const RESERVATION_SELECT = {
   id: true,
   tableId: true,
-  store: true,
+  outletId: true,
   customerName: true,
   customerPhone: true,
   partySize: true,
@@ -31,7 +34,7 @@ const RESERVATION_SELECT = {
   durationMinutes: true,
   status: true,
   notes: true,
-  createdBy: true,
+  createdById: true,
   seatedAt: true,
   cancelledAt: true,
   noShowAt: true,
@@ -46,7 +49,7 @@ const RESERVATION_SELECT = {
       floor: { select: { id: true, name: true } },
     },
   },
-  createdByEmployee: {
+  createdBy: {
     select: { id: true, fullName: true, employeeCode: true },
   },
 };
@@ -74,13 +77,13 @@ function assertRequiredFields({
   }
 }
 
-async function assertTableInStore(tableId, store) {
+async function assertTableInOutlet(tableId, outletId) {
   const table = await prisma.restaurantTable.findFirst({
-    where: { id: tableId, store },
+    where: { id: tableId, outletId },
     select: { id: true },
   });
   if (!table) {
-    throw new Error("Selected table does not exist in this store");
+    throw new Error("Selected table does not exist in this outlet");
   }
 }
 
@@ -122,10 +125,10 @@ async function assertNoConflict({
 // ==============================================
 
 // filters: { date, status, tableId, customer, phone }
-export async function listReservations(store = DEFAULT_STORE, filters = {}) {
+export async function listReservations(outletId, filters = {}) {
   const { date, status, tableId, customer, phone } = filters;
 
-  const where = { store };
+  const where = { outletId };
 
   if (status) where.status = status;
   if (tableId) where.tableId = tableId;
@@ -151,9 +154,9 @@ export async function listReservations(store = DEFAULT_STORE, filters = {}) {
   });
 }
 
-export async function getReservationById(id, store = DEFAULT_STORE) {
+export async function getReservationById(id, outletId) {
   return prisma.tableReservation.findFirst({
-    where: { id, store },
+    where: { id, outletId },
     select: RESERVATION_SELECT,
   });
 }
@@ -170,7 +173,7 @@ export async function createReservation({
   reservedFor,
   durationMinutes,
   notes,
-  store = DEFAULT_STORE,
+  outletId,
   createdBy,
 }) {
   assertRequiredFields({
@@ -183,28 +186,28 @@ export async function createReservation({
 
   const duration = durationMinutes ? Number(durationMinutes) : 60;
 
-  await assertTableInStore(tableId, store);
+  await assertTableInOutlet(tableId, outletId);
   await assertNoConflict({ tableId, reservedFor, durationMinutes: duration });
 
   return prisma.tableReservation.create({
     data: {
       tableId,
-      store,
+      outletId,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       partySize: Number(partySize),
       reservedFor: new Date(reservedFor),
       durationMinutes: duration,
       notes: notes?.trim() || null,
-      createdBy: createdBy || null,
+      createdById: createdBy || null,
     },
     select: RESERVATION_SELECT,
   });
 }
 
-export async function updateReservation(id, store, data) {
+export async function updateReservation(id, outletId, data) {
   const existing = await prisma.tableReservation.findFirst({
-    where: { id, store },
+    where: { id, outletId },
     select: { id: true, tableId: true, status: true },
   });
   if (!existing) throw new Error("Reservation not found");
@@ -231,7 +234,7 @@ export async function updateReservation(id, store, data) {
     durationMinutes !== undefined ? Number(durationMinutes) : undefined;
 
   if (tableId) {
-    await assertTableInStore(tableId, store);
+    await assertTableInOutlet(tableId, outletId);
   }
 
   // Only re-check conflicts if something time/table-relevant changed.
@@ -271,9 +274,9 @@ export async function updateReservation(id, store, data) {
 // STATUS TRANSITIONS
 // ==============================================
 
-async function transition(id, store, fromStatuses, toStatus, timestampField) {
+async function transition(id, outletId, fromStatuses, toStatus, timestampField) {
   const existing = await prisma.tableReservation.findFirst({
-    where: { id, store },
+    where: { id, outletId },
     select: { id: true, status: true },
   });
   if (!existing) throw new Error("Reservation not found");
@@ -294,22 +297,22 @@ async function transition(id, store, fromStatuses, toStatus, timestampField) {
   });
 }
 
-export async function seatReservation(id, store) {
+export async function seatReservation(id, outletId) {
   // BOOKED -> SEATED. Deliberately does NOT touch RestaurantTable.status —
   // that continues to be driven by the existing order/KOT/billing flow.
-  return transition(id, store, ["BOOKED"], "SEATED", "seatedAt");
+  return transition(id, outletId, ["BOOKED"], "SEATED", "seatedAt");
 }
 
-export async function cancelReservation(id, store) {
-  return transition(id, store, ["BOOKED"], "CANCELLED", "cancelledAt");
+export async function cancelReservation(id, outletId) {
+  return transition(id, outletId, ["BOOKED"], "CANCELLED", "cancelledAt");
 }
 
-export async function noShowReservation(id, store) {
-  return transition(id, store, ["BOOKED"], "NO_SHOW", "noShowAt");
+export async function noShowReservation(id, outletId) {
+  return transition(id, outletId, ["BOOKED"], "NO_SHOW", "noShowAt");
 }
 
-export async function completeReservation(id, store) {
-  return transition(id, store, ["SEATED"], "COMPLETED", "completedAt");
+export async function completeReservation(id, outletId) {
+  return transition(id, outletId, ["SEATED"], "COMPLETED", "completedAt");
 }
 
 // ==============================================

@@ -190,6 +190,57 @@ async function getEmployeePerformance(req, res) {
 }
 
 /**
+ * GET /api/reports/counter-summary
+ * Phase 2.2 — grouped by billing counter/terminal.
+ */
+async function getCounterSummary(req, res) {
+  try {
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
+    const data = await reportsService.getCounterSummary(filters);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("[reports.controller] getCounterSummary failed:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load counter summary." });
+  }
+}
+
+/**
+ * GET /api/reports/assignee-wise-summary
+ * Phase 2.2 — same column shape as counter-summary, grouped by waiter/assignee.
+ */
+async function getAssigneeWiseSummary(req, res) {
+  try {
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
+    const data = await reportsService.getAssigneeWiseSummary(filters);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("[reports.controller] getAssigneeWiseSummary failed:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load assignee-wise summary." });
+  }
+}
+
+/**
+ * GET /api/reports/settlement-summary
+ * Phase 2.2 — outlet-wide collected-vs-outstanding view for the period.
+ */
+async function getSettlementSummary(req, res) {
+  try {
+    const filters = reportsService.parseFilters(req.query, req.tenant.outletId);
+    const data = await reportsService.getSettlementSummary(filters);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("[reports.controller] getSettlementSummary failed:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load settlement summary." });
+  }
+}
+
+/**
  * GET /api/reports/customer-analytics
  */
 async function getCustomerAnalytics(req, res) {
@@ -317,5 +368,8 @@ export default {
   getInventoryAlerts,
   getKitchenPerformance,
   getRecentTransactions,
+  getCounterSummary,
+  getAssigneeWiseSummary,
+  getSettlementSummary,
   exportReport,
 };

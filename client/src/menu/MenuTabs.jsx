@@ -1,7 +1,7 @@
 // client/src/menu/MenuTabs.jsx
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { FiCoffee, FiGrid, FiLayers, FiTag, FiPackage, FiBarChart2 } from "react-icons/fi";
+import { FiCoffee, FiGrid, FiLayers, FiTag, FiPackage, FiBarChart2, FiPower } from "react-icons/fi";
 
 const tabs = [
   { label: "Menu Items", to: "/menu", icon: <FiCoffee size={15} />, end: true },
@@ -10,6 +10,7 @@ const tabs = [
   { label: "Kitchen Sections", to: "/menu/kitchen-sections", icon: <FiTag size={15} />, end: false },
   { label: "Add-ons", to: "/menu/addons", icon: <FiTag size={15} />, end: false },
   { label: "Combo Meals", to: "/menu/combos", icon: <FiPackage size={15} />, end: false },
+  { label: "On/Off", to: "/menu/on-off", icon: <FiPower size={15} />, end: false },
   { label: "Reports", to: "/menu/reports", icon: <FiBarChart2 size={15} />, end: false },
 ];
 

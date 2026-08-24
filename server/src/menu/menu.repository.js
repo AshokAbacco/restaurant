@@ -146,11 +146,12 @@ export const updateVariant = (id, data) =>
 export const deleteVariant = (id) => prisma.menuVariant.delete({ where: { id } });
 
 // ---------- Add-ons ----------
-// NOTE: this duplicates server/src/pos/add-ons/addOns.service.js almost
-// exactly — same AddOn model, same CRUD shape, reachable at a different
-// URL (/api/addons here vs /api/pos/add-ons there). Both are now correctly
-// outlet-scoped, but this is worth consolidating onto one implementation;
-// see the note left in menu.service.js's Add-ons section.
+// NOTE: server/src/pos/add-ons/ used to duplicate this section almost
+// exactly with its own separate CRUD — that's been consolidated; the
+// pos/add-ons controller now delegates to menu.service.js's functions
+// below instead of maintaining its own copy. /api/pos/add-ons stays as a
+// URL (the POS order screen's add-on picker reads from it), it's just
+// backed by this same code now.
 
 export const findAllAddOns = (outletId) =>
   prisma.addOn.findMany({ where: { outletId }, orderBy: { name: "asc" } });

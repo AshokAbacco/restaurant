@@ -8,6 +8,7 @@ import KitchenSections from "./pages/KitchenSections";
 import AddOns from "./pages/AddOns";
 import Combos from "./pages/Combos";
 import Reports from "./pages/Reports";
+import MenuItemToggle from "./pages/MenuItemToggle";
 
 const MenuRoutes = () => {
   return (
@@ -20,6 +21,7 @@ const MenuRoutes = () => {
         <Route path="addons" element={<AddOns />} />
         <Route path="combos" element={<Combos />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="on-off" element={<MenuItemToggle />} />
       </Route>
     </Routes>
   );

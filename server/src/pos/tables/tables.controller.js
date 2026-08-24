@@ -310,3 +310,99 @@ export async function getMyTableDetail(req, res) {
       .json({ message: "Failed to fetch table detail", error: err.message });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Table Reservations (Phase 1.3)
+// ---------------------------------------------------------------------------
+
+export async function getReservations(req, res) {
+  try {
+    const { date, tableId, status } = req.query;
+    const reservations = await tablesService.listReservations(
+      { date, tableId, status },
+      req.tenant.outletId,
+    );
+    res.json(reservations);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch reservations", error: err.message });
+  }
+}
+
+export async function getReservation(req, res) {
+  try {
+    const reservation = await tablesService.getReservationById(
+      req.params.id,
+      req.tenant.outletId,
+    );
+    if (!reservation)
+      return res.status(404).json({ message: "Reservation not found" });
+    res.json(reservation);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch reservation", error: err.message });
+  }
+}
+
+export async function createReservation(req, res) {
+  try {
+    const reservation = await tablesService.createReservation(
+      { ...req.body, createdById: req.user?.employeeId },
+      req.tenant.outletId,
+    );
+    res.status(201).json(reservation);
+  } catch (err) {
+    if (err.code === "RESERVATION_CONFLICT") {
+      return res.status(409).json({ message: err.message });
+    }
+    res
+      .status(400)
+      .json({ message: "Failed to create reservation", error: err.message });
+  }
+}
+
+export async function updateReservation(req, res) {
+  try {
+    const reservation = await tablesService.updateReservation(
+      req.params.id,
+      req.body,
+      req.tenant.outletId,
+    );
+    res.json(reservation);
+  } catch (err) {
+    res
+      .status(400)
+      .json({ message: "Failed to update reservation", error: err.message });
+  }
+}
+
+export async function seatReservation(req, res) {
+  try {
+    const reservation = await tablesService.seatReservation(
+      req.params.id,
+      req.tenant.outletId,
+    );
+    res.json(reservation);
+  } catch (err) {
+    res
+      .status(400)
+      .json({ message: "Failed to seat reservation", error: err.message });
+  }
+}
+
+export async function cancelReservation(req, res) {
+  try {
+    const reservation = await tablesService.cancelReservation(
+      req.params.id,
+      req.body,
+      req.tenant.outletId,
+    );
+    res.json(reservation);
+  } catch (err) {
+    res
+      .status(400)
+      .json({ message: "Failed to cancel reservation", error: err.message });
+  }
+}

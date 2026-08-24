@@ -5,8 +5,10 @@ import TableStrip from "./components/TableStrip";
 import MenuBrowser from "./components/MenuBrowser";
 import OrderTicket from "./components/OrderTicket";
 import SuccessToast from "./components/SuccessToast";
+import CounterPicker from "./components/CounterPicker";
 import { createOrder } from "./api/posApi";
 import { placeDineInOrder } from "../offline/offlineQueue";
+import { getSelectedCounterId } from "./api/counterContext";
 
 export default function PosOrderScreen() {
   const navigate = useNavigate();
@@ -138,7 +140,7 @@ export default function PosOrderScreen() {
         // goes straight to the network as before.
         const order = await createOrder({
           orderType,
-          store: "Main Store",
+          counterId: getSelectedCounterId(),
           items,
         });
         setCart([]);
@@ -172,7 +174,7 @@ export default function PosOrderScreen() {
         {
           orderType,
           tableId,
-          store: "Main Store",
+          counterId: getSelectedCounterId(),
           items,
         },
         ticketMeta,
@@ -195,10 +197,11 @@ export default function PosOrderScreen() {
 
   return (
     <div className="flex h-screen flex-col bg-stone-50">
-      <header className="border-b border-stone-200 bg-white px-6 py-3">
+      <header className="flex items-center justify-between border-b border-stone-200 bg-white px-6 py-3">
         <h1 className="font-mono text-lg font-bold text-stone-900">
           POS · New Order
         </h1>
+        <CounterPicker />
       </header>
 
       <SuccessToast

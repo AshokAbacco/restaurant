@@ -1,5 +1,12 @@
 // server/src/pos/pos.controller.js
 import * as posService from "./pos.service.js";
+// FEATURE (Phase 1.1 — Custom Order Status): attaches each outlet's
+// custom display label onto order responses, without touching the real
+// OrderStatus state machine in pos.service.js at all — see
+// settings.service.js. Kept at the controller layer deliberately: this is
+// a presentation concern (what to SHOW for a status), not a data-fetch
+// concern, so pos.service.js's core order queries stay untouched.
+import { getOrderStatusLabelMap } from "../settings/settings.service.js";
 
 // Every handler below reads req.tenant.outletId (set by requireOutletContext
 // — see src/middleware/tenantContext.js, wired in ahead of this router in
@@ -9,7 +16,13 @@ import * as posService from "./pos.service.js";
 
 export async function getOrders(req, res) {
   try {
-    res.json(await posService.listOrders(req.query, req.tenant.outletId));
+    const result = await posService.listOrders(req.query, req.tenant.outletId);
+    const labelMap = await getOrderStatusLabelMap(req.tenant.outletId);
+    result.data = result.data.map((order) => ({
+      ...order,
+      statusLabel: labelMap[order.status] || order.status,
+    }));
+    res.json(result);
   } catch (err) {
     res
       .status(500)
@@ -24,7 +37,8 @@ export async function getOrder(req, res) {
       req.tenant.outletId,
     );
     if (!order) return res.status(404).json({ message: "Order not found" });
-    res.json(order);
+    const labelMap = await getOrderStatusLabelMap(req.tenant.outletId);
+    res.json({ ...order, statusLabel: labelMap[order.status] || order.status });
   } catch (err) {
     res
       .status(500)

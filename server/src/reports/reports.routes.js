@@ -28,6 +28,9 @@ router.get("/customer-analytics", reportsController.getCustomerAnalytics);
 router.get("/inventory-alerts", reportsController.getInventoryAlerts);
 router.get("/kitchen-performance", reportsController.getKitchenPerformance);
 router.get("/transactions", reportsController.getRecentTransactions);
+router.get("/counter-summary", reportsController.getCounterSummary);
+router.get("/assignee-wise-summary", reportsController.getAssigneeWiseSummary);
+router.get("/settlement-summary", reportsController.getSettlementSummary);
 
 // Export a report as CSV or XLSX, e.g.:
 //   GET /api/reports/export/top-selling?format=xlsx&period=thismonth

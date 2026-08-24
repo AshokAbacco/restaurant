@@ -113,3 +113,35 @@ export const getMyTables = () => request("/pos/tables/my-tables");
 
 export const getMyTableDetail = (tableId) =>
   request(`/pos/tables/my-tables/${tableId}`);
+
+// ---------------------------------------------------------------------------
+// Table Reservations (Phase 1.3)
+// ---------------------------------------------------------------------------
+
+export const getReservations = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/pos/tables/reservations${qs ? `?${qs}` : ""}`);
+};
+
+// payload: { tableId, customerName, customerPhone?, partySize, reservedFor,
+//   durationMinutes?, notes?, customerId? }
+export const createReservation = (payload) =>
+  request("/pos/tables/reservations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateReservation = (id, payload) =>
+  request(`/pos/tables/reservations/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+export const seatReservation = (id) =>
+  request(`/pos/tables/reservations/${id}/seat`, { method: "POST" });
+
+export const cancelReservation = (id, reason) =>
+  request(`/pos/tables/reservations/${id}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });

@@ -9,7 +9,7 @@ const STATUS_BADGE = {
   RESERVED: "bg-amber-50 text-amber-600 border-amber-200",
 };
 
-const EMPTY_FORM = { name: "", capacity: "", section: "", store: "", status: "FREE" };
+const EMPTY_FORM = { name: "", capacity: "", section: "", status: "FREE" };
 
 function EditIcon(props) {
   return (
@@ -79,7 +79,6 @@ export default function TableManagerModal({ isOpen, onClose }) {
       name: table.name || "",
       capacity: table.capacity ?? "",
       section: table.section || "",
-      store: table.store || "",
       status: table.status || "FREE",
     });
     setError(null);
@@ -98,7 +97,6 @@ export default function TableManagerModal({ isOpen, onClose }) {
       name: form.name.trim(),
       capacity: form.capacity ? Number(form.capacity) : null,
       section: form.section.trim() || null,
-      store: form.store.trim() || null,
       status: form.status,
     };
     try {
@@ -287,25 +285,14 @@ export default function TableManagerModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-600">Section</label>
-                  <input
-                    value={form.section}
-                    onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))}
-                    placeholder="e.g. Main Hall"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-600">Store</label>
-                  <input
-                    value={form.store}
-                    onChange={(e) => setForm((f) => ({ ...f, store: e.target.value }))}
-                    placeholder="e.g. Main Store"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
-                  />
-                </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-600">Section</label>
+                <input
+                  value={form.section}
+                  onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))}
+                  placeholder="e.g. Main Hall"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">

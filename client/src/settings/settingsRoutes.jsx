@@ -28,6 +28,10 @@ import PaymentGateway from "./payment/PaymentGateway";
 // Tax
 import TaxBilling from "./tax/TaxBilling";
 
+// Order Status
+import OrderStatusSettings from "./order-status/OrderStatusSettings";
+import CountersSettings from "./counters/CountersSettings";
+
 // Printer
 import PrinterSettings from "./printer/PrinterSettings";
 
@@ -72,6 +76,10 @@ const SettingsRoutes = () => {
 
       {/* Tax */}
       <Route path="tax" element={<TaxBilling />} />
+
+      {/* Order Status */}
+      <Route path="order-status" element={<OrderStatusSettings />} />
+      <Route path="counters" element={<CountersSettings />} />
 
       {/* Printer */}
       <Route path="printer" element={<PrinterSettings />} />

@@ -6,6 +6,7 @@ import TableOrderCard, {
   deriveTableCategory,
   CATEGORY_RANK,
 } from "./components/TableOrderCard";
+import MoveKotItemsModal from "./components/MoveKotItemsModal";
 import { getTablesBoard, getOrders } from "./api/posApi";
 import { fetchWithOfflineFallback } from "../offline/offlineCache";
 import {
@@ -82,6 +83,9 @@ export default function OrdersPage() {
   const [isOffline, setIsOffline] = useState(false);
   // orderIds with a "delivered" update queued but not yet synced.
   const [pendingOrderIds, setPendingOrderIds] = useState(new Set());
+
+  // Phase 1.4 — "Move KOT/Items" dialog
+  const [showMoveModal, setShowMoveModal] = useState(false);
 
   const loadTables = useCallback(async () => {
     const { data, fromCache } = await fetchWithOfflineFallback(
@@ -250,7 +254,16 @@ export default function OrdersPage() {
               </p>
             </div>
           </div>
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowMoveModal(true)}
+              disabled={occupiedTableCount === 0}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Move KOT / Items
+            </button>
+            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+          </div>
         </div>
 
         {isOffline && (
@@ -369,6 +382,13 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      <MoveKotItemsModal
+        open={showMoveModal}
+        onClose={() => setShowMoveModal(false)}
+        tables={tables}
+        onMoved={load}
+      />
     </div>
   );
 }

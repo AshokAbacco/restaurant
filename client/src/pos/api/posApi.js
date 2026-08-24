@@ -32,6 +32,16 @@ export const getMenuItems = (params = {}) => {
   return requestMenu(`/menu${qs ? `?${qs}` : ""}`);
 };
 
+// FEATURE (Phase 1.5 — Menu Item quick On/Off): reuses the existing full
+// menu-item update endpoint with just the one field — updateMenuItem on
+// the backend already does a plain partial Prisma update, so a
+// single-field payload was already supported without any backend change.
+export const updateMenuItemAvailability = (id, isAvailable) =>
+  requestMenu(`/menu/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ isAvailable }),
+  });
+
 export const getTables = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return request(`/pos/tables${qs ? `?${qs}` : ""}`);
@@ -40,6 +50,14 @@ export const getTables = (params = {}) => {
 // Floors that tables are grouped under (Ground Floor, Rooftop, etc.) —
 // powers the floor step in the "Select a table" flow and Table Manager.
 export const getFloors = () => request("/pos/tables/floors");
+
+// Phase 2.2 — Counter/Terminal management. Read-only from the POS
+// terminal's perspective (picking which counter this device is); creating/
+// editing counters themselves is an Owner/Admin action in Settings.
+export const getCounters = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/pos/counters${qs ? `?${qs}` : ""}`);
+};
 
 export const createFloor = (payload) =>
   request("/pos/tables/floors", {
@@ -126,6 +144,39 @@ export const sendToKitchen = (orderId, orderItemIds) =>
     body: JSON.stringify({ orderItemIds }),
   });
 
+// GET counterpart to sendToKitchen above — the existing KOTs already on an
+// order, used by the "Move KOT/Items" dialog's KOT-wise tab to list what's
+// available to move.
+export const getKotsForOrder = (orderId) => request(`/pos/kot/orders/${orderId}`);
+
+// ==============================================
+// MOVE KOT / ITEMS (Phase 1.4)
+// Table View's three-tab "Move KOT/Items" dialog. Every variant returns
+// { sourceOrder, destinationOrder } (table-wise returns just the updated
+// order, since there's only one order involved) — the caller should
+// re-fetch the tables board afterward rather than try to patch state from
+// this response, since a move can create a brand-new order/table entry
+// board-side.
+// ==============================================
+
+export const moveTableWise = ({ sourceTableId, destinationTableId }) =>
+  request("/pos/kot/move/table", {
+    method: "POST",
+    body: JSON.stringify({ sourceTableId, destinationTableId }),
+  });
+
+export const moveKotWise = ({ kotId, destinationTableId }) =>
+  request("/pos/kot/move/kot", {
+    method: "POST",
+    body: JSON.stringify({ kotId, destinationTableId }),
+  });
+
+export const moveItemsWise = ({ orderItemIds, destinationTableId }) =>
+  request("/pos/kot/move/items", {
+    method: "POST",
+    body: JSON.stringify({ orderItemIds, destinationTableId }),
+  });
+
 export const getKitchenDisplay = (kitchenSectionId) => {
   const qs = kitchenSectionId ? `?kitchenSectionId=${kitchenSectionId}` : "";
   return request(`/pos/kot/display${qs}`);
@@ -152,10 +203,15 @@ export const getAddOns = () => request(`/pos/add-ons?isEnabled=true`);
 export const getBillingSummary = (orderId) =>
   request(`/pos/billing/orders/${orderId}/summary`);
 
-// payload: { payments: [{ method, amount, transactionReference? }], discount? }
-// Records the payment(s), and only on full payment marks the order
-// COMPLETED, generates the invoice, and frees the table. Returns
-// { order, payments, invoice }.
+// payload: { payments: [{ method, amount, transactionReference? }], discount?,
+//   allowDue?, customerId? }
+// Records the payment(s). If the payments given don't cover the full bill
+// and allowDue is true, the remainder is tracked as a DuePayment against
+// customerId (or the order's own customer if already attached) instead of
+// blocking completion — see billing.service.js's completeBilling. Either
+// way, once accepted, the order is marked COMPLETED, the invoice is
+// generated, and the table is freed. Returns { order, payments, invoice,
+// duePayment }.
 export const completeBilling = (orderId, payload) =>
   request(`/pos/billing/orders/${orderId}/complete`, {
     method: "POST",
@@ -166,6 +222,30 @@ export const getOrders = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return request(`/pos/orders${qs ? `?${qs}` : ""}`);
 };
+
+// ==============================================
+// DUE PAYMENTS (Phase 1.2 — Due Payment Settlement)
+// ==============================================
+
+// Outstanding (or filtered) due payments for the outlet. status omitted =
+// everything not yet SETTLED (see duePayments.service.js's default).
+export const getDuePayments = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/pos/due-payments${qs ? `?${qs}` : ""}`);
+};
+
+export const getDuePayment = (id) => request(`/pos/due-payments/${id}`);
+
+// { customer, duePayments, totalOutstanding } for one customer's full tab.
+export const getCustomerDuePayments = (customerId) =>
+  request(`/pos/due-payments/customers/${customerId}`);
+
+// payload: { amount, paymentMethod, notes? }
+export const settleDuePayment = (id, payload) =>
+  request(`/pos/due-payments/${id}/settle`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
 // Notes left by kitchen staff on a specific ticket (e.g. "ran out of paneer,
 // used tofu instead"). Adding one returns just the new note; the ticket's

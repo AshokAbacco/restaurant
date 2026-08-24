@@ -53,7 +53,6 @@ const EMPTY_FORM = {
   joiningDate: "",
   employmentType: "",
   status: "ACTIVE",
-  store: "Main Store",
   address: {
     houseNo: "",
     street: "",
@@ -104,7 +103,6 @@ const EmployeeForm = () => {
         joiningDate: emp.joiningDate ? emp.joiningDate.substring(0, 10) : "",
         employmentType: emp.employmentType || "",
         status: emp.status || "ACTIVE",
-        store: emp.store || "Main Store",
         address: {
           houseNo: emp.address?.houseNo || "",
           street: emp.address?.street || "",
@@ -200,7 +198,6 @@ const EmployeeForm = () => {
       joiningDate: formData.joiningDate,
       employmentType: formData.employmentType || null,
       status: formData.status,
-      store: formData.store || "Main Store",
       ...(addressFilled ? { address: formData.address } : {}),
     };
 
@@ -516,20 +513,6 @@ const EmployeeForm = () => {
                 <option value="RESIGNED">Resigned</option>
                 <option value="TERMINATED">Terminated</option>
               </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Store / Branch
-              </label>
-              <input
-                type="text"
-                name="store"
-                value={formData.store}
-                onChange={handleChange}
-                placeholder="Main Store"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
-              />
             </div>
           </div>
         </section>
