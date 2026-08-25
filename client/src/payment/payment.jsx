@@ -33,15 +33,18 @@ const GREY = "FF94A3B8";
 const ORDER_TYPE_META = {
   DINE_IN: {
     label: "Dine In",
-    className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    className:
+      "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/30",
   },
   TAKEAWAY: {
     label: "Takeaway",
-    className: "bg-orange-50 text-orange-700 border-orange-200",
+    className:
+      "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30",
   },
   DELIVERY: {
     label: "Delivery",
-    className: "bg-cyan-50 text-cyan-700 border-cyan-200",
+    className:
+      "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/30",
   },
 };
 
@@ -463,11 +466,13 @@ export default function Payment() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 p-6">
+    <div className="min-h-[calc(100vh-4rem)] bg-[#F3F5EE] dark:bg-[#12160F] p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-[#212121]">Payments</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-xl font-bold text-[#1F2937] dark:text-white">
+            Payments
+          </h1>
+          <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
             Orders and payment totals, date-wise
           </p>
         </div>
@@ -477,12 +482,12 @@ export default function Payment() {
             <button
               key={p.key}
               onClick={() => applyPreset(p.key)}
-              className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+              className="rounded-full bg-white dark:bg-[#171C17] px-3 py-1.5 text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0] shadow-sm ring-1 ring-[#E7EAE1] dark:ring-[#262B24] hover:bg-[#F3F5EE] dark:hover:bg-white/10"
             >
               {p.label}
             </button>
           ))}
-          <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-slate-200">
+          <div className="flex items-center gap-2 rounded-full bg-white dark:bg-[#171C17] px-3 py-1.5 shadow-sm ring-1 ring-[#E7EAE1] dark:ring-[#262B24]">
             <input
               type="date"
               value={from}
@@ -490,21 +495,23 @@ export default function Payment() {
               onChange={(e) =>
                 setRange((r) => ({ ...r, from: e.target.value }))
               }
-              className="bg-transparent text-xs font-medium text-slate-600 outline-none"
+              className="bg-transparent text-xs font-medium text-[#6B7280] dark:text-[#9CA8A0] outline-none dark:[color-scheme:dark]"
             />
-            <span className="text-xs text-slate-300">to</span>
+            <span className="text-xs text-[#C7CCC2] dark:text-[#4A5248]">
+              to
+            </span>
             <input
               type="date"
               value={to}
               min={from}
               onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-              className="bg-transparent text-xs font-medium text-slate-600 outline-none"
+              className="bg-transparent text-xs font-medium text-[#6B7280] dark:text-[#9CA8A0] outline-none dark:[color-scheme:dark]"
             />
           </div>
           <button
             onClick={handleExportExcel}
             disabled={loading || exporting || orders.length === 0}
-            className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="flex items-center gap-1.5 rounded-full bg-[#3FA34D] px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] disabled:cursor-not-allowed disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280]"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
               <path
@@ -521,13 +528,13 @@ export default function Payment() {
       </div>
 
       {error && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
+        <p className="mb-4 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm font-medium text-[#EF5350] dark:text-red-400">
           {error}
         </p>
       )}
 
       {isOffline && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+        <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
           <WifiOff className="h-3.5 w-3.5" />
           Offline — showing last-synced data for this date range. Deleting an
           order needs a connection.
@@ -540,7 +547,7 @@ export default function Payment() {
           label="Orders Completed"
           value={loading ? "—" : stats.ordersCompleted}
           sub={`of ${stats.totalOrders} total`}
-          accent="text-emerald-600"
+          accent="text-[#3FA34D] dark:text-[#43B75A]"
         />
         <SummaryCard
           label="Orders Pending"
@@ -550,39 +557,41 @@ export default function Payment() {
               ? `${stats.ordersCancelled} cancelled`
               : "awaiting completion"
           }
-          accent="text-amber-600"
+          accent="text-amber-600 dark:text-amber-400"
         />
         <SummaryCard
           label="Payments Completed"
           value={loading ? "—" : `₹${stats.paymentsCompletedAmount.toFixed(2)}`}
           sub={`${stats.paymentsCompletedCount} order${stats.paymentsCompletedCount === 1 ? "" : "s"}`}
-          accent="text-emerald-600"
+          accent="text-[#3FA34D] dark:text-[#43B75A]"
         />
         <SummaryCard
           label="Payments Pending"
           value={loading ? "—" : `₹${stats.paymentsPendingAmount.toFixed(2)}`}
           sub={`${stats.paymentsPendingCount} order${stats.paymentsPendingCount === 1 ? "" : "s"}`}
-          accent="text-[#E53935]"
+          accent="text-[#EF5350] dark:text-red-400"
         />
       </div>
 
       {/* ============ Orders table ============ */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-5 py-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
+      <div className="overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
+        <div className="border-b border-[#E7EAE1] dark:border-[#262B24] px-5 py-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0]">
             Orders in range
           </h2>
         </div>
         <div className="max-h-[560px] overflow-y-auto">
           {loading ? (
-            <p className="p-5 text-sm text-slate-400">Loading orders…</p>
+            <p className="p-5 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+              Loading orders…
+            </p>
           ) : orders.length === 0 ? (
-            <p className="p-5 text-sm text-slate-400">
+            <p className="p-5 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
               No orders in this date range.
             </p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
+              <thead className="sticky top-0 bg-[#F3F5EE] dark:bg-[#1D231C] text-left text-xs uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                 <tr>
                   <th className="px-5 py-2">Order</th>
                   <th className="px-5 py-2">Order Type</th>
@@ -604,20 +613,20 @@ export default function Payment() {
                   );
                   const paymentLabel = paymentLabelFor(order);
                   const paymentColor = isCancelled
-                    ? "text-slate-400"
+                    ? "text-[#9CA3AF] dark:text-[#6B7280]"
                     : due <= 0
-                      ? "text-emerald-600"
+                      ? "text-[#3FA34D] dark:text-[#43B75A]"
                       : paid > 0
-                        ? "text-amber-600"
-                        : "text-[#E53935]";
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-[#EF5350] dark:text-red-400";
                   const typeBadge = ORDER_TYPE_META[order.orderType];
 
                   return (
                     <tr
                       key={order.id}
-                      className="border-b border-slate-100 last:border-0"
+                      className="border-b border-[#E7EAE1] dark:border-[#262B24] last:border-0"
                     >
-                      <td className="px-5 py-2.5 font-mono text-xs font-semibold text-slate-600">
+                      <td className="px-5 py-2.5 font-mono text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
                         {order.orderNumber}
                       </td>
                       <td className="px-5 py-2.5">
@@ -628,26 +637,26 @@ export default function Payment() {
                             {typeBadge.label}
                           </span>
                         ) : (
-                          <span className="text-slate-400">
+                          <span className="text-[#9CA3AF] dark:text-[#6B7280]">
                             {order.orderType}
                           </span>
                         )}
                       </td>
-                      <td className="px-5 py-2.5 text-slate-700">
+                      <td className="px-5 py-2.5 text-[#1F2937] dark:text-[#E4E9E2]">
                         {order.table?.name || "—"}
                       </td>
                       <td className="px-5 py-2.5">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                        <span className="rounded-full bg-[#F3F5EE] dark:bg-white/5 px-2 py-0.5 text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
                           {order.status}
                         </span>
                       </td>
-                      <td className="px-5 py-2.5 text-right font-mono text-slate-700">
+                      <td className="px-5 py-2.5 text-right font-mono text-[#1F2937] dark:text-[#E4E9E2]">
                         ₹{Number(order.grandTotal).toFixed(2)}
                       </td>
-                      <td className="px-5 py-2.5 text-right font-mono text-slate-700">
+                      <td className="px-5 py-2.5 text-right font-mono text-[#1F2937] dark:text-[#E4E9E2]">
                         ₹{paid.toFixed(2)}
                       </td>
-                      <td className="px-5 py-2.5 text-right font-mono text-slate-700">
+                      <td className="px-5 py-2.5 text-right font-mono text-[#1F2937] dark:text-[#E4E9E2]">
                         ₹{due.toFixed(2)}
                       </td>
                       <td
@@ -660,14 +669,14 @@ export default function Payment() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => setConfirmDeleteId(null)}
-                              className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                              className="text-xs font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#1F2937] dark:hover:text-white"
                             >
                               Cancel
                             </button>
                             <button
                               onClick={() => handleDelete(order.id)}
                               disabled={deletingId === order.id}
-                              className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                              className="text-xs font-semibold text-[#EF5350] dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50"
                             >
                               {deletingId === order.id
                                 ? "Deleting…"
@@ -679,7 +688,7 @@ export default function Payment() {
                             <button
                               onClick={() => setViewingOrderId(order.id)}
                               title="View order"
-                              className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+                              className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10 hover:text-[#3FA34D] dark:hover:text-[#43B75A]"
                             >
                               <Eye className="h-4 w-4" />
                             </button>
@@ -687,7 +696,7 @@ export default function Payment() {
                               <button
                                 onClick={() => setConfirmDeleteId(order.id)}
                                 title="Delete order"
-                                className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-[#EF5350] dark:hover:text-red-400"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -719,12 +728,12 @@ export default function Payment() {
 
 function SummaryCard({ label, value, sub, accent }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <div className="rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
         {label}
       </p>
       <p className={`mt-1 text-2xl font-bold ${accent}`}>{value}</p>
-      <p className="mt-0.5 text-xs text-slate-400">{sub}</p>
+      <p className="mt-0.5 text-xs text-[#9CA3AF] dark:text-[#6B7280]">{sub}</p>
     </div>
   );
 }

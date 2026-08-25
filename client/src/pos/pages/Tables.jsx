@@ -36,9 +36,10 @@ function Button({
   ...props
 }) {
   const variants = {
-    primary: "bg-[#1C3044] text-white hover:bg-[#27435B] shadow-sm",
+    primary:
+      "bg-[#3FA34D] text-white hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] shadow-sm",
     secondary:
-      "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
+      "bg-white dark:bg-[#171C17] text-[#6B7280] dark:text-[#9CA8A0] border border-[#E7EAE1] dark:border-[#262B24] hover:bg-[#F3F5EE] dark:hover:bg-white/10",
   };
   return (
     <button
@@ -311,229 +312,235 @@ export default function Tables() {
   const selectedFloor = floors.find((f) => f.id === selectedFloorId);
 
   return (
-    <div className="mx-auto max-w-8xl px-4 py-6 sm:px-6">
-      {/* Page header */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[30px] font-bold text-[#1C3044]">Tables</h1>
-          <p className="text-sm text-slate-400">
-            Manage floors and tables across your restaurant.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canAssign && (
-            <Button
-              variant={assignMode ? "primary" : "secondary"}
-              onClick={toggleAssignMode}
-              disabled={!hasFloors}
-            >
-              {assignMode ? (
-                <X className="h-4 w-4" />
-              ) : (
-                <UserCog className="h-4 w-4" />
-              )}
-              {assignMode ? "Cancel Assign" : "Assign Waiter"}
-            </Button>
-          )}
-          {!assignMode && (
-            <>
-              <Button variant="secondary" onClick={openAddFloor}>
-                <Plus className="h-4 w-4" />
-                Add Floor
-              </Button>
-              <Button
-                variant="primary"
-                onClick={openAddTable}
-                disabled={!hasFloors}
-              >
-                <Plus className="h-4 w-4" />
-                Add Table
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => openReserveModal(null)}
-                disabled={!hasFloors}
-              >
-                <CalendarClock className="h-4 w-4" />
-                Table Reservation
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Assign-mode toolbar: pick a scope once tables are selected, or assign
-          the whole floor / every table in one click without selecting anything. */}
-      {assignMode && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3">
-          <p className="text-sm text-slate-600">
-            {selectedTableIds.length > 0
-              ? `${selectedTableIds.length} table${selectedTableIds.length === 1 ? "" : "s"} selected`
-              : "Tap tables to select them, or assign a whole floor / everything below."}
-          </p>
+    <div className="min-h-full bg-[#F3F5EE] dark:bg-[#12160F]">
+      <div className="mx-auto max-w-8xl px-4 py-6 sm:px-6">
+        {/* Page header */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-[30px] font-bold text-[#1F2937] dark:text-white">
+              Tables
+            </h1>
+            <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+              Manage floors and tables across your restaurant.
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              className="!px-3 !py-1.5 !text-xs"
-              disabled={selectedTableIds.length === 0}
-              onClick={() => openAssignModal("selected")}
-            >
-              Assign Selected
-            </Button>
-            <Button
-              variant="secondary"
-              className="!px-3 !py-1.5 !text-xs"
-              disabled={!selectedFloorId}
-              onClick={() => openAssignModal("floor")}
-            >
-              Assign Whole Floor
-              {selectedFloor ? ` (${selectedFloor.name})` : ""}
-            </Button>
-            <Button
-              variant="secondary"
-              className="!px-3 !py-1.5 !text-xs"
-              onClick={() => openAssignModal("all")}
-            >
-              Assign All Tables
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
-
-      {floorsLoading ? (
-        <div className="py-16 text-center text-sm text-slate-400">
-          Loading floors…
-        </div>
-      ) : !hasFloors ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-16 text-center">
-          <p className="text-sm font-medium text-slate-500">
-            No floors available. Please add a floor first.
-          </p>
-          <Button className="mt-4" onClick={openAddFloor}>
-            <Plus className="h-4 w-4" />
-            Add Floor
-          </Button>
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-between">
-            <FloorTabs
-              floors={floors}
-              selectedFloorId={selectedFloorId}
-              onSelect={setSelectedFloorId}
-              onEditFloor={assignMode ? undefined : openEditFloor}
-              onDeleteFloor={
-                assignMode ? undefined : (floor) => setConfirmDeleteFloor(floor)
-              }
-            />
-          </div>
-
-          {confirmDeleteFloor && (
-            <div className="mt-3 flex items-center justify-between rounded-lg bg-red-50 px-3 py-2">
-              <span className="text-sm text-red-600">
-                Delete "{confirmDeleteFloor.name}"? Its tables will become
-                unassigned, not deleted.
-              </span>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setConfirmDeleteFloor(null)}
-                  className="text-xs font-medium text-slate-500 hover:text-slate-700"
+            {canAssign && (
+              <Button
+                variant={assignMode ? "primary" : "secondary"}
+                onClick={toggleAssignMode}
+                disabled={!hasFloors}
+              >
+                {assignMode ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <UserCog className="h-4 w-4" />
+                )}
+                {assignMode ? "Cancel Assign" : "Assign Waiter"}
+              </Button>
+            )}
+            {!assignMode && (
+              <>
+                <Button variant="secondary" onClick={openAddFloor}>
+                  <Plus className="h-4 w-4" />
+                  Add Floor
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={openAddTable}
+                  disabled={!hasFloors}
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDeleteFloor(confirmDeleteFloor.id)}
-                  className="text-xs font-semibold text-red-600 hover:text-red-700"
-                >
-                  Confirm
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-5">
-            {tablesLoading ? (
-              <div className="py-12 text-center text-sm text-slate-400">
-                Loading tables…
-              </div>
-            ) : tables.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-16 text-center">
-                <p className="text-sm font-medium text-slate-500">
-                  No tables on this floor yet.
-                </p>
-                <Button className="mt-4" onClick={openAddTable}>
                   <Plus className="h-4 w-4" />
                   Add Table
                 </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {tables.map((table) => (
-                  <TableCard
-                    key={table.id}
-                    table={table}
-                    onEdit={openEditTable}
-                    onDelete={handleDeleteTable}
-                    deleting={deletingTableId === table.id}
-                    confirmingDelete={confirmDeleteTableId === table.id}
-                    onRequestDelete={setConfirmDeleteTableId}
-                    onCancelDelete={() => setConfirmDeleteTableId(null)}
-                    assignMode={assignMode}
-                    selected={selectedTableIds.includes(table.id)}
-                    onToggleSelect={toggleSelectTable}
-                    onUnassign={canAssign ? handleUnassign : undefined}
-                    unassigning={unassigningTableId === table.id}
-                    onReserve={openReserveModal}
-                    onSeatReservation={handleSeatReservation}
-                    onCancelReservation={handleCancelReservation}
-                  />
-                ))}
-              </div>
+                <Button
+                  variant="secondary"
+                  onClick={() => openReserveModal(null)}
+                  disabled={!hasFloors}
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Table Reservation
+                </Button>
+              </>
             )}
           </div>
-        </>
-      )}
+        </div>
 
-      <AddFloorModal
-        open={showFloorModal}
-        onClose={() => setShowFloorModal(false)}
-        editingFloor={editingFloor}
-        onSave={handleSaveFloor}
-      />
+        {/* Assign-mode toolbar: pick a scope once tables are selected, or assign
+          the whole floor / every table in one click without selecting anything. */}
+        {assignMode && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#C9E7CF] dark:border-[#43B75A]/30 bg-[#EAF6EC]/60 dark:bg-[#43B75A]/10 px-4 py-3">
+            <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+              {selectedTableIds.length > 0
+                ? `${selectedTableIds.length} table${selectedTableIds.length === 1 ? "" : "s"} selected`
+                : "Tap tables to select them, or assign a whole floor / everything below."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="primary"
+                className="!px-3 !py-1.5 !text-xs"
+                disabled={selectedTableIds.length === 0}
+                onClick={() => openAssignModal("selected")}
+              >
+                Assign Selected
+              </Button>
+              <Button
+                variant="secondary"
+                className="!px-3 !py-1.5 !text-xs"
+                disabled={!selectedFloorId}
+                onClick={() => openAssignModal("floor")}
+              >
+                Assign Whole Floor
+                {selectedFloor ? ` (${selectedFloor.name})` : ""}
+              </Button>
+              <Button
+                variant="secondary"
+                className="!px-3 !py-1.5 !text-xs"
+                onClick={() => openAssignModal("all")}
+              >
+                Assign All Tables
+              </Button>
+            </div>
+          </div>
+        )}
 
-      <AddTableModal
-        open={showTableModal}
-        onClose={() => setShowTableModal(false)}
-        floors={floors}
-        defaultFloorId={selectedFloorId}
-        editingTable={editingTable}
-        onSave={handleSaveTable}
-      />
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-[#EF5350] dark:text-red-400">
+            {error}
+          </div>
+        )}
 
-      <AssignWaiterModal
-        open={!!assignModalScope}
-        onClose={() => setAssignModalScope(null)}
-        scope={assignModalScope}
-        selectedCount={selectedTableIds.length}
-        floorName={selectedFloor?.name}
-        waiters={waiters}
-        waitersLoading={waitersLoading}
-        onConfirm={handleConfirmAssign}
-      />
+        {floorsLoading ? (
+          <div className="py-16 text-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+            Loading floors…
+          </div>
+        ) : !hasFloors ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#E7EAE1] dark:border-[#262B24] py-16 text-center">
+            <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">
+              No floors available. Please add a floor first.
+            </p>
+            <Button className="mt-4" onClick={openAddFloor}>
+              <Plus className="h-4 w-4" />
+              Add Floor
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <FloorTabs
+                floors={floors}
+                selectedFloorId={selectedFloorId}
+                onSelect={setSelectedFloorId}
+                onEditFloor={assignMode ? undefined : openEditFloor}
+                onDeleteFloor={
+                  assignMode
+                    ? undefined
+                    : (floor) => setConfirmDeleteFloor(floor)
+                }
+              />
+            </div>
 
-      <ReserveTableModal
-        open={showReserveModal}
-        onClose={() => setShowReserveModal(false)}
-        tables={tables}
-        defaultTableId={reservingTableId}
-        onSave={handleSaveReservation}
-      />
+            {confirmDeleteFloor && (
+              <div className="mt-3 flex items-center justify-between rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2">
+                <span className="text-sm text-[#EF5350] dark:text-red-400">
+                  Delete "{confirmDeleteFloor.name}"? Its tables will become
+                  unassigned, not deleted.
+                </span>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setConfirmDeleteFloor(null)}
+                    className="text-xs font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#1F2937] dark:hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDeleteFloor(confirmDeleteFloor.id)}
+                    className="text-xs font-semibold text-[#EF5350] dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5">
+              {tablesLoading ? (
+                <div className="py-12 text-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+                  Loading tables…
+                </div>
+              ) : tables.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#E7EAE1] dark:border-[#262B24] py-16 text-center">
+                  <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">
+                    No tables on this floor yet.
+                  </p>
+                  <Button className="mt-4" onClick={openAddTable}>
+                    <Plus className="h-4 w-4" />
+                    Add Table
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {tables.map((table) => (
+                    <TableCard
+                      key={table.id}
+                      table={table}
+                      onEdit={openEditTable}
+                      onDelete={handleDeleteTable}
+                      deleting={deletingTableId === table.id}
+                      confirmingDelete={confirmDeleteTableId === table.id}
+                      onRequestDelete={setConfirmDeleteTableId}
+                      onCancelDelete={() => setConfirmDeleteTableId(null)}
+                      assignMode={assignMode}
+                      selected={selectedTableIds.includes(table.id)}
+                      onToggleSelect={toggleSelectTable}
+                      onUnassign={canAssign ? handleUnassign : undefined}
+                      unassigning={unassigningTableId === table.id}
+                      onReserve={openReserveModal}
+                      onSeatReservation={handleSeatReservation}
+                      onCancelReservation={handleCancelReservation}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        <AddFloorModal
+          open={showFloorModal}
+          onClose={() => setShowFloorModal(false)}
+          editingFloor={editingFloor}
+          onSave={handleSaveFloor}
+        />
+
+        <AddTableModal
+          open={showTableModal}
+          onClose={() => setShowTableModal(false)}
+          floors={floors}
+          defaultFloorId={selectedFloorId}
+          editingTable={editingTable}
+          onSave={handleSaveTable}
+        />
+
+        <AssignWaiterModal
+          open={!!assignModalScope}
+          onClose={() => setAssignModalScope(null)}
+          scope={assignModalScope}
+          selectedCount={selectedTableIds.length}
+          floorName={selectedFloor?.name}
+          waiters={waiters}
+          waitersLoading={waitersLoading}
+          onConfirm={handleConfirmAssign}
+        />
+
+        <ReserveTableModal
+          open={showReserveModal}
+          onClose={() => setShowReserveModal(false)}
+          tables={tables}
+          defaultTableId={reservingTableId}
+          onSave={handleSaveReservation}
+        />
+      </div>
     </div>
   );
 }

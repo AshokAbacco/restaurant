@@ -35,13 +35,13 @@ export default function OrderTicket({
   const canPlace = cart.length > 0 && (orderType !== "DINE_IN" || tableSelected) && !placing;
 
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative border-b border-dashed border-slate-300 px-4 pb-3 pt-4">
+    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] shadow-sm">
+      <div className="relative border-b border-dashed border-[#E7EAE1] dark:border-[#262B24] px-4 pb-3 pt-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0]">
             Order Ticket
           </h2>
-          <span className="rounded-lg bg-blue-50 px-2 py-0.5 font-mono text-xs font-semibold text-blue-600">
+          <span className="rounded-lg bg-[#EAF6EC] dark:bg-[#43B75A]/10 px-2 py-0.5 font-mono text-xs font-semibold text-[#3FA34D] dark:text-[#43B75A]">
             NEW
           </span>
         </div>
@@ -52,7 +52,9 @@ export default function OrderTicket({
               key={type}
               onClick={() => onChangeOrderType(type)}
               className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
-                orderType === type ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                orderType === type
+                  ? "bg-[#3FA34D] text-white dark:bg-[#43B75A]"
+                  : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
               }`}
             >
               {type.replace("_", " ")}
@@ -63,7 +65,7 @@ export default function OrderTicket({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {cart.length === 0 ? (
-          <p className="mt-8 text-center text-sm text-slate-400">
+          <p className="mt-8 text-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
             Tap a dish to add it to this ticket.
           </p>
         ) : (
@@ -75,10 +77,10 @@ export default function OrderTicket({
               const hasAddOns = addOns.length > 0;
 
               return (
-                <li key={item.cartLineId} className="border-b border-slate-100 pb-3 last:border-0">
+                <li key={item.cartLineId} className="border-b border-[#E7EAE1] dark:border-[#262B24] pb-3 last:border-0">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-medium text-slate-800">{item.name}</span>
-                    <span className="font-mono text-sm font-semibold text-slate-900">
+                    <span className="text-sm font-medium text-[#1F2937] dark:text-white">{item.name}</span>
+                    <span className="font-mono text-sm font-semibold text-[#1F2937] dark:text-white">
                       ₹{Number(item.sellingPrice).toFixed(0)}
                     </span>
                   </div>
@@ -86,7 +88,7 @@ export default function OrderTicket({
                   {hasAddOns && (
                     <ul className="mt-1 space-y-0.5">
                       {addOns.map((a) => (
-                        <li key={a.addOnId} className="flex justify-between text-xs text-slate-500">
+                        <li key={a.addOnId} className="flex justify-between text-xs text-[#6B7280] dark:text-[#9CA8A0]">
                           <span>
                             + {a.name} × {a.quantity}
                           </span>
@@ -97,37 +99,37 @@ export default function OrderTicket({
                   )}
 
                   {hasAddOns && (
-                    <div className="mt-1 flex justify-between border-t border-dotted border-slate-200 pt-1 text-xs font-semibold text-slate-700">
+                    <div className="mt-1 flex justify-between border-t border-dotted border-[#E7EAE1] dark:border-[#262B24] pt-1 text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
                       <span>Line total</span>
                       <span className="font-mono">₹{lineTotal.toFixed(0)}</span>
                     </div>
                   )}
 
                   <div className="mt-1.5 flex items-center gap-2">
-                    <div className="flex items-center rounded-lg border border-slate-200">
+                    <div className="flex items-center rounded-lg border border-[#E7EAE1] dark:border-[#262B24]">
                       <button
                         onClick={() => onDecrement(item.cartLineId)}
-                        className="px-2 py-0.5 text-slate-500 hover:bg-slate-100"
+                        className="px-2 py-0.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       >
                         −
                       </button>
-                      <span className="px-2 font-mono text-sm text-slate-700">{item.quantity}</span>
+                      <span className="px-2 font-mono text-sm text-[#1F2937] dark:text-white">{item.quantity}</span>
                       <button
                         onClick={() => onIncrement(item.cartLineId)}
-                        className="px-2 py-0.5 text-slate-500 hover:bg-slate-100"
+                        className="px-2 py-0.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       >
                         +
                       </button>
                     </div>
                     <button
                       onClick={() => setEditingLine(item)}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-[#3FA34D] dark:text-[#43B75A] hover:underline"
                     >
                       Add-ons
                     </button>
                     <button
                       onClick={() => onRemove(item.cartLineId)}
-                      className="text-xs text-red-500 hover:underline"
+                      className="text-xs text-red-500 dark:text-red-400 hover:underline"
                     >
                       Remove
                     </button>
@@ -136,7 +138,7 @@ export default function OrderTicket({
                     value={item.notes}
                     onChange={(e) => onNoteChange(item.cartLineId, e.target.value)}
                     placeholder="Add a note (e.g. less spicy)"
-                    className="mt-1.5 w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 focus:border-blue-400 focus:outline-none"
+                    className="mt-1.5 w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#262B24] px-2 py-1 text-xs text-[#6B7280] dark:text-[#9CA8A0] focus:border-[#3FA34D] focus:outline-none dark:focus:border-[#43B75A]"
                   />
                 </li>
               );
@@ -145,8 +147,8 @@ export default function OrderTicket({
         )}
       </div>
 
-      <div className="border-t border-dashed border-slate-300 px-4 py-3">
-        <div className="space-y-1 font-mono text-sm text-slate-600">
+      <div className="border-t border-dashed border-[#E7EAE1] dark:border-[#262B24] px-4 py-3">
+        <div className="space-y-1 font-mono text-sm text-[#6B7280] dark:text-[#9CA8A0]">
           <div className="flex justify-between">
             <span>Subtotal</span>
             <span>₹{subtotal.toFixed(2)}</span>
@@ -155,14 +157,14 @@ export default function OrderTicket({
             <span>GST</span>
             <span>₹{gst.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-base font-bold text-slate-900">
+          <div className="flex justify-between text-base font-bold text-[#1F2937] dark:text-white">
             <span>Total</span>
             <span>₹{total.toFixed(2)}</span>
           </div>
         </div>
 
         {error && (
-          <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
+          <p className="mt-2 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400">
             {error}
           </p>
         )}
@@ -170,7 +172,7 @@ export default function OrderTicket({
         <button
           onClick={onPlaceOrder}
           disabled={!canPlace}
-          className="mt-3 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mt-3 w-full rounded-lg bg-[#3FA34D] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] dark:disabled:bg-[#6B7280]"
         >
           {orderType === "TAKEAWAY"
             ? placing

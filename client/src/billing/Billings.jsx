@@ -369,15 +369,15 @@ export default function Billings() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4 overflow-hidden bg-slate-50 p-4">
+    <div className="flex h-[calc(100vh-4rem)] gap-4 overflow-hidden bg-[#F3F5EE] dark:bg-[#12160F] p-4">
       {/* ============ Active Orders (left) ============ */}
-      <div className="flex w-72 min-h-[500px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="shrink-0 border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-[#1C3044]">
+      <div className="flex w-72 min-h-[500px] shrink-0 flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
+        <div className="shrink-0 border-b border-[#E7EAE1] dark:border-[#262B24] px-4 py-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-[#1F2937] dark:text-white">
             Active Orders
           </h2>
           {isOffline && (
-            <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700">
+            <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
               <WifiOff className="h-3.5 w-3.5" />
               Offline — cash-only billing, invoice pending sync
             </div>
@@ -385,15 +385,19 @@ export default function Billings() {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {ordersLoading ? (
-            <p className="p-4 text-sm text-slate-400">Loading orders…</p>
+            <p className="p-4 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+              Loading orders…
+            </p>
           ) : ordersError ? (
-            <p className="p-4 text-sm text-red-600">{ordersError}</p>
+            <p className="p-4 text-sm text-[#EF5350] dark:text-red-400">
+              {ordersError}
+            </p>
           ) : orders.length === 0 ? (
-            <p className="p-4 text-sm text-slate-400">
+            <p className="p-4 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
               No orders awaiting billing.
             </p>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {orders.map((order) => {
                 const due = orderBalanceDue(order);
                 return (
@@ -402,25 +406,25 @@ export default function Billings() {
                       onClick={() => selectOrder(order.id)}
                       className={`flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors ${
                         selectedOrderId === order.id
-                          ? "bg-blue-50"
-                          : "hover:bg-slate-50"
+                          ? "bg-[#EAF6EC] dark:bg-[#43B75A]/10"
+                          : "hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       }`}
                     >
-                      <span className="font-mono text-xs font-semibold text-slate-500">
+                      <span className="font-mono text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
                         {order.orderNumber}
                       </span>
-                      <span className="font-semibold text-slate-800">
+                      <span className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                         {order.table?.name ||
                           order.orderType?.replace("_", " ")}
                       </span>
-                      <span className="flex w-full items-center justify-between text-xs text-slate-400">
+                      <span className="flex w-full items-center justify-between text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                         <span>{order.status}</span>
-                        <span className="font-mono font-semibold text-slate-600">
+                        <span className="font-mono font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
                           ₹{due.toFixed(2)}
                         </span>
                       </span>
                       {pendingBillingOrderIds.has(order.id) && (
-                        <span className="mt-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                        <span className="mt-1 rounded-full border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
                           Sync pending
                         </span>
                       )}
@@ -431,27 +435,27 @@ export default function Billings() {
             </ul>
           )}
           {queuedOrders.length > 0 && (
-            <div className="border-t border-slate-100">
-              <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            <div className="border-t border-[#E7EAE1] dark:border-[#262B24]">
+              <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                 Awaiting sync — not billable yet
               </p>
-              <ul className="divide-y divide-slate-50">
+              <ul className="divide-y divide-[#F3F5EE] dark:divide-white/5">
                 {queuedOrders.map((item) => (
                   <li
                     key={item.clientRequestId}
                     title="This order hasn't reached the server yet — it'll appear in the list above, billable, once it syncs."
                     className="flex cursor-not-allowed flex-col items-start gap-0.5 px-4 py-3 opacity-60"
                   >
-                    <span className="font-semibold text-slate-800">
+                    <span className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                       {item.ticketMeta?.tableName ||
                         item.ticketMeta?.orderType?.replace("_", " ") ||
                         "Order"}
                     </span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                       {(item.ticketMeta?.items || []).length} item
                       {(item.ticketMeta?.items || []).length === 1 ? "" : "s"}
                     </span>
-                    <span className="mt-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                    <span className="mt-1 rounded-full border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
                       Awaiting sync
                     </span>
                   </li>
@@ -463,26 +467,28 @@ export default function Billings() {
       </div>
 
       {/* ============ Billing panel (middle) ============ */}
-      <div className="flex flex-1 min-h-[500px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="flex flex-1 min-h-[500px] flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
         {!selectedOrderId ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
+          <div className="flex flex-1 items-center justify-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
             Select an order from the list to view its bill.
           </div>
         ) : summaryLoading ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
+          <div className="flex flex-1 items-center justify-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
             Loading bill…
           </div>
         ) : summaryError && !summary ? (
-          <div className="p-5 text-sm text-red-600">{summaryError}</div>
+          <div className="p-5 text-sm text-[#EF5350] dark:text-red-400">
+            {summaryError}
+          </div>
         ) : summary ? (
           <>
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h2 className="text-lg font-bold text-[#1C3044]">
+            <div className="flex shrink-0 items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] px-6 py-4">
+              <h2 className="text-lg font-bold text-[#1F2937] dark:text-white">
                 Billing &amp; Payment
               </h2>
               <button
                 onClick={() => selectOrder(null)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/10 hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
               >
                 <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
                   <path
@@ -497,16 +503,20 @@ export default function Billings() {
 
             {/* Scrollable content — everything except the header and footer button */}
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-white/5 p-3 text-sm">
                 <div>
-                  <p className="text-xs text-slate-400">Table</p>
-                  <p className="font-semibold text-slate-800">
+                  <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                    Table
+                  </p>
+                  <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                     {summary.table?.name || "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Customer</p>
-                  <p className="font-semibold text-slate-800">
+                  <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                    Customer
+                  </p>
+                  <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                     {summary.customer?.name || "Walk-in"}
                   </p>
                 </div>
@@ -516,22 +526,25 @@ export default function Billings() {
                 {summary.items.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-start justify-between border-b border-slate-100 pb-2 text-sm"
+                    className="flex items-start justify-between border-b border-[#E7EAE1] dark:border-[#262B24] pb-2 text-sm"
                   >
                     <div>
-                      <p className="font-medium text-slate-800">
+                      <p className="font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                         {item.name}{" "}
-                        <span className="text-slate-400">
+                        <span className="text-[#9CA3AF] dark:text-[#6B7280]">
                           × {item.quantity}
                         </span>
                       </p>
                       {item.addOns.map((a, idx) => (
-                        <p key={idx} className="text-xs text-slate-400">
+                        <p
+                          key={idx}
+                          className="text-xs text-[#9CA3AF] dark:text-[#6B7280]"
+                        >
                           + {a.name} × {a.quantity}
                         </p>
                       ))}
                     </div>
-                    <span className="font-mono font-semibold text-slate-800">
+                    <span className="font-mono font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                       ₹
                       {(
                         item.totalPrice +
@@ -543,9 +556,9 @@ export default function Billings() {
               </ul>
 
               {!result && (
-                <div className="mb-4 rounded-xl border border-slate-200 p-3">
+                <div className="mb-4 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                       Discount
                     </p>
                     {discountType && (
@@ -555,7 +568,7 @@ export default function Billings() {
                           setDiscountValue("");
                           setDiscountReason("");
                         }}
-                        className="text-xs font-semibold text-slate-400 hover:text-slate-600"
+                        className="text-xs font-semibold text-[#9CA3AF] dark:text-[#6B7280] hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
                       >
                         Clear
                       </button>
@@ -570,8 +583,8 @@ export default function Billings() {
                       }
                       className={`flex-1 rounded-lg border py-1.5 text-sm font-semibold transition-colors ${
                         discountType === "PERCENTAGE"
-                          ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          ? "border-[#3FA34D] bg-[#3FA34D] text-white dark:border-[#43B75A] dark:bg-[#43B75A]"
+                          : "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       }`}
                     >
                       Percentage
@@ -586,8 +599,8 @@ export default function Billings() {
                       }
                       className={`flex-1 rounded-lg border py-1.5 text-sm font-semibold transition-colors ${
                         discountType === "FIXED_AMOUNT"
-                          ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          ? "border-[#3FA34D] bg-[#3FA34D] text-white dark:border-[#43B75A] dark:bg-[#43B75A]"
+                          : "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       }`}
                     >
                       Amount
@@ -596,7 +609,7 @@ export default function Billings() {
                   {discountType && (
                     <div className="mt-2 space-y-2">
                       <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
                           {discountType === "PERCENTAGE" ? "%" : "₹"}
                         </span>
                         <input
@@ -611,7 +624,7 @@ export default function Billings() {
                               ? "e.g. 10"
                               : "e.g. 50"
                           }
-                          className="w-full rounded-lg border border-slate-200 py-1.5 pl-7 pr-3 text-sm outline-none focus:border-blue-400"
+                          className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] py-1.5 pl-7 pr-3 text-sm text-[#1F2937] dark:text-[#E4E9E2] placeholder:text-[#9CA3AF] dark:placeholder:text-[#6B7280] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                         />
                       </div>
                       <input
@@ -619,10 +632,10 @@ export default function Billings() {
                         value={discountReason}
                         onChange={(e) => setDiscountReason(e.target.value)}
                         placeholder="Reason (optional)"
-                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                        className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 py-1.5 text-sm text-[#1F2937] dark:text-[#E4E9E2] placeholder:text-[#9CA3AF] dark:placeholder:text-[#6B7280] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                       />
                       {pendingDiscountAmount > 0 && (
-                        <p className="text-xs font-medium text-emerald-600">
+                        <p className="text-xs font-medium text-[#3FA34D] dark:text-[#43B75A]">
                           −₹{pendingDiscountAmount.toFixed(2)} off this bill
                         </p>
                       )}
@@ -631,7 +644,7 @@ export default function Billings() {
                 </div>
               )}
 
-              <div className="space-y-1 border-t border-dashed border-slate-300 pt-3 font-mono text-sm text-slate-600">
+              <div className="space-y-1 border-t border-dashed border-[#D5DAD0] dark:border-[#2E342C] pt-3 font-mono text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span>₹{summary.subtotal.toFixed(2)}</span>
@@ -645,18 +658,18 @@ export default function Billings() {
                   <span>₹{summary.sgst.toFixed(2)}</span>
                 </div>
                 {summary.discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
+                  <div className="flex justify-between text-[#3FA34D] dark:text-[#43B75A]">
                     <span>Discount already applied</span>
                     <span>−₹{summary.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
                 {pendingDiscountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
+                  <div className="flex justify-between text-[#3FA34D] dark:text-[#43B75A]">
                     <span>New discount</span>
                     <span>−₹{pendingDiscountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-t border-slate-200 pt-1.5 text-base font-bold text-slate-900">
+                <div className="flex justify-between border-t border-[#E7EAE1] dark:border-[#262B24] pt-1.5 text-base font-bold text-[#1F2937] dark:text-white">
                   <span>Grand Total</span>
                   <span>
                     ₹
@@ -666,7 +679,7 @@ export default function Billings() {
                   </span>
                 </div>
                 {summary.totalPaid > 0 && (
-                  <div className="flex justify-between text-xs text-slate-400">
+                  <div className="flex justify-between text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                     <span>Already paid</span>
                     <span>₹{summary.totalPaid.toFixed(2)}</span>
                   </div>
@@ -675,7 +688,7 @@ export default function Billings() {
 
               {!result && (
                 <div className="mt-5">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                     Payment Method
                   </p>
                   <div className="flex gap-2">
@@ -693,10 +706,10 @@ export default function Billings() {
                           }
                           className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
                             mode === m.key
-                              ? "border-blue-600 bg-blue-600 text-white"
+                              ? "border-[#3FA34D] bg-[#3FA34D] text-white dark:border-[#43B75A] dark:bg-[#43B75A]"
                               : disabled
-                                ? "cursor-not-allowed border-slate-100 text-slate-300"
-                                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                                ? "cursor-not-allowed border-[#EEF1E8] dark:border-white/5 text-[#C7CCC2] dark:text-[#4A5248]"
+                                : "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                           }`}
                         >
                           {m.label}
@@ -707,8 +720,8 @@ export default function Billings() {
                       onClick={() => setMode("SPLIT")}
                       className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
                         mode === "SPLIT"
-                          ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          ? "border-[#3FA34D] bg-[#3FA34D] text-white dark:border-[#43B75A] dark:bg-[#43B75A]"
+                          : "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       }`}
                     >
                       Split
@@ -726,7 +739,7 @@ export default function Billings() {
                                 method: e.target.value,
                               })
                             }
-                            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+                            className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-2 py-1.5 text-sm text-[#1F2937] dark:text-[#E4E9E2] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                           >
                             {PAYMENT_METHODS.map((m) => (
                               <option key={m.key} value={m.key}>
@@ -745,12 +758,12 @@ export default function Billings() {
                               })
                             }
                             placeholder="Amount"
-                            className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+                            className="flex-1 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-2 py-1.5 text-sm text-[#1F2937] dark:text-[#E4E9E2] placeholder:text-[#9CA3AF] dark:placeholder:text-[#6B7280] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                           />
                           <button
                             onClick={() => removeSplitLine(line.id)}
                             disabled={splitLines.length === 1}
-                            className="rounded-lg px-2 py-1.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-30"
+                            className="rounded-lg px-2 py-1.5 text-xs text-[#EF5350] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-30"
                           >
                             Remove
                           </button>
@@ -758,12 +771,12 @@ export default function Billings() {
                       ))}
                       <button
                         onClick={addSplitLine}
-                        className="text-xs font-semibold text-blue-600 hover:underline"
+                        className="text-xs font-semibold text-[#3FA34D] dark:text-[#43B75A] hover:underline"
                       >
                         + Add another payment
                       </button>
                       <p
-                        className={`text-xs font-medium ${splitMismatch ? "text-red-500" : "text-emerald-600"}`}
+                        className={`text-xs font-medium ${splitMismatch ? "text-[#EF5350] dark:text-red-400" : "text-[#3FA34D] dark:text-[#43B75A]"}`}
                       >
                         Split total: ₹{splitTotal.toFixed(2)} of ₹
                         {previewBalanceDue.toFixed(2)} due
@@ -777,8 +790,8 @@ export default function Billings() {
                 <div
                   className={`mt-5 rounded-lg px-4 py-3 text-sm font-semibold ${
                     result.queuedOffline
-                      ? "bg-amber-50 text-amber-700"
-                      : "bg-emerald-50 text-emerald-700"
+                      ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                      : "bg-[#EAF6EC] dark:bg-[#43B75A]/10 text-[#2F7D3A] dark:text-[#43B75A]"
                   }`}
                 >
                   {result.queuedOffline
@@ -790,14 +803,14 @@ export default function Billings() {
               )}
 
               {kitchenError && (
-                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                <p className="mt-3 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
                   Payment succeeded, but sending the order to the kitchen
                   failed: {kitchenError}
                 </p>
               )}
 
               {payError && (
-                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                <p className="mt-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs font-medium text-[#EF5350] dark:text-red-400">
                   {payError}
                 </p>
               )}
@@ -805,11 +818,11 @@ export default function Billings() {
 
             {/* Sticky footer — always visible, never scrolls away */}
             {!result && (
-              <div className="shrink-0 border-t border-slate-200 px-6 py-4">
+              <div className="shrink-0 border-t border-[#E7EAE1] dark:border-[#262B24] px-6 py-4">
                 <button
                   onClick={handleCompletePayment}
                   disabled={processing || (mode === "SPLIT" && splitMismatch)}
-                  className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="w-full rounded-lg bg-[#3FA34D] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] disabled:cursor-not-allowed disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280]"
                 >
                   {processing
                     ? "Processing payment…"
@@ -823,7 +836,7 @@ export default function Billings() {
 
       {/* ============ Invoice (right) — only appears once paid ============ */}
       {selectedOrderId && (summary || result) && (
-        <div className="flex flex-1 min-h-[500px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="flex flex-1 min-h-[500px] flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
           {result && result.invoice ? (
             <InvoiceView
               invoice={result.invoice}
@@ -833,24 +846,24 @@ export default function Billings() {
             />
           ) : result && result.queuedOffline ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-              <WifiOff className="h-8 w-8 text-amber-500" />
-              <p className="text-sm font-semibold text-slate-700">
+              <WifiOff className="h-8 w-8 text-amber-500 dark:text-amber-400" />
+              <p className="text-sm font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                 Invoice pending sync
               </p>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
                 This order's payment is saved on this device. The printable
                 invoice will be generated automatically — with a proper
                 sequential invoice number — once the connection is back.
               </p>
               <button
                 onClick={handleDone}
-                className="mt-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200"
+                className="mt-2 rounded-lg bg-[#F3F5EE] dark:bg-white/5 px-4 py-2 text-sm font-semibold text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
               >
                 Back to Orders
               </button>
             </div>
           ) : (
-            <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-400">
+            <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
               Invoice will appear here once payment is completed.
             </div>
           )}

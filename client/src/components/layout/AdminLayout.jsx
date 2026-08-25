@@ -42,7 +42,7 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#f3f5ee] dark:bg-[#0D110C] transition-colors">
       {/* ======================================
           SIDEBAR
       ====================================== */}
@@ -77,9 +77,9 @@ const AdminLayout = () => {
               {/* Background Decoration */}
 
               <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 dark:bg-[#43B75A]/[0.06] rounded-full blur-3xl" />
 
-                <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/5 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/5 dark:bg-cyan-400/[0.05] rounded-full blur-3xl" />
               </div>
 
               {/* Content */}
@@ -107,49 +107,12 @@ const AdminLayout = () => {
             behavior: "smooth",
           })
         }
-        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-xl transition-all duration-300 hover:scale-110 z-20"
+        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-blue-600 dark:bg-[#43B75A] hover:bg-blue-700 dark:hover:bg-[#3FA34D] text-white shadow-xl transition-all duration-300 hover:scale-110 z-20"
       >
         ↑
       </button>
 
       {/* ================= GLOBAL LOADING (Future) ================= */}
-
-      {/*
-        Future Enhancement
-
-        <GlobalLoader />
-
-        Can be connected with:
-        - React Query
-        - Redux
-        - Zustand
-        - Axios Interceptors
-      */}
-
-      {/* ================= GLOBAL TOAST (Future) ================= */}
-
-      {/*
-        Future Enhancement
-
-        <Toaster
-          position="top-right"
-          richColors
-        />
-
-        Recommended:
-        react-hot-toast
-        sonner
-      */}
-
-      {/* ================= GLOBAL MODALS (Future) ================= */}
-
-      {/*
-        Future Enhancement
-
-        <GlobalModal />
-        <ConfirmDialog />
-        <DeleteDialog />
-      */}
     </div>
   );
 };

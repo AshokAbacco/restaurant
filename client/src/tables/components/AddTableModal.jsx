@@ -20,7 +20,14 @@ const emptyForm = (defaultFloorId) => ({
 // prefill the form and change the save button's label; leave it null/undefined
 // for the add flow. `floors` populates the required floor dropdown and
 // `defaultFloorId` preselects whichever floor tab is currently active.
-export default function AddTableModal({ open, onClose, floors, defaultFloorId, editingTable, onSave }) {
+export default function AddTableModal({
+  open,
+  onClose,
+  floors,
+  defaultFloorId,
+  editingTable,
+  onSave,
+}) {
   const [form, setForm] = useState(emptyForm(defaultFloorId));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -65,7 +72,7 @@ export default function AddTableModal({ open, onClose, floors, defaultFloorId, e
           capacity: form.capacity ? Number(form.capacity) : null,
           status: form.status,
         },
-        editingTable?.id
+        editingTable?.id,
       );
       handleClose();
     } catch (err) {
@@ -79,18 +86,23 @@ export default function AddTableModal({ open, onClose, floors, defaultFloorId, e
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F2937]/40 dark:bg-black/60 p-4"
       onClick={handleClose}
     >
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md">
-        <form onSubmit={handleSubmit} className="overflow-hidden rounded-2xl bg-white shadow-xl">
+        <form
+          onSubmit={handleSubmit}
+          className="overflow-hidden rounded-2xl bg-white dark:bg-[#171C17] shadow-xl"
+        >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-            <h2 className="text-lg font-bold text-[#1C3044]">{editingTable ? "Edit Table" : "Add Table"}</h2>
+          <div className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
+            <h2 className="text-lg font-bold text-[#1F2937] dark:text-white">
+              {editingTable ? "Edit Table" : "Add Table"}
+            </h2>
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/10 hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
             >
               <X className="h-5 w-5" />
             </button>
@@ -98,14 +110,22 @@ export default function AddTableModal({ open, onClose, floors, defaultFloorId, e
 
           {/* Body */}
           <div className="space-y-4 px-5 py-4">
-            {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+            {error && (
+              <div className="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-[#EF5350] dark:text-red-400">
+                {error}
+              </div>
+            )}
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">Select floor *</label>
+              <label className="mb-1 block text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">
+                Select floor *
+              </label>
               <select
                 value={form.floorId}
-                onChange={(e) => setForm((f) => ({ ...f, floorId: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, floorId: e.target.value }))
+                }
+                className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 py-2 text-sm text-[#1F2937] dark:text-[#E4E9E2] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
               >
                 <option value="" disabled>
                   Choose a floor
@@ -119,33 +139,45 @@ export default function AddTableModal({ open, onClose, floors, defaultFloorId, e
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">Table name / number *</label>
+              <label className="mb-1 block text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">
+                Table name / number *
+              </label>
               <input
                 value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
                 placeholder="e.g. T-05"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 py-2 text-sm text-[#1F2937] dark:text-[#E4E9E2] placeholder:text-[#9CA3AF] dark:placeholder:text-[#6B7280] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-600">Seating capacity</label>
+                <label className="mb-1 block text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">
+                  Seating capacity
+                </label>
                 <input
                   type="number"
                   min="0"
                   value={form.capacity}
-                  onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, capacity: e.target.value }))
+                  }
                   placeholder="4"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                  className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 py-2 text-sm text-[#1F2937] dark:text-[#E4E9E2] placeholder:text-[#9CA3AF] dark:placeholder:text-[#6B7280] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-600">Status</label>
+                <label className="mb-1 block text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">
+                  Status
+                </label>
                 <select
                   value={form.status}
-                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, status: e.target.value }))
+                  }
+                  className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 py-2 text-sm text-[#1F2937] dark:text-[#E4E9E2] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 >
                   {STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -158,18 +190,18 @@ export default function AddTableModal({ open, onClose, floors, defaultFloorId, e
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <div className="flex items-center justify-end gap-2 border-t border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/10"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-[#1C3044] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#27435B] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-[#3FA34D] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? "Saving…" : editingTable ? "Update Table" : "Save"}
             </button>
@@ -177,6 +209,6 @@ export default function AddTableModal({ open, onClose, floors, defaultFloorId, e
         </form>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

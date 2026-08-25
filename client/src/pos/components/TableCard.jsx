@@ -5,15 +5,15 @@ import { Pencil, Trash2, Users, UserCog, X, CalendarClock, Check } from "lucide-
 const STATUS_META = {
   FREE: {
     label: "Available",
-    className: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    className: "bg-[#EAF6EC] dark:bg-[#43B75A]/10 text-[#3FA34D] dark:text-[#43B75A] border-[#3FA34D]/20 dark:border-[#43B75A]/30",
   },
   OCCUPIED: {
     label: "Occupied",
-    className: "bg-red-50 text-red-600 border-red-200",
+    className: "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30",
   },
   RESERVED: {
     label: "Reserved",
-    className: "bg-amber-50 text-amber-600 border-amber-200",
+    className: "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30",
   },
 };
 
@@ -44,9 +44,9 @@ export default function TableCard({
   return (
     <div
       onClick={assignMode ? () => onToggleSelect?.(table.id) : undefined}
-      className={`rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md ${
+      className={`rounded-2xl border bg-white dark:bg-[#1D231D] p-4 shadow-sm transition-shadow hover:shadow-md dark:hover:shadow-black/30 ${
         assignMode ? "cursor-pointer" : ""
-      } ${selected ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-200"}`}
+      } ${selected ? "border-[#3FA34D] dark:border-[#43B75A] ring-2 ring-[#EAF6EC] dark:ring-[#43B75A]/20" : "border-[#E7EAE1] dark:border-[#262B24]"}`}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-2">
@@ -56,14 +56,14 @@ export default function TableCard({
               checked={selected}
               onChange={() => onToggleSelect?.(table.id)}
               onClick={(e) => e.stopPropagation()}
-              className="mt-1 h-4 w-4 rounded border-slate-300"
+              className="mt-1 h-4 w-4 rounded border-[#9CA3AF] dark:border-[#4B5563]"
             />
           )}
           <div>
-            <p className="font-mono text-base font-bold text-slate-800">
+            <p className="font-mono text-base font-bold text-[#1F2937] dark:text-white">
               {table.name}
             </p>
-            <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+            <p className="mt-1 flex items-center gap-1 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
               <Users className="h-3.5 w-3.5" />
               {table.capacity ? `${table.capacity} seats` : "Capacity not set"}
             </p>
@@ -77,11 +77,11 @@ export default function TableCard({
       </div>
 
       {/* Assigned waiter badge */}
-      <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5">
-        <span className="flex items-center gap-1.5 text-xs text-slate-500">
+      <div className="mt-3 flex items-center justify-between rounded-lg bg-[#F3F5EE] dark:bg-white/5 px-2.5 py-1.5">
+        <span className="flex items-center gap-1.5 text-xs text-[#6B7280] dark:text-[#9CA8A0]">
           <UserCog className="h-3.5 w-3.5" />
           {table.waiter ? (
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-[#1F2937] dark:text-white">
               {table.waiter.fullName}
             </span>
           ) : (
@@ -96,7 +96,7 @@ export default function TableCard({
             }}
             disabled={unassigning}
             title="Unassign waiter"
-            className="rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            className="rounded-md p-1 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -112,9 +112,9 @@ export default function TableCard({
               e.stopPropagation();
               setShowReservationActions((v) => !v);
             }}
-            className="flex w-full items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-left"
+            className="flex w-full items-center justify-between rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1.5 text-left"
           >
-            <span className="flex items-center gap-1.5 text-xs text-amber-700">
+            <span className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
               <CalendarClock className="h-3.5 w-3.5" />
               <span className="font-medium">
                 {new Date(reservation.reservedFor).toLocaleTimeString([], {
@@ -127,14 +127,14 @@ export default function TableCard({
           </button>
 
           {showReservationActions && (
-            <div className="absolute left-0 right-0 top-full z-10 mt-1 flex gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+            <div className="absolute left-0 right-0 top-full z-10 mt-1 flex gap-1 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] p-1.5 shadow-lg">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowReservationActions(false);
                   onSeatReservation?.(reservation.id);
                 }}
-                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-[#EAF6EC] dark:bg-[#43B75A]/10 px-2 py-1.5 text-xs font-semibold text-[#3FA34D] dark:text-[#43B75A] hover:bg-[#D9F3E2] dark:hover:bg-[#43B75A]/20"
               >
                 <Check className="h-3.5 w-3.5" />
                 Seat now
@@ -145,7 +145,7 @@ export default function TableCard({
                   setShowReservationActions(false);
                   onCancelReservation?.(reservation.id);
                 }}
-                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-red-50 px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100"
+                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-red-50 dark:bg-red-500/10 px-2 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20"
               >
                 <X className="h-3.5 w-3.5" />
                 Cancel
@@ -157,33 +157,33 @@ export default function TableCard({
 
       {!assignMode &&
         (confirmingDelete ? (
-          <div className="mt-4 flex items-center justify-between rounded-lg bg-red-50 px-3 py-2">
-            <span className="text-xs font-medium text-red-600">
+          <div className="mt-4 flex items-center justify-between rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2">
+            <span className="text-xs font-medium text-red-600 dark:text-red-400">
               Delete this table?
             </span>
             <div className="flex gap-3">
               <button
                 onClick={onCancelDelete}
-                className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                className="text-xs font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#1F2937] dark:hover:text-white"
               >
                 Cancel
               </button>
               <button
                 onClick={() => onDelete(table.id)}
                 disabled={deleting}
-                className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                className="text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50"
               >
                 {deleting ? "Deleting…" : "Confirm"}
               </button>
             </div>
           </div>
         ) : (
-          <div className="mt-4 flex justify-end gap-1 border-t border-slate-100 pt-3">
+          <div className="mt-4 flex justify-end gap-1 border-t border-[#E7EAE1] dark:border-[#262B24] pt-3">
             {onReserve && (
               <button
                 onClick={() => onReserve(table)}
                 title="Reserve this table"
-                className="rounded-lg p-2 text-slate-400 hover:bg-amber-50 hover:text-amber-600"
+                className="rounded-lg p-2 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-amber-50 dark:hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400"
               >
                 <CalendarClock className="h-4 w-4" />
               </button>
@@ -191,14 +191,14 @@ export default function TableCard({
             <button
               onClick={() => onEdit(table)}
               title="Edit table"
-              className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+              className="rounded-lg p-2 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10 hover:text-[#3FA34D] dark:hover:text-[#43B75A]"
             >
               <Pencil className="h-4 w-4" />
             </button>
             <button
               onClick={() => onRequestDelete(table.id)}
               title="Delete table"
-              className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+              className="rounded-lg p-2 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
             >
               <Trash2 className="h-4 w-4" />
             </button>

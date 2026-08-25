@@ -225,15 +225,15 @@ export default function OrdersPage() {
   const isTakeawayTab = filter === "TAKEAWAY";
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-3">
+    <div className="flex h-screen flex-col bg-[#F3F5EE] dark:bg-[#12160F]">
+      <header className="border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF6EC] dark:bg-[#43B75A]/10">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                className="h-5 w-5 text-blue-600"
+                className="h-5 w-5 text-[#3FA34D] dark:text-[#43B75A]"
               >
                 <path
                   d="M4 6h16M4 12h16M4 18h7"
@@ -245,8 +245,8 @@ export default function OrdersPage() {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Orders</h1>
-              <p className="text-xs text-slate-400">
+              <h1 className="text-lg font-bold text-[#1F2937] dark:text-white">Orders</h1>
+              <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                 {occupiedTableCount} active table
                 {occupiedTableCount === 1 ? "" : "s"} of {tables.length} ·{" "}
                 {takeawayOrders.length} active takeaway order
@@ -258,16 +258,16 @@ export default function OrdersPage() {
             <button
               onClick={() => setShowMoveModal(true)}
               disabled={occupiedTableCount === 0}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-[#E7EAE1] dark:border-[#262B24] px-3 py-1.5 text-sm font-semibold text-[#6B7280] dark:text-[#9CA8A0] transition-colors hover:bg-[#F3F5EE] dark:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Move KOT / Items
             </button>
-            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+            {error && <p className="text-sm font-medium text-[#EF5350] dark:text-red-400">{error}</p>}
           </div>
         </div>
 
         {isOffline && (
-          <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <div className="mt-3 flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
             <WifiOff className="h-3.5 w-3.5" />
             Offline — showing last-synced orders. "Order Delivered" will sync
             automatically once back online.
@@ -281,8 +281,8 @@ export default function OrdersPage() {
               onClick={() => setFilter(f.key)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 filter === f.key
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-[#3FA34D] text-white hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
+                  : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
               }`}
             >
               {f.label}
@@ -293,10 +293,10 @@ export default function OrdersPage() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <p className="text-sm text-slate-400">Loading orders…</p>
+          <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading orders…</p>
         ) : visibleItems.length === 0 ? (
           <div className="flex h-40 items-center justify-center">
-            <p className="text-slate-400">
+            <p className="text-[#9CA3AF] dark:text-[#6B7280]">
               {isTakeawayTab
                 ? "No active takeaway orders."
                 : "No tables match this filter."}
@@ -326,7 +326,7 @@ export default function OrdersPage() {
           <div className="mt-8">
             <button
               onClick={toggleCompletedTakeaway}
-              className="text-sm font-semibold text-blue-600 hover:underline"
+              className="text-sm font-semibold text-[#3FA34D] dark:text-[#43B75A] hover:underline"
             >
               {showCompletedTakeaway
                 ? "Hide completed orders"
@@ -334,42 +334,42 @@ export default function OrdersPage() {
             </button>
 
             {showCompletedTakeaway && (
-              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              <div className="mt-3 overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
+                <div className="border-b border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-white/5 px-4 py-2.5">
+                  <h2 className="text-xs font-bold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0]">
                     Completed Takeaway Orders
                   </h2>
                 </div>
                 {completedLoading ? (
-                  <p className="p-4 text-sm text-slate-400">Loading…</p>
+                  <p className="p-4 text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading…</p>
                 ) : completedError ? (
-                  <p className="p-4 text-sm font-medium text-red-600">
+                  <p className="p-4 text-sm font-medium text-[#EF5350] dark:text-red-400">
                     {completedError}
                   </p>
                 ) : completedTakeaway.length === 0 ? (
-                  <p className="p-4 text-sm text-slate-400">
+                  <p className="p-4 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
                     No completed takeaway orders yet.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
                     {completedTakeaway.map((order) => (
                       <li
                         key={order.id}
                         className="flex items-center justify-between px-4 py-3 text-sm"
                       >
                         <div>
-                          <p className="font-mono text-xs font-medium text-slate-500">
+                          <p className="font-mono text-xs font-medium text-[#6B7280] dark:text-[#9CA8A0]">
                             {order.orderNumber}
                           </p>
-                          <p className="font-medium text-slate-800">
+                          <p className="font-medium text-[#1F2937] dark:text-white">
                             {order.customerName || "Walk-in"}
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
+                          <span className="rounded-full border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-white/5 px-2.5 py-1 text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
                             Completed
                           </span>
-                          <span className="font-mono text-sm font-bold text-blue-600">
+                          <span className="font-mono text-sm font-bold text-[#3FA34D] dark:text-[#43B75A]">
                             ₹{Number(order.grandTotal).toFixed(2)}
                           </span>
                         </div>

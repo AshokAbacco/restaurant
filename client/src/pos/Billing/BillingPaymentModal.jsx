@@ -20,7 +20,12 @@ function makeSplitLineId() {
   return `split_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export default function BillingPaymentModal({ orderId, isOpen, onClose, onCompleted }) {
+export default function BillingPaymentModal({
+  orderId,
+  isOpen,
+  onClose,
+  onCompleted,
+}) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,7 +49,11 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
         }
         setSummary(data);
         setSplitLines([
-          { id: makeSplitLineId(), method: "CASH", amount: data.balanceDue || data.grandTotal },
+          {
+            id: makeSplitLineId(),
+            method: "CASH",
+            amount: data.balanceDue || data.grandTotal,
+          },
         ]);
       })
       .catch((err) => setError(err.message))
@@ -54,19 +63,31 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
   if (!isOpen) return null;
 
   function updateSplitLine(id, patch) {
-    setSplitLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    setSplitLines((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    );
   }
 
   function addSplitLine() {
-    setSplitLines((prev) => [...prev, { id: makeSplitLineId(), method: "CASH", amount: "" }]);
+    setSplitLines((prev) => [
+      ...prev,
+      { id: makeSplitLineId(), method: "CASH", amount: "" },
+    ]);
   }
 
   function removeSplitLine(id) {
-    setSplitLines((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
+    setSplitLines((prev) =>
+      prev.length > 1 ? prev.filter((l) => l.id !== id) : prev,
+    );
   }
 
-  const splitTotal = splitLines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
-  const splitMismatch = summary ? Math.abs(splitTotal - summary.balanceDue) > 0.01 : true;
+  const splitTotal = splitLines.reduce(
+    (sum, l) => sum + (Number(l.amount) || 0),
+    0,
+  );
+  const splitMismatch = summary
+    ? Math.abs(splitTotal - summary.balanceDue) > 0.01
+    : true;
 
   async function handleCompletePayment() {
     if (!summary) return;
@@ -95,65 +116,100 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 print:bg-transparent print:p-0">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl print:max-h-none print:w-full print:max-w-none print:shadow-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F2937]/40 dark:bg-black/60 p-4 print:bg-transparent print:p-0">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white dark:bg-[#171C17] shadow-xl print:max-h-none print:w-full print:max-w-none print:shadow-none">
         {!result && (
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 print:hidden">
-            <h2 className="text-lg font-bold text-[#1C3044]">Billing &amp; Payment</h2>
+          <div className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] px-5 py-4 print:hidden">
+            <h2 className="text-lg font-bold text-[#1F2937] dark:text-white">
+              Billing &amp; Payment
+            </h2>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/10 hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
             >
               <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
         )}
 
         {result ? (
-          <InvoiceView invoice={result.invoice} summary={summary} payments={result.payments} onDone={handleDone} />
+          <InvoiceView
+            invoice={result.invoice}
+            summary={summary}
+            payments={result.payments}
+            onDone={handleDone}
+          />
         ) : loading ? (
-          <div className="flex flex-1 items-center justify-center p-10 text-sm text-slate-400">
+          <div className="flex flex-1 items-center justify-center p-10 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
             Loading bill…
           </div>
         ) : error && !summary ? (
-          <div className="p-5 text-sm text-red-600">{error}</div>
+          <div className="p-5 text-sm text-[#EF5350] dark:text-red-400">
+            {error}
+          </div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4">
-              <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-white/5 p-3 text-sm">
                 <div>
-                  <p className="text-xs text-slate-400">Table</p>
-                  <p className="font-semibold text-slate-800">{summary.table?.name || "—"}</p>
+                  <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                    Table
+                  </p>
+                  <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                    {summary.table?.name || "—"}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Customer</p>
-                  <p className="font-semibold text-slate-800">{summary.customer?.name || "Walk-in"}</p>
+                  <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                    Customer
+                  </p>
+                  <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                    {summary.customer?.name || "Walk-in"}
+                  </p>
                 </div>
               </div>
 
               <ul className="mb-4 space-y-2">
                 {summary.items.map((item) => (
-                  <li key={item.id} className="flex items-start justify-between border-b border-slate-100 pb-2 text-sm">
+                  <li
+                    key={item.id}
+                    className="flex items-start justify-between border-b border-[#E7EAE1] dark:border-[#262B24] pb-2 text-sm"
+                  >
                     <div>
-                      <p className="font-medium text-slate-800">
-                        {item.name} <span className="text-slate-400">× {item.quantity}</span>
+                      <p className="font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                        {item.name}{" "}
+                        <span className="text-[#9CA3AF] dark:text-[#6B7280]">
+                          × {item.quantity}
+                        </span>
                       </p>
                       {item.addOns.map((a, idx) => (
-                        <p key={idx} className="text-xs text-slate-400">
+                        <p
+                          key={idx}
+                          className="text-xs text-[#9CA3AF] dark:text-[#6B7280]"
+                        >
                           + {a.name} × {a.quantity}
                         </p>
                       ))}
                     </div>
-                    <span className="font-mono font-semibold text-slate-800">
-                      ₹{(item.totalPrice + item.addOns.reduce((s, a) => s + a.totalPrice, 0)).toFixed(2)}
+                    <span className="font-mono font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                      ₹
+                      {(
+                        item.totalPrice +
+                        item.addOns.reduce((s, a) => s + a.totalPrice, 0)
+                      ).toFixed(2)}
                     </span>
                   </li>
                 ))}
               </ul>
 
-              <div className="space-y-1 border-t border-dashed border-slate-300 pt-3 font-mono text-sm text-slate-600">
+              <div className="space-y-1 border-t border-dashed border-[#D5DAD0] dark:border-[#2E342C] pt-3 font-mono text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span>₹{summary.subtotal.toFixed(2)}</span>
@@ -167,17 +223,17 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                   <span>₹{summary.sgst.toFixed(2)}</span>
                 </div>
                 {summary.discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
+                  <div className="flex justify-between text-[#3FA34D] dark:text-[#43B75A]">
                     <span>Discount</span>
                     <span>−₹{summary.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-t border-slate-200 pt-1.5 text-base font-bold text-slate-900">
+                <div className="flex justify-between border-t border-[#E7EAE1] dark:border-[#262B24] pt-1.5 text-base font-bold text-[#1F2937] dark:text-white">
                   <span>Grand Total</span>
                   <span>₹{summary.grandTotal.toFixed(2)}</span>
                 </div>
                 {summary.totalPaid > 0 && (
-                  <div className="flex justify-between text-xs text-slate-400">
+                  <div className="flex justify-between text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                     <span>Already paid</span>
                     <span>₹{summary.totalPaid.toFixed(2)}</span>
                   </div>
@@ -185,7 +241,7 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
               </div>
 
               <div className="mt-5">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                   Payment Method
                 </p>
                 <div className="flex gap-2">
@@ -195,8 +251,8 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                       onClick={() => setMode(m.key)}
                       className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
                         mode === m.key
-                          ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          ? "border-[#3FA34D] bg-[#3FA34D] text-white dark:border-[#43B75A] dark:bg-[#43B75A]"
+                          : "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       }`}
                     >
                       {m.label}
@@ -206,8 +262,8 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                     onClick={() => setMode("SPLIT")}
                     className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
                       mode === "SPLIT"
-                        ? "border-blue-600 bg-blue-600 text-white"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                        ? "border-[#3FA34D] bg-[#3FA34D] text-white dark:border-[#43B75A] dark:bg-[#43B75A]"
+                        : "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                     }`}
                   >
                     Split
@@ -220,8 +276,10 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                       <div key={line.id} className="flex items-center gap-2">
                         <select
                           value={line.method}
-                          onChange={(e) => updateSplitLine(line.id, { method: e.target.value })}
-                          className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+                          onChange={(e) =>
+                            updateSplitLine(line.id, { method: e.target.value })
+                          }
+                          className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-2 py-1.5 text-sm text-[#1F2937] dark:text-[#E4E9E2] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                         >
                           {PAYMENT_METHODS.map((m) => (
                             <option key={m.key} value={m.key}>
@@ -234,14 +292,16 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                           min="0"
                           step="0.01"
                           value={line.amount}
-                          onChange={(e) => updateSplitLine(line.id, { amount: e.target.value })}
+                          onChange={(e) =>
+                            updateSplitLine(line.id, { amount: e.target.value })
+                          }
                           placeholder="Amount"
-                          className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+                          className="flex-1 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-2 py-1.5 text-sm text-[#1F2937] dark:text-[#E4E9E2] placeholder:text-[#9CA3AF] dark:placeholder:text-[#6B7280] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                         />
                         <button
                           onClick={() => removeSplitLine(line.id)}
                           disabled={splitLines.length === 1}
-                          className="rounded-lg px-2 py-1.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-30"
+                          className="rounded-lg px-2 py-1.5 text-xs text-[#EF5350] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-30"
                         >
                           Remove
                         </button>
@@ -249,37 +309,42 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                     ))}
                     <button
                       onClick={addSplitLine}
-                      className="text-xs font-semibold text-blue-600 hover:underline"
+                      className="text-xs font-semibold text-[#3FA34D] dark:text-[#43B75A] hover:underline"
                     >
                       + Add another payment
                     </button>
-                    <p className={`text-xs font-medium ${splitMismatch ? "text-red-500" : "text-emerald-600"}`}>
-                      Split total: ₹{splitTotal.toFixed(2)} of ₹{summary.balanceDue.toFixed(2)} due
+                    <p
+                      className={`text-xs font-medium ${splitMismatch ? "text-[#EF5350] dark:text-red-400" : "text-[#3FA34D] dark:text-[#43B75A]"}`}
+                    >
+                      Split total: ₹{splitTotal.toFixed(2)} of ₹
+                      {summary.balanceDue.toFixed(2)} due
                     </p>
                   </div>
                 )}
               </div>
 
               {error && (
-                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                <p className="mt-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs font-medium text-[#EF5350] dark:text-red-400">
                   {error}
                 </p>
               )}
             </div>
 
-            <div className="border-t border-slate-200 px-5 py-4">
+            <div className="border-t border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
               <button
                 onClick={handleCompletePayment}
                 disabled={processing || (mode === "SPLIT" && splitMismatch)}
-                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="w-full rounded-lg bg-[#3FA34D] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] disabled:cursor-not-allowed disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280]"
               >
-                {processing ? "Processing payment…" : `Complete Payment · ₹${summary.balanceDue.toFixed(2)}`}
+                {processing
+                  ? "Processing payment…"
+                  : `Complete Payment · ₹${summary.balanceDue.toFixed(2)}`}
               </button>
             </div>
           </>
         )}
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

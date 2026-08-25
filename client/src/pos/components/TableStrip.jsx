@@ -7,11 +7,11 @@ import { fetchWithOfflineFallback } from "../../offline/offlineCache";
 import { subscribeToQueue } from "../../offline/offlineQueue";
 
 const STATUS_STYLE = {
-  FREE: "border-slate-200 bg-white text-slate-700 hover:border-blue-400",
+  FREE: "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] text-[#1F2937] dark:text-[#9CA8A0] hover:border-[#3FA34D] dark:hover:border-[#43B75A]",
   OCCUPIED:
-    "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-400",
+    "border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:border-amber-400",
   RESERVED:
-    "border-purple-200 bg-purple-50 text-purple-600 cursor-not-allowed opacity-60",
+    "border-purple-200 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 cursor-not-allowed opacity-60",
 };
 
 // FREE tables are the most common thing staff tap (starting a new order), so
@@ -117,7 +117,7 @@ export default function TableStrip({ selectedTableId, onSelect }) {
   return (
     <div>
       {isOffline && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+        <div className="mb-2 flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
           <WifiOff className="h-3.5 w-3.5" />
           Offline — showing last-synced tables. Occupied tables can't be added
           to until back online.
@@ -125,12 +125,12 @@ export default function TableStrip({ selectedTableId, onSelect }) {
       )}
 
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-400">
+        <span className="text-xs font-medium text-[#9CA3AF] dark:text-[#6B7280]">
           Select a floor
         </span>
         {/* <button
           onClick={() => setShowManager(true)}
-          className="flex items-center gap-1 rounded-lg bg-[#1C3044] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#27435B]"
+          className="flex items-center gap-1 rounded-xl bg-[#3FA34D] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
         >
           <Plus className="h-3.5 w-3.5" />
           Add Table
@@ -138,9 +138,9 @@ export default function TableStrip({ selectedTableId, onSelect }) {
       </div>
 
       {floorsLoading ? (
-        <div className="text-sm text-slate-400">Loading floors…</div>
+        <div className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading floors…</div>
       ) : floors.length === 0 ? (
-        <div className="text-sm text-slate-400">
+        <div className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
           No floors set up yet. Add a table to create one.
         </div>
       ) : (
@@ -151,8 +151,8 @@ export default function TableStrip({ selectedTableId, onSelect }) {
               onClick={() => setSelectedFloorId(floor.id)}
               className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 selectedFloorId === floor.id
-                  ? "bg-[#1C3044] text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-[#3FA34D] text-white dark:bg-[#43B75A]"
+                  : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
               }`}
             >
               {floor.name}
@@ -163,14 +163,14 @@ export default function TableStrip({ selectedTableId, onSelect }) {
 
       {floors.length > 0 && (
         <>
-          <span className="mb-2 block text-xs font-medium text-slate-400">
+          <span className="mb-2 block text-xs font-medium text-[#9CA3AF] dark:text-[#6B7280]">
             Select a table
           </span>
 
           {tablesLoading ? (
-            <div className="text-sm text-slate-400">Loading tables…</div>
+            <div className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading tables…</div>
           ) : sortedTables.length === 0 ? (
-            <div className="text-sm text-slate-400">
+            <div className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
               No tables on this floor yet.
             </div>
           ) : (
@@ -196,7 +196,7 @@ export default function TableStrip({ selectedTableId, onSelect }) {
                     onClick={() => onSelect(t)}
                     className={`shrink-0 rounded-lg border px-3 py-2 font-mono text-sm font-medium transition-colors ${
                       isSelected
-                        ? "border-blue-600 bg-blue-600 text-white"
+                        ? "border-[#3FA34D] bg-[#3FA34D] text-white dark:border-[#43B75A] dark:bg-[#43B75A]"
                         : STATUS_STYLE[t.status] || STATUS_STYLE.FREE
                     } ${isLockedOffline ? "cursor-not-allowed opacity-50" : ""}`}
                   >

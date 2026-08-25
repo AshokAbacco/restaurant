@@ -1,6 +1,6 @@
 // src/components/sidebar.jsx
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import {
@@ -39,10 +39,23 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
   const { user, logout } = useAuth();
 
   const location = useLocation();
-
+  const menuRef = useRef(null);
   // =====================================================
   // MOBILE DRAWER: lock body scroll + close on Escape
   // =====================================================
+
+  useEffect(() => {
+    if (!menuRef.current) return;
+
+    const activeItem = menuRef.current.querySelector(".active-menu");
+
+    if (activeItem) {
+      activeItem.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -443,7 +456,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
       {/* ===================== MENU ===================== */}
 
-      <div className="flex-1 overflow-y-auto py-4 px-3">
+      <div ref={menuRef} className="flex-1 overflow-y-auto py-4 px-3">
         <nav className="space-y-1">
           {menus.map((item) => {
             const active = location.pathname === item.path;
@@ -476,17 +489,19 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
             }
 
             return (
-              <NavLink
+             <NavLink
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
-                className={`relative flex items-center rounded-xl transition-all duration-200 ${
-                  collapsed ? "justify-center h-12" : "gap-4 px-4 py-3"
-                } ${
-                  active
-                    ? "bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 text-[#3FA34D] dark:text-[#43B75A] font-semibold"
-                    : "text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-[#1E241E] hover:text-[#1F2937] dark:hover:text-white"
-                }`}
+                className={({ isActive }) =>
+                  `relative flex items-center rounded-xl transition-all duration-200 ${
+                    collapsed ? "justify-center h-12" : "gap-4 px-4 py-3"
+                  } ${
+                    isActive
+                      ? "active-menu bg-[#3FA34D]/10 dark:bg-[#43B75A]/15 text-[#3FA34D] dark:text-[#43B75A] font-semibold"
+                      : "text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-[#1E241E] hover:text-[#1F2937] dark:hover:text-white"
+                  }`
+                }
               >
                 {active && !collapsed && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-[#3FA34D] dark:bg-[#43B75A]" />

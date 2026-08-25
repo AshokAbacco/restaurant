@@ -50,31 +50,31 @@ export default function SuccessToast({
       <div
         role="status"
         aria-live="polite"
-        className={`pointer-events-auto relative flex w-[320px] max-w-[calc(100vw-2rem)] items-start gap-3 overflow-hidden rounded-2xl border border-blue-100 bg-white p-4 shadow-lg shadow-blue-900/10 ring-1 ring-black/5 transition-all duration-300 ease-out ${
+        className={`pointer-events-auto relative flex w-[320px] max-w-[calc(100vw-2rem)] items-start gap-3 overflow-hidden rounded-2xl border border-[#EAF6EC] dark:border-[#43B75A]/20 bg-white dark:bg-[#1D231D] p-4 shadow-lg shadow-[#3FA34D]/10 dark:shadow-black/30 ring-1 ring-black/5 dark:ring-white/10 transition-all duration-300 ease-out ${
           entered ? "translate-x-0 opacity-100" : "translate-x-[130%] opacity-0"
         }`}
       >
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600" strokeWidth={2.4} />
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EAF6EC] dark:bg-[#43B75A]/15">
+          <CheckCircle2 className="h-5 w-5 text-[#3FA34D] dark:text-[#43B75A]" strokeWidth={2.4} />
         </span>
 
         <div className="min-w-0 flex-1 pt-0.5">
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          {message && <p className="mt-0.5 truncate text-xs text-slate-400">{message}</p>}
+          <p className="text-sm font-semibold text-[#1F2937] dark:text-white">{title}</p>
+          {message && <p className="mt-0.5 truncate text-xs text-[#9CA3AF] dark:text-[#6B7280]">{message}</p>}
         </div>
 
         <button
           onClick={dismiss}
           aria-label="Dismiss notification"
-          className="mt-0.5 shrink-0 rounded-lg p-1 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500"
+          className="mt-0.5 shrink-0 rounded-lg p-1 text-[#D1D5DB] dark:text-[#4B5563] transition-colors hover:bg-[#F3F5EE] dark:hover:bg-white/5 hover:text-[#9CA3AF] dark:hover:text-[#9CA8A0]"
         >
           <X className="h-4 w-4" strokeWidth={2} />
         </button>
 
         {/* Progress bar — subtle visual cue for the auto-dismiss countdown */}
-        <div className="absolute inset-x-0 bottom-0 h-1 overflow-hidden rounded-b-2xl bg-slate-100">
+        <div className="absolute inset-x-0 bottom-0 h-1 overflow-hidden rounded-b-2xl bg-[#F3F5EE] dark:bg-white/5">
           <div
-            className="h-full bg-emerald-500"
+            className="h-full bg-[#3FA34D] dark:bg-[#43B75A]"
             style={{
               animation: entered ? `success-toast-shrink ${duration}ms linear forwards` : "none",
             }}

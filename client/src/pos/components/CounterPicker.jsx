@@ -39,8 +39,8 @@ export default function CounterPicker({ onSelect }) {
         onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
           current
-            ? "border-slate-200 text-slate-600 hover:bg-slate-50"
-            : "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+            ? "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+            : "border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20"
         }`}
         title="Which physical counter/terminal is this?"
       >
@@ -50,11 +50,11 @@ export default function CounterPicker({ onSelect }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+        <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] p-1 shadow-lg">
           {loading ? (
-            <p className="px-2 py-1.5 text-xs text-slate-400">Loading…</p>
+            <p className="px-2 py-1.5 text-xs text-[#9CA3AF] dark:text-[#6B7280]">Loading…</p>
           ) : counters.length === 0 ? (
-            <p className="px-2 py-1.5 text-xs text-slate-400">
+            <p className="px-2 py-1.5 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
               No counters set up yet — add one in Settings.
             </p>
           ) : (
@@ -64,8 +64,8 @@ export default function CounterPicker({ onSelect }) {
                 onClick={() => handlePick(c)}
                 className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium ${
                   current?.id === c.id
-                    ? "bg-blue-50 text-blue-600"
-                    : "text-slate-600 hover:bg-slate-50"
+                    ? "bg-[#EAF6EC] dark:bg-[#43B75A]/10 text-[#3FA34D] dark:text-[#43B75A]"
+                    : "text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                 }`}
               >
                 {c.name}
