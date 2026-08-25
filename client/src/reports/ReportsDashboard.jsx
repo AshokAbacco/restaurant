@@ -28,7 +28,7 @@ import {
 import PageHeader from "../components/layout/PageHeader";
 import { getAccessToken } from "../api/apiClient";
 // If your app already has a central API base / axios instance, swap this out.
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const API_BASE = import.meta.env.VITE_API_BASE_URL; 
 
 const CATEGORY_COLORS = [
   "bg-green-500",

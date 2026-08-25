@@ -68,12 +68,12 @@ function ErrorToast({ message, onClose }) {
   if (!message) return null;
 
   return (
-    <div className="pointer-events-none fixed right-4 top-6 z-[100] font-body">
+    <div className="pointer-events-none fixed left-4 right-4 top-20 sm:left-auto sm:right-6 sm:top-6 z-[100] font-body">
       <div
         role="alert"
         aria-live="assertive"
-        className={`pointer-events-auto flex w-[320px] max-w-[calc(100vw-2rem)] items-start gap-3 overflow-hidden rounded-2xl border border-[#E7B4B0] bg-white p-4 shadow-lg shadow-[#7A1F1F]/10 ring-1 ring-black/5 transition-all duration-300 ease-out dark:border-[#5A2A26] dark:bg-[#1B211A] ${
-          entered ? "translate-x-0 opacity-100" : "translate-x-[130%] opacity-0"
+        className={`pointer-events-auto flex w-full sm:w-[320px] max-w-[calc(100vw-2rem)] items-start gap-3 overflow-hidden rounded-2xl border border-[#E7B4B0] bg-white p-4 shadow-lg shadow-[#7A1F1F]/10 ring-1 ring-black/5 transition-all duration-300 ease-out dark:border-[#5A2A26] dark:bg-[#1B211A] ${
+          entered ? "translate-y-0 sm:translate-x-0 opacity-100" : "-translate-y-[130%] sm:translate-y-0 sm:translate-x-[130%] opacity-0"
         }`}
       >
         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FBE9E7] dark:bg-[#3A2320]">
@@ -278,7 +278,7 @@ const Login = () => {
   // ==========================
 
   return (
-    <div className="h-screen bg-white dark:bg-[#10140F] flex relative overflow-hidden transition-colors font-body">
+    <div className="min-h-screen bg-white dark:bg-[#10140F] flex relative overflow-x-hidden transition-colors font-body">
       <LoginFonts />
       <ErrorToast message={toastMessage} onClose={() => setToastMessage("")} />
 
@@ -296,7 +296,7 @@ const Login = () => {
         title={
           theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
         }
-        className="absolute top-6 right-6 z-20 w-11 h-11 rounded-full border border-[#E4E0D2] dark:border-[#262B24] bg-white dark:bg-[#171C17] shadow-sm flex items-center justify-center hover:border-[#22B368]/40 dark:hover:border-[#59C97A]/40 transition-colors"
+        className="fixed top-4 right-4 sm:top-6 sm:right-6 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-[#E4E0D2] dark:border-[#262B24] bg-white dark:bg-[#171C17] shadow-sm flex items-center justify-center hover:border-[#22B368]/40 dark:hover:border-[#59C97A]/40 transition-colors"
       >
         {theme === "dark" ? (
           <FiSun size={18} className="text-[#E0A24C]" />
@@ -306,17 +306,18 @@ const Login = () => {
       </button>
 
       {/* ================= LEFT SIDE (HERO) ================= */}
+      {/* Hidden below lg — mobile/tablet users only see the sign-in card. */}
 
-      <div className="hidden lg:flex w-1/2 relative overflow-hidden z-10 h-full">
+      <div className="hidden lg:flex w-1/2 relative overflow-hidden z-10 min-h-screen">
         {/* dotted grid accent, top-left corner */}
         <DotGrid className="absolute top-6 left-10 w-24 h-16 text-[#D8E6DB] dark:text-[#1E271F]" />
 
-        <div className="relative z-10 flex flex-col justify-center px-16 xl:px-20 w-full h-full py-4 max-h-screen">
-          <p className="text-[#22B368] dark:text-[#59C97A] text-4xl font-extrabold tracking-tight mb-5.5">
+        <div className="relative z-10 flex flex-col justify-center px-10 lg:px-12 xl:px-20 w-full py-10">
+          <p className="text-[#22B368] dark:text-[#59C97A] text-3xl xl:text-4xl font-extrabold tracking-tight mb-5.5">
             Restaurant ERP
           </p>
 
-          <h1 className="text-2xl xl:text-[1.85rem] font-extrabold leading-[1.15] text-[#1C2620] dark:text-white">
+          <h1 className="text-xl lg:text-2xl xl:text-[1.85rem] font-extrabold leading-[1.15] text-[#1C2620] dark:text-white">
             Manage your restaurant 
            
             <span className="text-[#22B368] dark:text-[#59C97A]"> smarter,</span>{" "}
@@ -337,12 +338,12 @@ const Login = () => {
           <img
             src="/Res/res.png"
             alt="Restaurant ERP illustration"
-            className="w-full max-w-[220px] xl:max-w-[400px]  mx-auto my-3 select-none"
+            className="w-full max-w-[180px] lg:max-w-[260px] xl:max-w-[400px] mx-auto my-3 select-none"
             draggable="false"
           />
 
-          {/* feature strip */}
-          <div className="grid grid-cols-4 gap-3 bg-white dark:bg-[#171C17] rounded-2xl shadow-xl shadow-black/5 border border-[#EDEFE7] dark:border-[#262B24] px-4 py-4">
+          {/* feature strip — 2 cols while the panel is narrow (lg), 4 once there's room (xl+) */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 bg-white dark:bg-[#171C17] rounded-2xl shadow-xl shadow-black/5 border border-[#EDEFE7] dark:border-[#262B24] px-4 py-4">
             {features.map((feature, index) => (
               <div key={index} className="min-w-0">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#E9F8EE] dark:bg-[#1D2B20] text-[#22B368] dark:text-[#59C97A] text-sm mb-2">
@@ -362,25 +363,25 @@ const Login = () => {
 
       {/* ================= RIGHT SIDE ================= */}
 
-      <div className="flex-1 flex justify-center items-center p-4 lg:p-6 relative z-10 h-full">
+      <div className="flex-1 flex justify-center items-center p-4 sm:p-6 lg:p-8 relative z-10 min-h-screen">
         <div className="w-full max-w-md">
           {/* Mobile wordmark (left panel is hidden below lg) */}
           <div className="mb-4 flex items-center justify-center gap-2.5 lg:hidden">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#22B368]/10 dark:bg-[#59C97A]/10 text-[#22B368] dark:text-[#59C97A]">
               <FaUtensils size={15} />
             </span>
-            <span className="text-xl font-extrabold text-[#1C2620] dark:text-white">
+            <span className="text-lg sm:text-xl font-extrabold text-[#1C2620] dark:text-white">
               Restaurant ERP
             </span>
           </div>
 
-          <div className="rounded-3xl shadow-2xl shadow-black/5 border border-[#EDEFE7] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-8 py-6 transition-colors">
+          <div className="rounded-2xl sm:rounded-3xl shadow-2xl shadow-black/5 border border-[#EDEFE7] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-5 py-6 sm:px-8 sm:py-7 transition-colors">
             <div className="text-center">
-              <div className="mx-auto w-12 h-12 rounded-full bg-[#22B368] dark:bg-[#43B75A] flex items-center justify-center shadow-lg">
+              <div className="mx-auto w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#22B368] dark:bg-[#43B75A] flex items-center justify-center shadow-lg">
                 <FaUtensils className="text-white" size={18} />
               </div>
 
-              <h2 className="mt-3 text-xl font-extrabold text-[#1C2620] dark:text-white">
+              <h2 className="mt-3 text-lg sm:text-xl font-extrabold text-[#1C2620] dark:text-white">
                 {pendingOutletSelection ? "Choose an outlet" : "Welcome back!"}
               </h2>
 
@@ -395,7 +396,7 @@ const Login = () => {
               // ==========================
               // OUTLET PICKER (multi-outlet accounts, second login step)
               // ==========================
-              <div className="mt-8 space-y-3">
+              <div className="mt-6 sm:mt-8 space-y-3">
                 {outletError && (
                   <p className="text-[#C0392B] dark:text-[#E5786A] text-sm text-center mb-2">
                     {outletError}
@@ -408,7 +409,7 @@ const Login = () => {
                     type="button"
                     disabled={selectingOutletId !== null}
                     onClick={() => handleSelectOutlet(outlet.id)}
-                    className="w-full flex items-center justify-between gap-3 px-5 py-4 rounded-xl border border-[#E4E0D2] dark:border-[#262B24] bg-[#FBF9F3] dark:bg-[#1D231D] hover:border-[#22B368] dark:hover:border-[#59C97A] disabled:opacity-50 transition-all text-left"
+                    className="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 sm:py-4 rounded-xl border border-[#E4E0D2] dark:border-[#262B24] bg-[#FBF9F3] dark:bg-[#1D231D] hover:border-[#22B368] dark:hover:border-[#59C97A] disabled:opacity-50 transition-all text-left"
                   >
                     <span className="flex items-center gap-3 min-w-0">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22B368]/10 dark:bg-[#59C97A]/10">
@@ -463,7 +464,7 @@ const Login = () => {
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="you@restaurant.com"
-                      className={`w-full pl-12 pr-4 py-2.5 rounded-xl border bg-white dark:bg-[#1D231D] text-[#1C2620] dark:text-white outline-none transition-all ${
+                      className={`w-full pl-12 pr-4 py-3 rounded-xl border bg-white dark:bg-[#1D231D] text-[#1C2620] dark:text-white outline-none transition-all ${
                         errors.email
                           ? "border-[#D64545]"
                           : "border-[#E4E0D2] dark:border-[#262B24] focus:border-[#22B368] dark:focus:border-[#59C97A]"
@@ -583,7 +584,7 @@ const Login = () => {
 
             {/* Footer */}
 
-            <div className="mt-8">
+            <div className="mt-6 sm:mt-8">
               <div className="flex items-center gap-3" aria-hidden="true">
                 <span className="h-px flex-1 bg-[#E4E0D2] dark:bg-[#262B24]" />
                 <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
