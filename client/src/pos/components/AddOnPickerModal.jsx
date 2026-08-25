@@ -63,15 +63,15 @@ export default function AddOnPickerModal({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white dark:bg-[#1D231D] shadow-xl">
+        <div className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold text-[#1C3044]">Add-ons</h2>
-            <p className="text-xs text-slate-400">{menuItem.name}</p>
+            <h2 className="text-lg font-bold text-[#1F2937] dark:text-white">Add-ons</h2>
+            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">{menuItem.name}</p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5 hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
               <path
@@ -86,17 +86,17 @@ export default function AddOnPickerModal({
 
         <div className="flex-1 overflow-y-auto p-5">
           {isOffline && !loading && catalog.length > 0 && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+            <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
               <WifiOff className="h-3.5 w-3.5" />
               Offline — showing last-synced add-ons.
             </div>
           )}
           {loading ? (
-            <p className="text-sm text-slate-400">Loading add-ons…</p>
+            <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading add-ons…</p>
           ) : error ? (
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           ) : catalog.length === 0 ? (
-            <p className="text-sm text-slate-400">No add-ons available.</p>
+            <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">No add-ons available.</p>
           ) : (
             <ul className="space-y-3">
               {catalog.map((addOn) => {
@@ -104,30 +104,30 @@ export default function AddOnPickerModal({
                 return (
                   <li
                     key={addOn.id}
-                    className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5"
+                    className="flex items-center justify-between rounded-xl border border-[#E7EAE1] dark:border-[#262B24] px-3 py-2.5"
                   >
                     <div>
-                      <p className="text-sm font-medium text-slate-800">
+                      <p className="text-sm font-medium text-[#1F2937] dark:text-white">
                         {addOn.name}
                       </p>
-                      <p className="font-mono text-xs text-slate-400">
+                      <p className="font-mono text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                         ₹{Number(addOn.price).toFixed(0)}
                       </p>
                     </div>
-                    <div className="flex items-center rounded-lg border border-slate-200">
+                    <div className="flex items-center rounded-lg border border-[#E7EAE1] dark:border-[#262B24]">
                       <button
                         onClick={() => setQty(addOn.id, qty - 1)}
                         disabled={qty === 0}
-                        className="px-2.5 py-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                        className="px-2.5 py-1 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5 disabled:opacity-30"
                       >
                         −
                       </button>
-                      <span className="w-6 text-center font-mono text-sm text-slate-700">
+                      <span className="w-6 text-center font-mono text-sm text-[#1F2937] dark:text-white">
                         {qty}
                       </span>
                       <button
                         onClick={() => setQty(addOn.id, qty + 1)}
-                        className="px-2.5 py-1 text-slate-500 hover:bg-slate-100"
+                        className="px-2.5 py-1 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       >
                         +
                       </button>
@@ -139,16 +139,16 @@ export default function AddOnPickerModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
           <button
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="rounded-lg bg-[#3FA34D] px-5 py-2 text-sm font-semibold text-white hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
           >
             Add to Ticket
           </button>

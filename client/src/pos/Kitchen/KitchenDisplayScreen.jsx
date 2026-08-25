@@ -192,15 +192,15 @@ export default function KitchenDisplayScreen() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-3">
+    <div className="flex h-screen flex-col bg-[#F3F5EE] dark:bg-[#12160F]">
+      <header className="border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF6EC] dark:bg-[#43B75A]/10">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                className="h-5 w-5 text-blue-600"
+                className="h-5 w-5 text-[#3FA34D] dark:text-[#43B75A]"
               >
                 <rect
                   x="3"
@@ -215,19 +215,23 @@ export default function KitchenDisplayScreen() {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">
+              <h1 className="text-lg font-bold text-[#1F2937] dark:text-white">
                 Kitchen Display
               </h1>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                 {visibleKots.length} active ticket
                 {visibleKots.length === 1 ? "" : "s"}
               </p>
             </div>
           </div>
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+          {error && (
+            <p className="text-sm font-medium text-[#EF5350] dark:text-red-400">
+              {error}
+            </p>
+          )}
         </div>
         {isOffline && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <div className="mt-2 flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
             <WifiOff className="h-3.5 w-3.5" />
             Offline — showing last-synced tickets plus any new orders placed on
             this device. Everything syncs automatically once back online.
@@ -236,13 +240,13 @@ export default function KitchenDisplayScreen() {
       </header>
 
       {sections.length > 0 && (
-        <div className="flex gap-2 border-b border-slate-200 bg-white px-6 py-2">
+        <div className="flex gap-2 border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-2">
           <button
             onClick={() => setActiveSectionId("ALL")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               activeSectionId === "ALL"
-                ? "bg-blue-600 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-[#3FA34D] text-white hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
+                : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
             }`}
           >
             All Stations
@@ -253,8 +257,8 @@ export default function KitchenDisplayScreen() {
               onClick={() => setActiveSectionId(s.id)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 activeSectionId === s.id
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-[#3FA34D] text-white hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
+                  : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
               }`}
             >
               {s.name}
@@ -265,10 +269,14 @@ export default function KitchenDisplayScreen() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <p className="text-sm text-slate-400">Loading tickets…</p>
+          <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+            Loading tickets…
+          </p>
         ) : visibleKots.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <p className="text-slate-400">No active tickets. All caught up.</p>
+            <p className="text-[#9CA3AF] dark:text-[#6B7280]">
+              No active tickets. All caught up.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

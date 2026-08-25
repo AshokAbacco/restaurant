@@ -137,13 +137,13 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 print:bg-transparent print:p-0">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl print:max-h-none print:w-full print:max-w-none print:shadow-none">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-xl print:max-h-none print:w-full print:max-w-none print:shadow-none">
         {!result && (
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 print:hidden">
-            <h2 className="text-lg font-bold text-[#1C3044]">Billing &amp; Payment</h2>
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-5 py-4 print:hidden">
+            <h2 className="text-lg font-bold text-[#1C3044] dark:text-white">Billing &amp; Payment</h2>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300"
             >
               <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -155,46 +155,46 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
         {result ? (
           <InvoiceView invoice={result.invoice} summary={summary} payments={result.payments} onDone={handleDone} />
         ) : loading ? (
-          <div className="flex flex-1 items-center justify-center p-10 text-sm text-slate-400">
+          <div className="flex flex-1 items-center justify-center p-10 text-sm text-slate-400 dark:text-slate-500">
             Loading bill…
           </div>
         ) : error && !summary ? (
-          <div className="p-5 text-sm text-red-600">{error}</div>
+          <div className="p-5 text-sm text-red-600 dark:text-red-400">{error}</div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4">
-              <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 text-sm">
                 <div>
-                  <p className="text-xs text-slate-400">Table</p>
-                  <p className="font-semibold text-slate-800">{summary.table?.name || "—"}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Table</p>
+                  <p className="font-semibold text-slate-800 dark:text-slate-100">{summary.table?.name || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Customer</p>
-                  <p className="font-semibold text-slate-800">{summary.customer?.name || "Walk-in"}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Customer</p>
+                  <p className="font-semibold text-slate-800 dark:text-slate-100">{summary.customer?.name || "Walk-in"}</p>
                 </div>
               </div>
 
               <ul className="mb-4 space-y-2">
                 {summary.items.map((item) => (
-                  <li key={item.id} className="flex items-start justify-between border-b border-slate-100 pb-2 text-sm">
+                  <li key={item.id} className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-2 text-sm">
                     <div>
-                      <p className="font-medium text-slate-800">
-                        {item.name} <span className="text-slate-400">× {item.quantity}</span>
+                      <p className="font-medium text-slate-800 dark:text-slate-100">
+                        {item.name} <span className="text-slate-400 dark:text-slate-500">× {item.quantity}</span>
                       </p>
                       {item.addOns.map((a, idx) => (
-                        <p key={idx} className="text-xs text-slate-400">
+                        <p key={idx} className="text-xs text-slate-400 dark:text-slate-500">
                           + {a.name} × {a.quantity}
                         </p>
                       ))}
                     </div>
-                    <span className="font-mono font-semibold text-slate-800">
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">
                       ₹{(item.totalPrice + item.addOns.reduce((s, a) => s + a.totalPrice, 0)).toFixed(2)}
                     </span>
                   </li>
                 ))}
               </ul>
 
-              <div className="space-y-1 border-t border-dashed border-slate-300 pt-3 font-mono text-sm text-slate-600">
+              <div className="space-y-1 border-t border-dashed border-slate-300 dark:border-slate-700 pt-3 font-mono text-sm text-slate-600 dark:text-slate-400">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span>₹{summary.subtotal.toFixed(2)}</span>
@@ -208,17 +208,17 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                   <span>₹{summary.sgst.toFixed(2)}</span>
                 </div>
                 {summary.discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
+                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                     <span>Discount</span>
                     <span>−₹{summary.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-t border-slate-200 pt-1.5 text-base font-bold text-slate-900">
+                <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1.5 text-base font-bold text-slate-900 dark:text-white">
                   <span>Grand Total</span>
                   <span>₹{summary.grandTotal.toFixed(2)}</span>
                 </div>
                 {summary.totalPaid > 0 && (
-                  <div className="flex justify-between text-xs text-slate-400">
+                  <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500">
                     <span>Already paid</span>
                     <span>₹{summary.totalPaid.toFixed(2)}</span>
                   </div>
@@ -226,7 +226,7 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
               </div>
 
               <div className="mt-5">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                   Payment Method
                 </p>
                 <div className="flex gap-2">
@@ -237,7 +237,7 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                       className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
                         mode === m.key
                           ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                       }`}
                     >
                       {m.label}
@@ -248,7 +248,7 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                     className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
                       mode === "SPLIT"
                         ? "border-blue-600 bg-blue-600 text-white"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                     }`}
                   >
                     Split
@@ -262,7 +262,7 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                         <select
                           value={line.method}
                           onChange={(e) => updateSplitLine(line.id, { method: e.target.value })}
-                          className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
                         >
                           {PAYMENT_METHODS.map((m) => (
                             <option key={m.key} value={m.key}>
@@ -277,12 +277,12 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                           value={line.amount}
                           onChange={(e) => updateSplitLine(line.id, { amount: e.target.value })}
                           placeholder="Amount"
-                          className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+                          className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
                         />
                         <button
                           onClick={() => removeSplitLine(line.id)}
                           disabled={splitLines.length === 1}
-                          className="rounded-lg px-2 py-1.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-30"
+                          className="rounded-lg px-2 py-1.5 text-xs text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-30"
                         >
                           Remove
                         </button>
@@ -290,11 +290,11 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                     ))}
                     <button
                       onClick={addSplitLine}
-                      className="text-xs font-semibold text-blue-600 hover:underline"
+                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       + Add another payment
                     </button>
-                    <p className={`text-xs font-medium ${splitMismatch ? "text-red-500" : "text-emerald-600"}`}>
+                    <p className={`text-xs font-medium ${splitMismatch ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                       Split total: ₹{splitTotal.toFixed(2)} of ₹{summary.balanceDue.toFixed(2)} due
                     </p>
                   </div>
@@ -302,22 +302,22 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
               </div>
 
               {/* FEATURE (Phase 1.2 — Due Payment Settlement) */}
-              <div className="mt-5 border-t border-slate-100 pt-4">
+              <div className="mt-5 border-t border-slate-100 dark:border-slate-800 pt-4">
                 {summary.customer ? (
                   <>
-                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                       <input
                         type="checkbox"
                         checked={markRestAsDue}
                         onChange={(e) => setMarkRestAsDue(e.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300"
+                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
                       />
                       Mark remaining balance as due for {summary.customer.name}
                     </label>
 
                     {markRestAsDue && mode !== "SPLIT" && (
                       <div className="mt-3 flex items-center gap-2">
-                        <label className="text-xs text-slate-500 whitespace-nowrap">
+                        <label className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                           Collecting now
                         </label>
                         <input
@@ -327,37 +327,37 @@ export default function BillingPaymentModal({ orderId, isOpen, onClose, onComple
                           step="0.01"
                           value={dueCollectNowAmount}
                           onChange={(e) => setDueCollectNowAmount(e.target.value)}
-                          className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+                          className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
                         />
                       </div>
                     )}
 
                     {markRestAsDue && (
-                      <p className="mt-2 text-xs font-medium text-amber-600">
+                      <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
                         ₹{dueRemaining.toFixed(2)} will be tracked as due against{" "}
                         {summary.customer.name}, and the order will still be completed.
                       </p>
                     )}
                   </>
                 ) : (
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
                     Add a customer to this order to offer "mark as due" billing.
                   </p>
                 )}
               </div>
 
               {error && (
-                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                <p className="mt-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400">
                   {error}
                 </p>
               )}
             </div>
 
-            <div className="border-t border-slate-200 px-5 py-4">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-5 py-4">
               <button
                 onClick={handleCompletePayment}
                 disabled={processing || (mode === "SPLIT" && splitMismatch)}
-                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700"
               >
                 {processing
                   ? "Processing payment…"

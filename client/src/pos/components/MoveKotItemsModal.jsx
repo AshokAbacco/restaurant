@@ -132,19 +132,19 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white dark:bg-[#1D231D] shadow-xl"
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-lg font-bold text-[#1C3044]">Move KOT / Items</h2>
+        <div className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
+          <h2 className="text-lg font-bold text-[#1F2937] dark:text-white">Move KOT / Items</h2>
           <button
             onClick={handleClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5 hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex gap-1 border-b border-slate-200 px-5 pt-3">
+        <div className="flex gap-1 border-b border-[#E7EAE1] dark:border-[#262B24] px-5 pt-3">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -156,8 +156,8 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
               }}
               className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 tab === t.key
-                  ? "border-b-2 border-[#27435B] text-[#27435B]"
-                  : "text-slate-400 hover:text-slate-600"
+                  ? "border-b-2 border-[#3FA34D] dark:border-[#43B75A] text-[#3FA34D] dark:text-[#43B75A]"
+                  : "text-[#9CA3AF] dark:text-[#6B7280] hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
               }`}
             >
               {t.label}
@@ -166,7 +166,7 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
         </div>
 
         {error && (
-          <div className="mx-5 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+          <div className="mx-5 mt-3 rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
             {error}
           </div>
         )}
@@ -175,7 +175,7 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
           {/* Source / destination pickers — shared by all three tabs */}
           <div className="mb-4 flex items-center gap-3">
             <div className="flex-1">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                 From table
               </label>
               <select
@@ -185,7 +185,7 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
                   setSelectedKotId("");
                   setSelectedItemIds([]);
                 }}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#262B24] text-[#1F2937] dark:text-white px-3 py-2 text-sm outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
               >
                 <option value="" disabled>
                   Choose a table
@@ -198,16 +198,16 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
               </select>
             </div>
 
-            <ArrowRight className="mt-5 h-4 w-4 shrink-0 text-slate-300" />
+            <ArrowRight className="mt-5 h-4 w-4 shrink-0 text-[#9CA3AF] dark:text-[#6B7280]" />
 
             <div className="flex-1">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                 To table
               </label>
               <select
                 value={destinationTableId}
                 onChange={(e) => setDestinationTableId(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#262B24] text-[#1F2937] dark:text-white px-3 py-2 text-sm outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
               >
                 <option value="" disabled>
                   Choose a table
@@ -225,7 +225,7 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
 
           {/* Table Wise — nothing further to pick, the whole order moves */}
           {tab === "TABLE" && sourceTableId && (
-            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+            <p className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-white/5 px-3 py-2 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
               Every item and ticket on this table moves to the destination
               table's order — if the destination already has an active
               order, everything is merged into it.
@@ -235,13 +235,13 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
           {/* KOT Wise — pick one ticket */}
           {tab === "KOT" && sourceTableId && (
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                 Select a KOT
               </p>
               {loadingSource ? (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading…</p>
               ) : sourceKots.length === 0 ? (
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
                   No kitchen tickets on this table's order yet.
                 </p>
               ) : (
@@ -251,8 +251,8 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
                       key={kot.id}
                       className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm ${
                         selectedKotId === kot.id
-                          ? "border-blue-400 bg-blue-50"
-                          : "border-slate-200"
+                          ? "border-[#3FA34D] bg-[#EAF6EC] dark:border-[#43B75A] dark:bg-[#43B75A]/10"
+                          : "border-[#E7EAE1] dark:border-[#262B24]"
                       }`}
                     >
                       <span className="flex items-center gap-2">
@@ -262,13 +262,13 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
                           checked={selectedKotId === kot.id}
                           onChange={() => setSelectedKotId(kot.id)}
                         />
-                        <span className="font-mono font-medium">{kot.kotNumber}</span>
-                        <span className="text-slate-400">
+                        <span className="font-mono font-medium text-[#1F2937] dark:text-white">{kot.kotNumber}</span>
+                        <span className="text-[#9CA3AF] dark:text-[#6B7280]">
                           {kot.kitchenSection?.name} · {kot.items.length} item
                           {kot.items.length === 1 ? "" : "s"}
                         </span>
                       </span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+                      <span className="rounded-full bg-[#F3F5EE] dark:bg-white/5 px-2 py-0.5 text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
                         {kot.status}
                       </span>
                     </label>
@@ -281,13 +281,13 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
           {/* Item Wise — pick individual items, possibly across KOTs */}
           {tab === "ITEM" && sourceTableId && (
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
                 Select items to move
               </p>
               {loadingSource ? (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading…</p>
               ) : !sourceOrder || sourceOrder.items.length === 0 ? (
-                <p className="text-sm text-slate-400">No items on this order.</p>
+                <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">No items on this order.</p>
               ) : (
                 <div className="space-y-2">
                   {sourceOrder.items.map((item) => (
@@ -295,8 +295,8 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
                       key={item.id}
                       className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm ${
                         selectedItemIds.includes(item.id)
-                          ? "border-blue-400 bg-blue-50"
-                          : "border-slate-200"
+                          ? "border-[#3FA34D] bg-[#EAF6EC] dark:border-[#43B75A] dark:bg-[#43B75A]/10"
+                          : "border-[#E7EAE1] dark:border-[#262B24]"
                       }`}
                     >
                       <span className="flex items-center gap-2">
@@ -305,10 +305,10 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
                           checked={selectedItemIds.includes(item.id)}
                           onChange={() => toggleItem(item.id)}
                         />
-                        <span className="font-medium">{item.menuItem?.name}</span>
-                        <span className="text-slate-400">× {item.quantity}</span>
+                        <span className="font-medium text-[#1F2937] dark:text-white">{item.menuItem?.name}</span>
+                        <span className="text-[#9CA3AF] dark:text-[#6B7280]">× {item.quantity}</span>
                       </span>
-                      <span className="font-mono text-slate-600">
+                      <span className="font-mono text-[#6B7280] dark:text-[#9CA8A0]">
                         ₹{Number(item.totalPrice).toFixed(2)}
                       </span>
                     </label>
@@ -319,17 +319,17 @@ export default function MoveKotItemsModal({ open, onClose, tables = [], onMoved 
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
           <button
             onClick={handleClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="rounded-lg bg-[#1C3044] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#27435B] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-[#3FA34D] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
           >
             {saving ? "Moving…" : "Move"}
           </button>

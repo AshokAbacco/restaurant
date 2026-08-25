@@ -90,35 +90,43 @@ export async function sendToKitchen(orderId, orderItemIds, outletId, client = pr
 
     const kitchenOrder = await client.kitchenOrder.create({
       data: {
-        outletId,
+        outlet: {
+          connect: {
+            id: outletId
+          }
+        },
+
         order: { connect: { id: orderId } },
+
         kotNumber,
         status: "NEW",
-        kitchenSection: { connect: { id: kitchenSectionId } },
+
+        kitchenSection: {
+          connect: { id: kitchenSectionId }
+        },
+
         targetPrepMinutes: targetPrepMinutes || null,
         printedAt: new Date(),
+
         items: {
           create: items.map((item) => ({
             quantity: item.quantity,
-            orderItem: { connect: { id: item.id } },
-          })),
+            orderItem: { connect: { id: item.id } }
+          }))
         },
+
         statusLogs: {
           create: {
             fromStatus: null,
             toStatus: "NEW",
-            reason: "Sent to kitchen",
-          },
-        },
-      },
-      include: {
-        kitchenSection: true,
-        items: { include: { orderItem: { include: { menuItem: true } } } },
-      },
+            reason: "Sent to kitchen"
+          }
+        }
+      }
     });
 
-    createdKots.push(kitchenOrder);
-  }
+        createdKots.push(kitchenOrder);
+      }
 
   await client.order.update({
     where: { id: orderId },

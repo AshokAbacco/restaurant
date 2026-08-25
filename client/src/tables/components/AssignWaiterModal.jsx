@@ -60,23 +60,23 @@ export default function AssignWaiterModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F2937]/40 dark:bg-black/60 p-4"
       onClick={onClose}
     >
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md">
         <form
           onSubmit={handleSubmit}
-          className="overflow-hidden rounded-2xl bg-white shadow-xl"
+          className="overflow-hidden rounded-2xl bg-white dark:bg-[#171C17] shadow-xl"
         >
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-[#1C3044]">
+          <div className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-[#1F2937] dark:text-white">
               <UserCog className="h-5 w-5" />
               Assign Waiter
             </h2>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/10 hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
             >
               <X className="h-5 w-5" />
             </button>
@@ -84,28 +84,30 @@ export default function AssignWaiterModal({
 
           <div className="space-y-4 px-5 py-4">
             {error && (
-              <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              <div className="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-[#EF5350] dark:text-red-400">
                 {error}
               </div>
             )}
 
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
               This will assign{" "}
-              <span className="font-semibold text-slate-700">{scopeLabel}</span>{" "}
+              <span className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                {scopeLabel}
+              </span>{" "}
               to the waiter you choose below. Any previous assignment on those
               tables will be replaced.
             </p>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">
+              <label className="mb-1 block text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0]">
                 Select waiter *
               </label>
               {waitersLoading ? (
-                <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400">
+                <div className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] px-3 py-2 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
                   Loading waiters…
                 </div>
               ) : waiters.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-sm text-slate-400">
+                <div className="rounded-lg border border-dashed border-[#E7EAE1] dark:border-[#262B24] px-3 py-2 text-sm text-[#9CA3AF] dark:text-[#6B7280]">
                   No waiter logins found. Create one from Employees → select
                   employee → Account tab.
                 </div>
@@ -113,7 +115,7 @@ export default function AssignWaiterModal({
                 <select
                   value={waiterId}
                   onChange={(e) => setWaiterId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+                  className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 py-2 text-sm text-[#1F2937] dark:text-[#E4E9E2] outline-none focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 >
                   <option value="" disabled>
                     Choose a waiter
@@ -130,18 +132,18 @@ export default function AssignWaiterModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <div className="flex items-center justify-end gap-2 border-t border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/10"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || waitersLoading || waiters.length === 0}
-              className="rounded-lg bg-[#1C3044] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#27435B] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-[#3FA34D] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? "Assigning…" : "Assign"}
             </button>

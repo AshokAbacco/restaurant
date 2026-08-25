@@ -196,9 +196,9 @@ export default function PosOrderScreen() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-stone-50">
-      <header className="flex items-center justify-between border-b border-stone-200 bg-white px-6 py-3">
-        <h1 className="font-mono text-lg font-bold text-stone-900">
+    <div className="flex h-screen flex-col bg-[#F3F5EE] dark:bg-[#12160F]">
+      <header className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
+        <h1 className="font-mono text-lg font-bold text-[#1F2937] dark:text-white">
           POS · New Order
         </h1>
         <CounterPicker />
@@ -222,13 +222,13 @@ export default function PosOrderScreen() {
       />
 
       {orderType === "DINE_IN" && (
-        <div className="border-b border-stone-200 bg-white px-6 py-3">
+        <div className="border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
           <TableStrip selectedTableId={tableId} onSelect={setSelectedTable} />
         </div>
       )}
 
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 md:grid-cols-[1fr_360px]">
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white p-4">
+        <div className="overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] p-4">
           <MenuBrowser onAddItem={addItem} />
         </div>
 

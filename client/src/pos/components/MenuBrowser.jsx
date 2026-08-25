@@ -103,7 +103,7 @@ export default function MenuBrowser({ onAddItem }) {
   return (
     <div className="flex h-full flex-col">
       {offlineNotice && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+        <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
           <WifiOff className="h-3.5 w-3.5" />
           Showing last-synced menu — you're offline right now.
         </div>
@@ -114,7 +114,7 @@ export default function MenuBrowser({ onAddItem }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search dish or SKU…"
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] px-3 py-2 text-sm text-[#1F2937] dark:text-white focus:border-[#3FA34D] focus:outline-none focus:ring-1 focus:ring-[#3FA34D] dark:focus:border-[#43B75A] dark:focus:ring-[#43B75A]"
         />
       </div>
 
@@ -123,8 +123,8 @@ export default function MenuBrowser({ onAddItem }) {
           onClick={() => setActiveCategoryId(ALL_CATEGORY_ID)}
           className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
             activeCategoryId === ALL_CATEGORY_ID
-              ? "bg-blue-600 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              ? "bg-[#3FA34D] text-white dark:bg-[#43B75A]"
+              : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
           }`}
         >
           All Items
@@ -135,8 +135,8 @@ export default function MenuBrowser({ onAddItem }) {
             onClick={() => setActiveCategoryId(c.id)}
             className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               activeCategoryId === c.id
-                ? "bg-blue-600 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-[#3FA34D] text-white dark:bg-[#43B75A]"
+                : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
             }`}
           >
             {c.name}
@@ -145,9 +145,9 @@ export default function MenuBrowser({ onAddItem }) {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading menu…</div>
+        <div className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading menu…</div>
       ) : visibleItems.length === 0 ? (
-        <div className="text-sm text-slate-400">
+        <div className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
           No items in this category yet.
         </div>
       ) : (
@@ -156,15 +156,15 @@ export default function MenuBrowser({ onAddItem }) {
             <button
               key={item.id}
               onClick={() => item.isAvailable && onAddItem(item)}
-              className={`group relative flex h-[140px] flex-col rounded-xl border border-slate-200 bg-white p-3 text-left transition-all ${
+              className={`group relative flex h-[140px] flex-col rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] p-3 text-left transition-all ${
                 item.isAvailable
-                  ? "hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md"
+                  ? "hover:-translate-y-0.5 hover:border-[#3FA34D] dark:hover:border-[#43B75A] hover:shadow-md"
                   : "cursor-not-allowed opacity-40"
               }`}
             >
               <span
                 className={`absolute right-3 top-3 h-2 w-2 shrink-0 rounded-full ${
-                  FOOD_TYPE_DOT[item.foodType] || "bg-slate-400"
+                  FOOD_TYPE_DOT[item.foodType] || "bg-[#9CA3AF]"
                 }`}
               />
               {/* FEATURE (Phase 1.5): quick on/off — shows on hover (and
@@ -178,24 +178,24 @@ export default function MenuBrowser({ onAddItem }) {
                 title={item.isAvailable ? "Mark unavailable" : "Mark available"}
                 className={`absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full transition-opacity ${
                   item.isAvailable
-                    ? "cursor-pointer bg-slate-100 text-slate-400 opacity-0 hover:bg-slate-200 group-hover:opacity-100"
-                    : "cursor-pointer bg-red-100 text-red-500 opacity-100 hover:bg-red-200"
+                    ? "cursor-pointer bg-[#F3F5EE] dark:bg-white/5 text-[#9CA3AF] dark:text-[#6B7280] opacity-0 hover:bg-[#E7EAE1] dark:hover:bg-white/10 group-hover:opacity-100"
+                    : "cursor-pointer bg-red-100 dark:bg-red-500/15 text-red-500 dark:text-red-400 opacity-100 hover:bg-red-200 dark:hover:bg-red-500/25"
                 } ${togglingId === item.id ? "animate-pulse" : ""}`}
               >
                 <Power className="h-3.5 w-3.5" />
               </span>
-              <span className="line-clamp-2 pr-4 text-sm font-semibold text-slate-900">
+              <span className="line-clamp-2 pr-4 text-sm font-semibold text-[#1F2937] dark:text-white">
                 {item.name}
               </span>
-              <span className="mt-1 font-mono text-xs text-slate-400">
+              <span className="mt-1 font-mono text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                 {item.sku}
               </span>
               <div className="mt-auto flex items-end justify-between pt-2">
-                <span className="font-mono text-base font-semibold text-blue-600">
+                <span className="font-mono text-base font-semibold text-[#3FA34D] dark:text-[#43B75A]">
                   ₹{Number(item.sellingPrice).toFixed(0)}
                 </span>
                 {!item.isAvailable && (
-                  <span className="text-xs font-medium text-red-500">
+                  <span className="text-xs font-medium text-red-500 dark:text-red-400">
                     Unavailable
                   </span>
                 )}

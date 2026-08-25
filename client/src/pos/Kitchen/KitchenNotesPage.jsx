@@ -122,15 +122,15 @@ export default function KitchenNotesPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-3">
+    <div className="flex h-screen flex-col bg-[#F3F5EE] dark:bg-[#12160F]">
+      <header className="border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-500/10">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                className="h-5 w-5 text-amber-600"
+                className="h-5 w-5 text-amber-600 dark:text-amber-400"
               >
                 <path
                   d="M4 4h16v12H8l-4 4V4z"
@@ -141,19 +141,23 @@ export default function KitchenNotesPage() {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">
+              <h1 className="text-lg font-bold text-[#1F2937] dark:text-white">
                 Kitchen Notes
               </h1>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                 {notes.length} note{notes.length === 1 ? "" : "s"} from the
                 kitchen
               </p>
             </div>
           </div>
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+          {error && (
+            <p className="text-sm font-medium text-[#EF5350] dark:text-red-400">
+              {error}
+            </p>
+          )}
         </div>
         {isOffline && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <div className="mt-2 flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
             <WifiOff className="h-3.5 w-3.5" />
             Offline — showing last-synced notes and tickets. Adding a note needs
             a connection.
@@ -162,7 +166,7 @@ export default function KitchenNotesPage() {
       </header>
 
       {canAddNotes && (
-        <div className="border-b border-slate-200 bg-white px-6 py-4">
+        <div className="border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-4">
           <form
             onSubmit={handleSubmit}
             className="mx-auto flex max-w-2xl flex-col gap-2 sm:flex-row sm:items-start"
@@ -171,7 +175,7 @@ export default function KitchenNotesPage() {
               value={selectedKotId}
               onChange={(e) => setSelectedKotId(e.target.value)}
               disabled={tickets.length === 0 || isOffline}
-              className="rounded-lg border border-slate-200 px-2.5 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none sm:w-48"
+              className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-2.5 py-2 text-sm text-[#1F2937] dark:text-[#E4E9E2] focus:border-[#3FA34D] dark:focus:border-[#43B75A] focus:outline-none disabled:opacity-60 sm:w-48"
             >
               {tickets.length === 0 ? (
                 <option value="">No active tickets</option>
@@ -194,20 +198,20 @@ export default function KitchenNotesPage() {
                   : "Add a note about the selected ticket…"
               }
               disabled={tickets.length === 0 || isOffline}
-              className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
+              className="min-w-0 flex-1 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 py-2 text-sm text-[#1F2937] dark:text-[#E4E9E2] placeholder:text-[#9CA3AF] dark:placeholder:text-[#6B7280] focus:border-[#3FA34D] dark:focus:border-[#43B75A] focus:outline-none disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={
                 submitting || !noteText.trim() || !selectedKotId || isOffline
               }
-              className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="shrink-0 rounded-lg bg-[#3FA34D] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] disabled:cursor-not-allowed disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280]"
             >
               {submitting ? "Adding…" : "Add Note"}
             </button>
           </form>
           {formError && (
-            <p className="mx-auto mt-1.5 max-w-2xl text-xs text-red-600">
+            <p className="mx-auto mt-1.5 max-w-2xl text-xs text-[#EF5350] dark:text-red-400">
               {formError}
             </p>
           )}
@@ -216,24 +220,28 @@ export default function KitchenNotesPage() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <p className="text-sm text-slate-400">Loading notes…</p>
+          <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+            Loading notes…
+          </p>
         ) : notes.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <p className="text-slate-400">No notes from the kitchen yet.</p>
+            <p className="text-[#9CA3AF] dark:text-[#6B7280]">
+              No notes from the kitchen yet.
+            </p>
           </div>
         ) : (
           <ul className="mx-auto max-w-2xl space-y-3">
             {notes.map((n) => (
               <li
                 key={n.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-[#1F2937] dark:text-white">
                       {n.chef?.fullName || "Kitchen"}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                       {n.kitchenOrder?.kotNumber}
                       {n.kitchenOrder?.kitchenSection?.name
                         ? ` · ${n.kitchenOrder.kitchenSection.name}`
@@ -246,11 +254,13 @@ export default function KitchenNotesPage() {
                         : ""}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs text-slate-400">
+                  <span className="shrink-0 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                     {timeAgo(n.createdAt)}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-slate-700">{n.note}</p>
+                <p className="mt-2 text-sm text-[#4B5563] dark:text-[#C7CFC5]">
+                  {n.note}
+                </p>
               </li>
             ))}
           </ul>
