@@ -15,7 +15,10 @@ import { writeAuditLog } from "../lib/auditLog.service.js";
 // Basing it on the highest orderNumber actually seen removes that
 // possibility. Lexicographic DESC sort matches numeric order here because
 // every orderNumber is zero-padded to the same width.
-async function generateOrderNumber(outletId, client = prisma) {
+// Exported for reuse by kot/kotMove.service.js (Phase 1.4 — Table/KOT/Item-wise
+// move creates a fresh Order at the destination table when none exists yet,
+// and needs the exact same numbering scheme every other order uses).
+export async function generateOrderNumber(outletId, client = prisma) {
   const last = await client.order.findFirst({
     where: { outletId },
     orderBy: { orderNumber: "desc" },
@@ -138,11 +141,11 @@ async function resolveAddOnPricing(itemsData, outletId, client = prisma) {
 // existed, letting one outlet's order silently reference another outlet's
 // table/customer/waiter.
 async function validateOrderReferences(
-  { tableId, customerId, waiterId, deliveryPartnerId },
+  { tableId, customerId, waiterId, deliveryPartnerId, counterId },
   outletId,
   client = prisma,
 ) {
-  const [table, customer, waiter, deliveryPartner] = await Promise.all([
+  const [table, customer, waiter, deliveryPartner, counter] = await Promise.all([
     tableId
       ? client.restaurantTable.findFirst({ where: { id: tableId, outletId } })
       : null,
@@ -157,6 +160,13 @@ async function validateOrderReferences(
           where: { id: deliveryPartnerId, outletId },
         })
       : null,
+    // Phase 2.2 — Counter/Terminal tracking: counterId is optional (an
+    // outlet that hasn't set up counters yet, or a device that hasn't
+    // picked one, simply omits it) but if given, it must be a real,
+    // active counter belonging to this outlet.
+    counterId
+      ? client.billingCounter.findFirst({ where: { id: counterId, outletId, isActive: true } })
+      : null,
   ]);
 
   if (tableId && !table) throw new Error("Table not found");
@@ -164,6 +174,7 @@ async function validateOrderReferences(
   if (waiterId && !waiter) throw new Error("Waiter not found");
   if (deliveryPartnerId && !deliveryPartner)
     throw new Error("Delivery partner not found");
+  if (counterId && !counter) throw new Error("Counter not found");
 }
 
 export async function createOrder(payload, outletId, client = prisma) {
@@ -183,6 +194,7 @@ export async function createOrder(payload, outletId, client = prisma) {
     serviceChargeAmount = 0,
     notes,
     clientRequestId,
+    counterId,
   } = payload;
 
   if (!items || items.length === 0)
@@ -206,7 +218,7 @@ export async function createOrder(payload, outletId, client = prisma) {
   }
 
   await validateOrderReferences(
-    { tableId, customerId, waiterId, deliveryPartnerId },
+    { tableId, customerId, waiterId, deliveryPartnerId, counterId },
     outletId,
     client,
   );
@@ -239,6 +251,7 @@ export async function createOrder(payload, outletId, client = prisma) {
         tableId,
         customerId,
         waiterId,
+        counterId,
         numberOfGuests,
         deliveryPartnerId,
         deliveryCharge,
@@ -372,6 +385,7 @@ export async function listOrders(
         table: true,
         customer: true,
         waiter: { select: { fullName: true, employeeCode: true } },
+        counter: { select: { id: true, name: true } },
         items: {
           include: { menuItem: true, addOns: { include: { addOn: true } } },
         },
@@ -394,6 +408,7 @@ export async function getOrderById(id, outletId) {
       table: true,
       customer: true,
       waiter: { select: { fullName: true, employeeCode: true } },
+      counter: { select: { id: true, name: true } },
       deliveryPartner: true,
       items: {
         include: { menuItem: true, addOns: { include: { addOn: true } } },
@@ -599,7 +614,7 @@ export async function addItemsToOrder(orderId, items, outletId) {
   return { order: updatedOrder, newItems };
 }
 
-async function recalculateOrderTotals(orderId) {
+export async function recalculateOrderTotals(orderId) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { items: true },

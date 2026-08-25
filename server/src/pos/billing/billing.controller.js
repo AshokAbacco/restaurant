@@ -17,7 +17,10 @@ export async function completeBilling(req, res) {
   try {
     const result = await billingService.completeBilling(
       req.params.orderId,
-      req.body,
+      // performedById: who's actually completing the bill (for the cash
+      // drawer's SALE transaction and the audit trail generally) — the
+      // authenticated session, never a client-supplied field.
+      { ...req.body, performedById: req.user?.employeeId },
       req.tenant.outletId,
     );
     res.status(201).json(result);

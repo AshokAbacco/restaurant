@@ -250,7 +250,7 @@ const Login = () => {
   // ==========================
 
   return (
-    <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0D110C] flex relative transition-colors">
+    <div className="min-h-screen bg-gradient-to-br from-[#F3F5EE] via-white to-[#EFF2E9] dark:from-[#0D110C] dark:via-[#10140F] dark:to-[#0D110C] flex relative transition-colors">
       <ErrorToast message={toastMessage} onClose={() => setToastMessage("")} />
 
       {/* ============ THEME TOGGLE (TOP RIGHT) ============ */}
@@ -261,7 +261,7 @@ const Login = () => {
         title={
           theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
         }
-        className="absolute top-6 right-6 z-20 w-11 h-11 rounded-full border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] shadow-sm shadow-black/[0.02] dark:shadow-none flex items-center justify-center hover:border-[#3FA34D]/40 dark:hover:border-[#43B75A]/40 transition-colors"
+        className="absolute top-6 right-6 z-20 w-11 h-11 rounded-full border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] shadow-sm flex items-center justify-center hover:border-[#3FA34D]/40 dark:hover:border-[#43B75A]/40 transition-colors"
       >
         {theme === "dark" ? (
           <FiSun size={18} className="text-[#FFA94D]" />
@@ -279,19 +279,12 @@ const Login = () => {
         <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full bg-[#FFA94D]/10 blur-3xl" />
 
         <div className="relative z-10 flex flex-col justify-center px-20 text-white w-full">
-          {/* Text-based brand mark — replaces the old logo image */}
-          <div className="mb-16 flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/15 border border-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg shrink-0">
-              <span className="text-3xl">🍽️</span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-extrabold tracking-tight leading-none">
-                Restaurant ERP
-              </h1>
-              <p className="text-white/70 text-sm mt-1.5">
-                Management System
-              </p>
-            </div>
+          <div className="mb-16">
+            <img
+              src="/Logo/LogoRest.png"
+              alt="Restaurant ERP"
+              className="w-full max-w-[350px] object-contain"
+            />
           </div>
 
           <h2 className="text-5xl font-extrabold leading-tight mb-6">
@@ -328,20 +321,14 @@ const Login = () => {
 
       <div className="flex-1 flex justify-center items-center p-6 lg:p-12">
         <div className="w-full max-w-md">
-          <div className="bg-white dark:bg-[#171C17] rounded-3xl shadow-sm shadow-black/[0.02] dark:shadow-none border border-[#E7EAE1] dark:border-[#262B24] p-8 transition-colors">
+          <div className="bg-white/80 dark:bg-[#171C17]/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8 transition-colors">
             <div className="text-center">
-              {/* Text-based brand mark for the mobile / right-panel header
-                  (replaces the old <img> logo entirely) */}
               <div className="mx-auto w-20 h-20 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] flex items-center justify-center shadow-xl overflow-hidden">
                 <p className="text-white text-3xl">🍽️</p>
               </div>
 
-              <p className="mt-4 text-sm font-semibold uppercase tracking-wide text-[#3FA34D] dark:text-[#43B75A]">
-                Restaurant ERP
-              </p>
-
-              <h2 className="mt-2 text-3xl font-bold text-[#1F2937] dark:text-white">
-                Welcome Back
+              <h2 className="mt-6 text-3xl font-bold text-[#1F2937] dark:text-white">
+                {pendingOutletSelection ? "Choose an Outlet" : "Welcome Back"}
               </h2>
 
               <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0]">

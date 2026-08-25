@@ -13,8 +13,10 @@ import expensesRoutes from "./expenses/expenses.routes.js";
 import employeeRoutes from "./employees/employees.routes.js";
 import kotRoutes from "./pos/kot/kot.routes.js";
 import posRoutes from "./pos/pos.routes.js";
+import reservationsRoutes from "./reservations/reservations.routes.js"; // lives as its own top-level module, not nested under pos/
 import kdsRoutes from "./kds/kds.routes.js";
 import storesRoutes from "./stores/stores.routes.js";
+import settingsRoutes from "./settings/settings.routes.js";
 import kioskRoutes from "./kiosk/kiosk.routes.js";
 import ReportsRoutes from "./reports/reports.routes.js";
 import profitLossRoutes from "./profitLoss/profitLoss.routes.js";
@@ -43,19 +45,6 @@ app.use("/api/auth", authRoutes);
 
 // ==============================================
 // PROTECTED MODULES
-// Every route below requires a valid access token AND an outlet selected
-// for the session (requireOutletContext — see
-// src/middleware/tenantContext.js — populates req.tenant, which every
-// service in these modules now uses to scope its Prisma queries). Role
-// checks are layered on per-module based on who should reasonably touch
-// that data; adjust as your permission model firms up (these mirror the
-// canX() helpers in AuthContext).
-//
-// /api/kiosk is deliberately excluded — it's the no-staff-auth
-// customer-facing flow, resolved to an outlet via the QR code/table
-// reference in the request itself rather than a staff JWT. Follow-up:
-// give kiosk routes their own outlet-resolution path rather than assuming
-// req.tenant exists there.
 // ==============================================
 app.use("/api/kiosk", kioskRoutes);
 
@@ -95,6 +84,21 @@ app.use(
   requireRole("OWNER", "ADMIN", "MANAGER", "CASHIER", "WAITER"),
   posRoutes,
 );
+
+// Reservations — kept as its own top-level module (src/reservations/), so
+// it's mounted directly here rather than nested inside pos.routes.js. The
+// URL path stays /api/pos/reservations to match the existing frontend
+// client (tableReservationApi.js calls "/pos/reservations"), and it uses
+// the same role gate as the rest of /api/pos — reservations.routes.js then
+// narrows further per-route (browse vs manage) internally.
+app.use(
+  "/api/pos/reservations",
+  requireAuth,
+  requireOutletContext,
+  requireRole("OWNER", "ADMIN", "MANAGER", "CASHIER", "WAITER"),
+  reservationsRoutes,
+);
+
 app.use(
   "/api/kds",
   requireAuth,
@@ -108,6 +112,13 @@ app.use(
   requireOutletContext,
   requireRole("OWNER", "ADMIN", "MANAGER"),
   storesRoutes,
+);
+app.use(
+  "/api/settings",
+  requireAuth,
+  requireOutletContext,
+  requireRole("OWNER", "ADMIN", "MANAGER"),
+  settingsRoutes,
 );
 app.use(
   "/api/reports",
@@ -127,10 +138,7 @@ app.use(
   profitLossRoutes,
 );
 
-// Dashboard — FIX: this route was previously mounted with NO auth
-// middleware at all, despite the comment above claiming "requireAuth
-// only" — meaning /api/dashboard was reachable by anyone, unauthenticated.
-// Now correctly requires both.
+// Dashboard
 app.use(
   "/api/dashboard",
   requireAuth,
@@ -140,8 +148,6 @@ app.use(
 
 // ==============================================
 // FALLBACK ERROR HANDLER
-// Catches thrown/rejected errors from any route above so a bug in a
-// controller doesn't crash the process or leak a stack trace to the client.
 // ==============================================
 app.use((err, req, res, next) => {
   console.error(err);

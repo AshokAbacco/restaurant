@@ -44,6 +44,15 @@ router.get(
   tablesController.getWaiters,
 );
 
+// Reservation routes — before "/:id" for the same reason as /floors,
+// /my-tables, /waiters above.
+router.get("/reservations", tablesController.getReservations);
+router.post("/reservations", tablesController.createReservation);
+router.get("/reservations/:id", tablesController.getReservation);
+router.put("/reservations/:id", tablesController.updateReservation);
+router.post("/reservations/:id/seat", tablesController.seatReservation);
+router.post("/reservations/:id/cancel", tablesController.cancelReservation);
+
 router.get("/", tablesController.getTables);
 router.get("/board", tablesController.getTablesBoard);
 router.get("/:id", tablesController.getTable);

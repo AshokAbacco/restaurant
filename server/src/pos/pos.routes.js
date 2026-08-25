@@ -8,11 +8,14 @@ import addOnsRoutes from "./add-ons/addOns.routes.js";
 import discountsRoutes from "./discounts/discounts.routes.js";
 import paymentsRoutes from "./payments/payments.routes.js";
 import billSplitsRoutes from "./bill-splits/billSplits.routes.js";
+import duePaymentsRoutes from "./due-payments/duePayments.routes.js";
+import cashDrawerRoutes from "./cash-drawer/cashDrawer.routes.js";
+import countersRoutes from "./counters/counters.routes.js";
 import invoicesRoutes from "./invoices/invoices.routes.js";
 import deliveryPartnersRoutes from "./delivery-partners/deliveryPartners.routes.js";
 import loyaltyRoutes from "./loyalty/loyalty.routes.js";
 import billingRoutes from "./billing/billing.routes.js";
-import reservationsRoutes from "../reservations/reservations.routes.js";
+
 const router = Router();
 
 // Mounted with no auth for now — role guards get added here later
@@ -39,10 +42,13 @@ router.use("/add-ons", addOnsRoutes);
 router.use("/discounts", discountsRoutes);
 router.use("/payments", paymentsRoutes);
 router.use("/bill-splits", billSplitsRoutes);
+router.use("/due-payments", duePaymentsRoutes);
+router.use("/cash-drawer", cashDrawerRoutes);
+router.use("/counters", countersRoutes);
 router.use("/invoices", invoicesRoutes);
 router.use("/delivery-partners", deliveryPartnersRoutes);
 router.use("/loyalty", loyaltyRoutes);
 // Complete Service -> Billing & Payment -> Invoice -> Free Table flow
 router.use("/billing", billingRoutes);
-router.use("/reservations", reservationsRoutes);
+
 export default router;

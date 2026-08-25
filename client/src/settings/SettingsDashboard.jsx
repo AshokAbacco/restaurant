@@ -21,6 +21,8 @@ import {
   FiDatabase,
   FiAward,
   FiCpu,
+  FiTag,
+  FiMapPin,
 } from "react-icons/fi";
 
 // ==============================================
@@ -77,6 +79,24 @@ const SETTINGS = [
     icon: FiFileText,
     color: "bg-red-500",
     path: "/settings/tax",
+  },
+  {
+    id: 6.5,
+    title: "Order Status Labels",
+    description:
+      "Rename and recolor order statuses shown on POS, KDS, and reports.",
+    icon: FiTag,
+    color: "bg-teal-500",
+    path: "/settings/order-status",
+  },
+  {
+    id: 6.6,
+    title: "Billing Counters",
+    description:
+      "Manage physical POS terminals/counters for Counter Summary reporting.",
+    icon: FiMapPin,
+    color: "bg-indigo-500",
+    path: "/settings/counters",
   },
   {
     id: 7,

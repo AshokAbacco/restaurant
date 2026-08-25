@@ -3,21 +3,6 @@
 // Run with: node prisma/seed.js
 // ==============================================
 //
-// Seeds TWO organizations, on purpose:
-//
-// 1. "Mehfil Arabic Restaurant" — has TWO outlets ("Main Branch" and
-//    "Second Branch"). Its OWNER account can log in and switch between
-//    them (see auth.service.js's login()/selectOutlet() — this is exactly
-//    the multi-outlet flow built in section 0.2). Manager/Cashier/Kitchen
-//    are pinned to Main Branch only, like real staff would be.
-//
-// 2. "Demo Org Two" — a single-outlet, completely separate organization
-//    with its own owner. It exists so you can manually verify tenant
-//    isolation: log in as this owner and confirm you can never see
-//    Mehfil's menu items, orders, employees, etc. — even if you copy an
-//    id straight out of Mehfil's data and try to fetch it directly. That
-//    manual check is worth doing once yourself before section 0.7 turns
-//    it into an automated test.
 
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";

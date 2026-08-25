@@ -253,11 +253,8 @@ export const deleteVariant = async (req, res) => {
 };
 
 // ---------- Add-ons ----------
-// NOTE: same live duplication as menu.service.js/menu.repository.js flagged
-// above — this whole section is a near-exact duplicate of
-// src/pos/add-ons/addOns.controller.js over the same AddOn table, reachable
-// at a different URL. Both are correctly outlet-scoped now, but worth
-// consolidating onto one before adding more features on top of either.
+// NOTE: src/pos/add-ons/addOns.controller.js now delegates here instead
+// of maintaining its own copy — see that file's header comment.
 
 export const getAddOns = async (req, res) => {
   try {

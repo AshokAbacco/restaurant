@@ -1,7 +1,11 @@
-// server/src/pos/reservations/reservations.controller.js
+// server/src/reservations/reservations.controller.js
 import * as reservationsService from "./reservations.service.js";
 
-const storeOf = (req) => req.user?.store || "Main Store";
+// requireOutletContext (mounted ahead of this router in index.js) populates
+// req.tenant with the outlet resolved for this session — same pattern used
+// by every other module scoped to an outlet. There is no "store" concept on
+// TableReservation; it's scoped by outletId.
+const outletOf = (req) => req.tenant?.outletId;
 
 // ==============================================
 // LIST / GET
@@ -11,7 +15,7 @@ export async function getReservations(req, res) {
   try {
     const { date, status, tableId, customer, phone } = req.query;
     const reservations = await reservationsService.listReservations(
-      storeOf(req),
+      outletOf(req),
       { date, status, tableId, customer, phone },
     );
     res.json(reservations);
@@ -26,7 +30,7 @@ export async function getReservationById(req, res) {
   try {
     const reservation = await reservationsService.getReservationById(
       req.params.id,
-      storeOf(req),
+      outletOf(req),
     );
     if (!reservation) {
       return res.status(404).json({ message: "Reservation not found" });
@@ -47,7 +51,7 @@ export async function createReservation(req, res) {
   try {
     const reservation = await reservationsService.createReservation({
       ...req.body,
-      store: storeOf(req),
+      outletId: outletOf(req),
       createdBy: req.user?.employeeId,
     });
 
@@ -66,7 +70,7 @@ export async function updateReservation(req, res) {
   try {
     const reservation = await reservationsService.updateReservation(
       req.params.id,
-      storeOf(req),
+      outletOf(req),
       req.body,
     );
     res.json(reservation);
@@ -85,7 +89,7 @@ export async function seatReservation(req, res) {
   try {
     const reservation = await reservationsService.seatReservation(
       req.params.id,
-      storeOf(req),
+      outletOf(req),
     );
     res.json(reservation);
   } catch (err) {
@@ -99,7 +103,7 @@ export async function cancelReservation(req, res) {
   try {
     const reservation = await reservationsService.cancelReservation(
       req.params.id,
-      storeOf(req),
+      outletOf(req),
     );
     res.json(reservation);
   } catch (err) {
@@ -113,7 +117,7 @@ export async function noShowReservation(req, res) {
   try {
     const reservation = await reservationsService.noShowReservation(
       req.params.id,
-      storeOf(req),
+      outletOf(req),
     );
     res.json(reservation);
   } catch (err) {
@@ -127,7 +131,7 @@ export async function completeReservation(req, res) {
   try {
     const reservation = await reservationsService.completeReservation(
       req.params.id,
-      storeOf(req),
+      outletOf(req),
     );
     res.json(reservation);
   } catch (err) {

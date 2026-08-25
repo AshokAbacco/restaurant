@@ -1,9 +1,12 @@
 // client/src/expenses/components/ExpenseForm.jsx
 // v2 — numbered step indicator, richer category tiles,
 // nicer review + success screens. Same validation/logic as before.
-// v3 — Store is now fetched from the database (Store model) instead of
-// a hardcoded array, so newly created stores show up automatically.
 // v4 — restyled to match the app's green/cream design system.
+// v5 — removed the "Store" field entirely: expenses are now scoped to the
+// logged-in session's outlet server-side (see the multi-tenancy retrofit),
+// so this dropdown had been silently ignored on submit for a while —
+// selecting a value did nothing, since expenses.controller.js never reads
+// a `store` field from the request body anymore.
 // ==============================================
 
 import { useEffect, useMemo, useState } from "react";
@@ -100,7 +103,6 @@ const ExpenseForm = ({ mode = "create" }) => {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [stores, setStores] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [attachment, setAttachment] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -122,12 +124,10 @@ const ExpenseForm = ({ mode = "create" }) => {
     paymentDate: "",
     transactionReference: "",
     status: "DRAFT",
-    store: "Main Store",
   });
 
   useEffect(() => {
     loadCategories();
-    loadStores();
     if (mode === "edit") loadExpense();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,14 +135,6 @@ const ExpenseForm = ({ mode = "create" }) => {
   const loadCategories = async () => {
     try {
       setCategories(await expenseService.getCategories());
-    } catch (err) {
-      setFieldErrors((prev) => ({ ...prev, load: err.message }));
-    }
-  };
-
-  const loadStores = async () => {
-    try {
-      setStores(await expenseService.getStores());
     } catch (err) {
       setFieldErrors((prev) => ({ ...prev, load: err.message }));
     }
@@ -172,7 +164,6 @@ const ExpenseForm = ({ mode = "create" }) => {
         paymentDate: expense.paymentDate ? expense.paymentDate.substring(0, 10) : "",
         transactionReference: expense.transactionReference || "",
         status: expense.status,
-        store: expense.store || "Main Store",
       });
       setOriginalStatus(expense.status);
     } catch (err) {
@@ -404,20 +395,6 @@ const ExpenseForm = ({ mode = "create" }) => {
                   className={`${ui.input} ${fieldErrors.expenseDate ? "border-[#EF5350]" : ""}`}
                 />
                 <FieldError message={fieldErrors.expenseDate} />
-              </div>
-
-              <div>
-                <FieldLabel required>Store</FieldLabel>
-                <select name="store" value={form.store} onChange={handleChange} className={ui.input}>
-                  {stores.length === 0 && (
-                    <option value={form.store}>{form.store || "Loading stores…"}</option>
-                  )}
-                  {stores.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
@@ -658,7 +635,7 @@ const ExpenseForm = ({ mode = "create" }) => {
               </div>
               <div>
                 <p className={`font-bold ${ui.heading}`}>{form.title}</p>
-                <p className={`text-sm ${ui.muted}`}>{selectedCategory?.name} · {form.store}</p>
+                <p className={`text-sm ${ui.muted}`}>{selectedCategory?.name}</p>
               </div>
             </div>
 

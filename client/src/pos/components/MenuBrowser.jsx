@@ -1,7 +1,7 @@
 // src/pos/components/MenuBrowser.jsx
 import { useEffect, useMemo, useState } from "react";
-import { WifiOff } from "lucide-react";
-import { getCategories, getMenuItems } from "../api/posApi";
+import { WifiOff, Power } from "lucide-react";
+import { getCategories, getMenuItems, updateMenuItemAvailability } from "../api/posApi";
 import { fetchWithOfflineFallback } from "../../offline/offlineCache";
 
 const FOOD_TYPE_DOT = {
@@ -64,6 +64,42 @@ export default function MenuBrowser({ onAddItem }) {
     );
   }, [items, search]);
 
+  // FEATURE (Phase 1.5 — Menu Item quick On/Off): flips isAvailable on the
+  // spot, no full item-edit screen. Optimistic — updates local state
+  // immediately since this is meant to be fast under service pressure
+  // (e.g. "we just ran out of this"), and reverts only if the request
+  // actually fails. Updates both `items` (what's rendered) and `allItems`
+  // (the "All Items" cache) so the change is visible everywhere in this
+  // component without a full re-fetch.
+  const [togglingId, setTogglingId] = useState(null);
+
+  async function handleToggleAvailability(item, e) {
+    e.stopPropagation(); // don't also trigger onAddItem on the parent tile
+    const nextValue = !item.isAvailable;
+    setTogglingId(item.id);
+
+    const patch = (list) =>
+      list.map((i) => (i.id === item.id ? { ...i, isAvailable: nextValue } : i));
+    setItems(patch);
+    setAllItems(patch);
+
+    try {
+      await updateMenuItemAvailability(item.id, nextValue);
+    } catch (err) {
+      // Revert on failure — e.g. a WAITER role the backend doesn't permit
+      // to edit menu items, or a genuine network error.
+      setItems((list) =>
+        list.map((i) => (i.id === item.id ? { ...i, isAvailable: item.isAvailable } : i)),
+      );
+      setAllItems((list) =>
+        list.map((i) => (i.id === item.id ? { ...i, isAvailable: item.isAvailable } : i)),
+      );
+      console.error("Failed to toggle item availability:", err.message);
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       {offlineNotice && (
@@ -119,15 +155,35 @@ export default function MenuBrowser({ onAddItem }) {
           {visibleItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => onAddItem(item)}
-              disabled={!item.isAvailable}
-              className="group relative flex h-[140px] flex-col rounded-xl border border-slate-200 bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => item.isAvailable && onAddItem(item)}
+              className={`group relative flex h-[140px] flex-col rounded-xl border border-slate-200 bg-white p-3 text-left transition-all ${
+                item.isAvailable
+                  ? "hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md"
+                  : "cursor-not-allowed opacity-40"
+              }`}
             >
               <span
                 className={`absolute right-3 top-3 h-2 w-2 shrink-0 rounded-full ${
                   FOOD_TYPE_DOT[item.foodType] || "bg-slate-400"
                 }`}
               />
+              {/* FEATURE (Phase 1.5): quick on/off — shows on hover (and
+                  always when the item is already off, so it's easy to find
+                  and flip back on). Stops propagation so tapping it doesn't
+                  also add the item to the cart via the parent button. */}
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => handleToggleAvailability(item, e)}
+                title={item.isAvailable ? "Mark unavailable" : "Mark available"}
+                className={`absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full transition-opacity ${
+                  item.isAvailable
+                    ? "cursor-pointer bg-slate-100 text-slate-400 opacity-0 hover:bg-slate-200 group-hover:opacity-100"
+                    : "cursor-pointer bg-red-100 text-red-500 opacity-100 hover:bg-red-200"
+                } ${togglingId === item.id ? "animate-pulse" : ""}`}
+              >
+                <Power className="h-3.5 w-3.5" />
+              </span>
               <span className="line-clamp-2 pr-4 text-sm font-semibold text-slate-900">
                 {item.name}
               </span>

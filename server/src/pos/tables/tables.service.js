@@ -1,29 +1,7 @@
 // server/src/pos/tables/tables.service.js
 import prisma from "../../config/prisma.js";
-import { getUpcomingReservationsByTableIds } from "../../reservations/reservations.service.js";
 
 const WAITER_SELECT = { id: true, fullName: true, employeeCode: true };
-
-// Additive, read-only: attaches each table's soonest upcoming BOOKED
-// reservation (if any) as `upcomingReservation`. Never reads or writes
-// RestaurantTable.status — the existing FREE/OCCUPIED status flow (driven
-// by orders/KOT/billing, e.g. mergeTables below) is completely untouched.
-async function withUpcomingReservations(tables) {
-  const byTable = await getUpcomingReservationsByTableIds(
-    tables.map((t) => t.id),
-  );
-  return tables.map((t) => ({
-    ...t,
-    upcomingReservation: byTable[t.id]
-      ? {
-          id: byTable[t.id].id,
-          customerName: byTable[t.id].customerName,
-          partySize: byTable[t.id].partySize,
-          reservedFor: byTable[t.id].reservedFor,
-        }
-      : null,
-  }));
-}
 
 // ---------------------------------------------------------------------------
 // Floors — power the floor tabs on the Tables Management page. A floor is
@@ -64,13 +42,7 @@ export async function deleteFloor(id, outletId) {
   return prisma.floor.delete({ where: { id } });
 }
 
-export async function listTables({
-  status,
-  section,
-  store,
-  floorId,
-  waiterId,
-}) {
+export async function listTables({ status, section, outletId, floorId, waiterId }) {
   const tables = await prisma.restaurantTable.findMany({
     where: {
       outletId,
@@ -94,7 +66,19 @@ export async function listTables({
     orderBy: { name: "asc" },
   });
 
-  return withUpcomingReservations(tables);
+  // FEATURE (Phase 1.3 — Table Reservation): same batched lookup
+  // getTablesBoard uses, so the Tables management page (which calls this
+  // function, not getTablesBoard) can show the same "Reserved 7:30 PM"
+  // badge on its TableCard grid.
+  const upcomingByTable = await getUpcomingReservationsByTable(
+    tables.map((t) => t.id),
+    outletId,
+  );
+
+  return tables.map((table) => ({
+    ...table,
+    upcomingReservation: upcomingByTable[table.id] || null,
+  }));
 }
 
 // Kitchen stage ranking, lowest = least progressed. Used to pick the
@@ -153,13 +137,17 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
     orderBy: { name: "asc" },
   });
 
-  const byTable = await getUpcomingReservationsByTableIds(
+  // FEATURE (Phase 1.3 — Table Reservation): one extra query for every
+  // table's next upcoming reservation, so the floor view can show
+  // "Reserved 7:30 PM" on an otherwise-free table without N+1 queries (one
+  // findMany here instead of one per table).
+  const upcomingByTable = await getUpcomingReservationsByTable(
     tables.map((t) => t.id),
+    outletId,
   );
 
   return tables.map((table) => {
     const order = table.orders[0] || null;
-    const upcoming = byTable[table.id];
     return {
       id: table.id,
       name: table.name,
@@ -167,16 +155,7 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
       section: table.section,
       status: table.status,
       waiter: table.waiter,
-      // Additive, read-only — does not affect status/order/kitchen logic
-      // above in any way.
-      upcomingReservation: upcoming
-        ? {
-            id: upcoming.id,
-            customerName: upcoming.customerName,
-            partySize: upcoming.partySize,
-            reservedFor: upcoming.reservedFor,
-          }
-        : null,
+      upcomingReservation: upcomingByTable[table.id] || null,
       order: order
         ? {
             id: order.id,
@@ -505,3 +484,253 @@ export async function getTableDetailForWaiter(tableId, waiterId, outletId) {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// TABLE RESERVATIONS (Phase 1.3)
+//
+// A reservation is a future booking against a specific table. Booking it
+// does NOT touch RestaurantTable.status immediately — a table stays FREE
+// (bookable for a walk-in right now) right up until either its reservation
+// time arrives (a scheduled sweep could flip it to RESERVED — not built
+// yet, see note on markNoShows below) or staff explicitly seat the party
+// (seatReservation, which does set status to OCCUPIED). This avoids a
+// table sitting artificially "reserved" and unusable all day for a booking
+// that's still 6 hours out.
+// ---------------------------------------------------------------------------
+
+const RESERVATION_INCLUDE = {
+  table: { select: { id: true, name: true, capacity: true, section: true } },
+  customer: { select: { id: true, name: true, mobile: true } },
+  createdBy: { select: { fullName: true, employeeCode: true } },
+};
+
+// Powers the floor view's "Reserved 7:30 PM" badge — the single next
+// upcoming (still-BOOKED, in-the-future) reservation per table, batched
+// into one query for however many tableIds are passed in.
+async function getUpcomingReservationsByTable(tableIds, outletId) {
+  if (tableIds.length === 0) return {};
+
+  const reservations = await prisma.tableReservation.findMany({
+    where: {
+      outletId,
+      tableId: { in: tableIds },
+      status: "BOOKED",
+      reservedFor: { gte: new Date() },
+    },
+    orderBy: { reservedFor: "asc" },
+    select: {
+      id: true,
+      tableId: true,
+      customerName: true,
+      partySize: true,
+      reservedFor: true,
+    },
+  });
+
+  const byTable = {};
+  for (const r of reservations) {
+    // Already sorted by reservedFor ascending — first one seen per table
+    // is that table's NEXT reservation; later ones for the same table are
+    // ignored here (the full list is available via listReservations).
+    if (!byTable[r.tableId]) byTable[r.tableId] = r;
+  }
+  return byTable;
+}
+
+export async function listReservations({ date, tableId, status }, outletId) {
+  const where = { outletId };
+  if (tableId) where.tableId = tableId;
+  if (status) where.status = status;
+
+  if (date) {
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    where.reservedFor = { gte: dayStart, lt: dayEnd };
+  }
+
+  return prisma.tableReservation.findMany({
+    where,
+    include: RESERVATION_INCLUDE,
+    orderBy: { reservedFor: "asc" },
+  });
+}
+
+export async function getReservationById(id, outletId) {
+  return prisma.tableReservation.findFirst({
+    where: { id, outletId },
+    include: RESERVATION_INCLUDE,
+  });
+}
+
+export async function createReservation(payload, outletId) {
+  const {
+    tableId,
+    customerId,
+    customerName,
+    customerPhone,
+    partySize,
+    reservedFor,
+    durationMinutes,
+    notes,
+    createdById,
+  } = payload;
+
+  if (!tableId) throw new Error("tableId is required");
+  if (!customerName || !customerName.trim())
+    throw new Error("customerName is required");
+  if (!partySize || Number(partySize) <= 0)
+    throw new Error("partySize must be greater than 0");
+  if (!reservedFor) throw new Error("reservedFor is required");
+
+  const reservedForDate = new Date(reservedFor);
+  if (Number.isNaN(reservedForDate.getTime())) {
+    throw new Error("reservedFor is not a valid date/time");
+  }
+
+  const table = await prisma.restaurantTable.findFirst({ where: { id: tableId, outletId } });
+  if (!table) throw new Error("Table not found");
+
+  if (customerId) {
+    const customer = await prisma.customer.findFirst({ where: { id: customerId, outletId } });
+    if (!customer) throw new Error("Customer not found");
+  }
+
+  // Warn-level conflict check (per the plan: reservations "block/warn"
+  // against overlapping bookings on the same table) — an overlapping BOOKED
+  // reservation on the same table is flagged as an error the caller can
+  // choose to override by not retrying, rather than silently double-booking.
+  const duration = durationMinutes || 90;
+  const newStart = reservedForDate;
+  const newEnd = new Date(newStart.getTime() + duration * 60000);
+
+  const existingOnTable = await prisma.tableReservation.findMany({
+    where: { outletId, tableId, status: "BOOKED" },
+    select: { reservedFor: true, durationMinutes: true, customerName: true },
+  });
+
+  const conflict = existingOnTable.find((r) => {
+    const existingStart = new Date(r.reservedFor);
+    const existingEnd = new Date(existingStart.getTime() + r.durationMinutes * 60000);
+    return newStart < existingEnd && newEnd > existingStart;
+  });
+
+  if (conflict) {
+    const err = new Error(
+      `This table already has a reservation for ${conflict.customerName} around that time.`,
+    );
+    err.code = "RESERVATION_CONFLICT";
+    throw err;
+  }
+
+  return prisma.tableReservation.create({
+    data: {
+      outletId,
+      tableId,
+      customerId: customerId || null,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone || null,
+      partySize: Number(partySize),
+      reservedFor: reservedForDate,
+      durationMinutes: duration,
+      notes: notes || null,
+      createdById: createdById || null,
+    },
+    include: RESERVATION_INCLUDE,
+  });
+}
+
+export async function updateReservation(id, payload, outletId) {
+  const existing = await prisma.tableReservation.findFirst({ where: { id, outletId } });
+  if (!existing) throw new Error("Reservation not found");
+
+  if (existing.status !== "BOOKED") {
+    throw new Error(`Cannot reschedule a reservation that's already ${existing.status}.`);
+  }
+
+  const data = {};
+  if (payload.customerName !== undefined) data.customerName = payload.customerName.trim();
+  if (payload.customerPhone !== undefined) data.customerPhone = payload.customerPhone;
+  if (payload.partySize !== undefined) data.partySize = Number(payload.partySize);
+  if (payload.notes !== undefined) data.notes = payload.notes;
+  if (payload.durationMinutes !== undefined) data.durationMinutes = Number(payload.durationMinutes);
+  if (payload.tableId !== undefined) {
+    const table = await prisma.restaurantTable.findFirst({
+      where: { id: payload.tableId, outletId },
+    });
+    if (!table) throw new Error("Table not found");
+    data.tableId = payload.tableId;
+  }
+  if (payload.reservedFor !== undefined) {
+    const d = new Date(payload.reservedFor);
+    if (Number.isNaN(d.getTime())) throw new Error("reservedFor is not a valid date/time");
+    data.reservedFor = d;
+  }
+
+  return prisma.tableReservation.update({
+    where: { id },
+    data,
+    include: RESERVATION_INCLUDE,
+  });
+}
+
+// Marks the party as arrived — occupies the table for real. This is the
+// bridge between "a future booking" and "an actual table in use"; nothing
+// about POS order creation changes here, staff still open/create the order
+// on this table normally once seated.
+export async function seatReservation(id, outletId) {
+  const reservation = await prisma.tableReservation.findFirst({ where: { id, outletId } });
+  if (!reservation) throw new Error("Reservation not found");
+  if (reservation.status !== "BOOKED") {
+    throw new Error(`Cannot seat a reservation that's already ${reservation.status}.`);
+  }
+
+  const table = await prisma.restaurantTable.findFirst({
+    where: { id: reservation.tableId, outletId },
+  });
+  if (!table) throw new Error("Table not found");
+  if (table.status === "OCCUPIED") {
+    throw new Error("This table is already occupied by another order.");
+  }
+
+  const [updated] = await prisma.$transaction([
+    prisma.tableReservation.update({
+      where: { id },
+      data: { status: "SEATED" },
+      include: RESERVATION_INCLUDE,
+    }),
+    prisma.restaurantTable.update({
+      where: { id: reservation.tableId },
+      data: { status: "OCCUPIED" },
+    }),
+  ]);
+
+  return updated;
+}
+
+export async function cancelReservation(id, { reason } = {}, outletId) {
+  const reservation = await prisma.tableReservation.findFirst({ where: { id, outletId } });
+  if (!reservation) throw new Error("Reservation not found");
+  if (reservation.status !== "BOOKED") {
+    throw new Error(`Cannot cancel a reservation that's already ${reservation.status}.`);
+  }
+
+  return prisma.tableReservation.update({
+    where: { id },
+    data: {
+      status: "CANCELLED",
+      notes: reason
+        ? `${reservation.notes ? reservation.notes + "\n" : ""}Cancelled: ${reason}`
+        : reservation.notes,
+    },
+    include: RESERVATION_INCLUDE,
+  });
+}
+
+// FOLLOW-UP (not built yet): a scheduled job to sweep BOOKED reservations
+// whose reservedFor + durationMinutes has passed without being seated, and
+// mark them NO_SHOW. Would follow the exact same "loop over every active
+// Outlet" pattern already noted for alerts.service.js's generateAlerts and
+// attendance.service.js's markAbsentees — flagging here rather than
+// guessing at a cron setup that doesn't exist in this codebase yet.

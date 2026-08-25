@@ -770,6 +770,186 @@ async function getDashboard(filters) {
   };
 }
 
+// ==============================================
+// Phase 2.2 — Counter / Settlement / Assignee-Wise Summaries
+// ==============================================
+//
+// Counter Summary and Assignee-Wise Summary share the exact same column
+// shape (complimentary/sales-return/cancelled/success order counts, net
+// amount, discount, tax, total sales, payment-method breakdown, and
+// outstanding due-payment total) — they only differ in what they group
+// orders BY (billing counter vs. the waiter/assignee on the order). One
+// shared aggregator, two thin callers.
+//
+// NOTE on payment-method columns: this system's PaymentMethod enum is
+// CASH/CARD/UPI/BANK_TRANSFER/CHEQUE/OTHER — there's no separate "Wallet"/
+// "Online Cash"/"Online Paid" distinction the way PetPooja's screen shows
+// it. Rather than fake columns that don't correspond to real data, the
+// breakdown below uses the real enum values plus a separate "Due Payment"
+// column (sourced from DuePayment, Phase 1.2) for the amount still
+// outstanding — that combination covers the same underlying question
+// ("how was this money collected, and how much wasn't") without inventing
+// distinctions this app doesn't actually track.
+
+const PAYMENT_METHODS_FOR_SUMMARY = ["CASH", "CARD", "UPI", "BANK_TRANSFER", "CHEQUE", "OTHER"];
+
+function emptySummaryGroup(key, label) {
+  return {
+    key,
+    label,
+    complimentaryOrders: 0,
+    salesReturnOrders: 0,
+    cancelledOrders: 0,
+    successOrders: 0,
+    netAmount: 0,
+    totalDiscount: 0,
+    totalTax: 0,
+    totalSales: 0,
+    duePayment: 0,
+    paymentBreakdown: Object.fromEntries(PAYMENT_METHODS_FOR_SUMMARY.map((m) => [m, 0])),
+  };
+}
+
+function roundGroup(g) {
+  return {
+    ...g,
+    netAmount: Math.round(g.netAmount * 100) / 100,
+    totalDiscount: Math.round(g.totalDiscount * 100) / 100,
+    totalTax: Math.round(g.totalTax * 100) / 100,
+    totalSales: Math.round(g.totalSales * 100) / 100,
+    duePayment: Math.round(g.duePayment * 100) / 100,
+    paymentBreakdown: Object.fromEntries(
+      Object.entries(g.paymentBreakdown).map(([k, v]) => [k, Math.round(v * 100) / 100]),
+    ),
+  };
+}
+
+// groupKeyFn/labelFn receive the raw Order row (with .payments, .counter,
+// .waiter already included) and decide which group a row belongs to.
+async function buildBillingSummary(filters, groupKeyFn, labelFn) {
+  // includeAllStatuses: true — unlike almost every other report in this
+  // file, this one NEEDS cancelled/refunded orders, since counting them
+  // (not just excluding them) is the whole point of this report.
+  const where = buildOrderWhere(filters, { includeAllStatuses: true });
+
+  const orders = await prisma.order.findMany({
+    where,
+    include: {
+      payments: { where: { status: "PAID" } },
+      counter: { select: { id: true, name: true } },
+      waiter: { select: { id: true, fullName: true } },
+    },
+  });
+
+  const groups = new Map();
+  for (const order of orders) {
+    const key = groupKeyFn(order) ?? "unassigned";
+    if (!groups.has(key)) {
+      groups.set(key, emptySummaryGroup(key, labelFn(order)));
+    }
+    const g = groups.get(key);
+
+    if (order.status === "CANCELLED") {
+      g.cancelledOrders++;
+      continue; // cancelled orders don't contribute to any money column
+    }
+    if (order.status === "REFUNDED") g.salesReturnOrders++;
+    if (order.status === "COMPLETED") g.successOrders++;
+    if (Number(order.grandTotal) === 0) g.complimentaryOrders++;
+
+    g.netAmount += num(order.subtotal);
+    g.totalDiscount += num(order.discountAmount);
+    g.totalTax += num(order.gstAmount);
+    g.totalSales += num(order.grandTotal);
+
+    for (const p of order.payments) {
+      if (g.paymentBreakdown[p.method] !== undefined) {
+        g.paymentBreakdown[p.method] += num(p.amount);
+      }
+    }
+  }
+
+  // Due-payment totals per group — DuePayment links to Order, not
+  // directly to counter/waiter, so it's joined through the order here
+  // rather than queried standalone.
+  const duePayments = await prisma.duePayment.findMany({
+    where: { outletId: filters.outletId, createdAt: { gte: filters.start, lte: filters.end } },
+    include: {
+      order: { include: { counter: { select: { id: true, name: true } }, waiter: { select: { id: true, fullName: true } } } },
+    },
+  });
+  for (const dp of duePayments) {
+    if (!dp.order) continue;
+    const key = groupKeyFn(dp.order) ?? "unassigned";
+    if (groups.has(key)) {
+      groups.get(key).duePayment += num(dp.originalAmount) - num(dp.amountPaid);
+    }
+  }
+
+  return Array.from(groups.values())
+    .map(roundGroup)
+    .sort((a, b) => b.totalSales - a.totalSales);
+}
+
+async function getCounterSummary(filters) {
+  return buildBillingSummary(
+    filters,
+    (order) => order.counterId,
+    (order) => order.counter?.name || "Unassigned",
+  );
+}
+
+async function getAssigneeWiseSummary(filters) {
+  return buildBillingSummary(
+    filters,
+    (order) => order.waiterId,
+    (order) => order.waiter?.fullName || "Unassigned",
+  );
+}
+
+// Settlement Summary — a period-level view of what's actually been
+// collected (by method) versus what's still outstanding as due payments,
+// for reconciling against a bank deposit / end-of-day cash count. Unlike
+// Counter/Assignee summaries, this is intentionally NOT grouped by
+// counter or person — it's the single-row "how much money is where"
+// answer for the whole outlet over the selected period.
+async function getSettlementSummary(filters) {
+  const paymentWhere = { status: "PAID", order: buildOrderWhere(filters) };
+
+  const [paymentTotals, duePaymentAgg] = await Promise.all([
+    prisma.payment.groupBy({
+      by: ["method"],
+      where: paymentWhere,
+      _sum: { amount: true },
+      _count: { id: true },
+    }),
+    prisma.duePayment.aggregate({
+      where: { outletId: filters.outletId, createdAt: { gte: filters.start, lte: filters.end } },
+      _sum: { originalAmount: true, amountPaid: true },
+    }),
+  ]);
+
+  const byMethod = Object.fromEntries(PAYMENT_METHODS_FOR_SUMMARY.map((m) => [m, { amount: 0, count: 0 }]));
+  for (const row of paymentTotals) {
+    if (byMethod[row.method]) {
+      byMethod[row.method] = { amount: num(row._sum.amount), count: row._count.id };
+    }
+  }
+
+  const totalCollected = Object.values(byMethod).reduce((s, m) => s + m.amount, 0);
+  const totalDueOriginal = num(duePaymentAgg._sum.originalAmount);
+  const totalDuePaid = num(duePaymentAgg._sum.amountPaid);
+  const totalOutstanding = Math.round((totalDueOriginal - totalDuePaid) * 100) / 100;
+
+  return {
+    period: { start: filters.start, end: filters.end },
+    byMethod,
+    totalCollected: Math.round(totalCollected * 100) / 100,
+    totalOutstandingDue: totalOutstanding,
+    grandTotal: Math.round((totalCollected + totalOutstanding) * 100) / 100,
+  };
+}
+
 async function getExportData(reportType, filters) {
   switch (reportType) {
     case "transactions": {
@@ -802,6 +982,14 @@ async function getExportData(reportType, filters) {
     case "customer-analytics": {
       const analytics = await getCustomerAnalytics(filters);
       return [analytics];
+    }
+    case "counter-summary":
+      return getCounterSummary(filters);
+    case "assignee-wise-summary":
+      return getAssigneeWiseSummary(filters);
+    case "settlement-summary": {
+      const summary = await getSettlementSummary(filters);
+      return [summary];
     }
     default:
       throw new Error(`Unknown report type for export: ${reportType}`);
@@ -875,6 +1063,9 @@ export default {
   getInventoryValue,
   getRefundsAndDiscounts,
   getDashboard,
+  getCounterSummary,
+  getAssigneeWiseSummary,
+  getSettlementSummary,
   getExportData,
   toCSV,
   toExcelBuffer,

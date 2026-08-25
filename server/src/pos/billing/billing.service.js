@@ -15,6 +15,8 @@ import * as paymentsService from "../payments/payments.service.js";
 import * as posService from "../pos.service.js";
 import * as invoicesService from "../invoices/invoices.service.js";
 import * as discountsService from "../discounts/discounts.service.js";
+import * as duePaymentsService from "../due-payments/duePayments.service.js";
+import * as cashDrawerService from "../cash-drawer/cashDrawer.service.js";
 
 function toInvoiceLine(orderItem) {
   return {
@@ -96,8 +98,21 @@ export async function getBillingSummary(orderId, outletId) {
 }
 
 // payments: [{ method: "CASH"|"CARD"|"UPI"|"OTHER", amount, transactionReference? }]
+//   — can be empty or partial if allowDue is true (see below).
 // discount (optional): { discountId } | { code } | { type: "MANUAL", amount, reason, approvedById }
-export async function completeBilling(orderId, { payments, discount } = {}, outletId) {
+// allowDue (optional, Phase 1.2 — Due Payment Settlement): if the payments
+//   given don't cover the full grandTotal, instead of throwing, track the
+//   remainder as a DuePayment against customerId (falls back to the
+//   order's own customerId if already set) and still complete the order —
+//   the table is freed and stock consumed exactly as if it were fully
+//   paid; the balance just becomes a collectible debt instead of blocking
+//   service completion. Every existing caller that doesn't pass this gets
+//   byte-for-byte the same behavior as before this feature existed.
+export async function completeBilling(
+  orderId,
+  { payments, discount, allowDue, customerId, performedById } = {},
+  outletId,
+) {
   const order = await prisma.order.findFirst({ where: { id: orderId, outletId } });
   if (!order) throw new Error("Order not found");
 
@@ -119,6 +134,7 @@ export async function completeBilling(orderId, { payments, discount } = {}, outl
         order,
         payments: existingPayments,
         invoice: existingInvoice,
+        duePayment: null,
         alreadyBilled: true,
       };
     }
@@ -130,9 +146,14 @@ export async function completeBilling(orderId, { payments, discount } = {}, outl
     throw new Error("Cannot bill a cancelled order.");
 
   if (!payments || payments.length === 0) {
-    throw new Error("At least one payment is required to complete billing.");
+    if (!allowDue) {
+      throw new Error("At least one payment is required to complete billing.");
+    }
+    // allowDue with zero payments = the entire bill goes on account —
+    // valid (e.g. a regular customer settling their whole tab later),
+    // just skip straight to the due-payment path below.
   }
-  for (const p of payments) {
+  for (const p of payments || []) {
     if (!p.method)
       throw new Error("Every payment line needs a payment method.");
     if (!p.amount || Number(p.amount) <= 0)
@@ -149,7 +170,7 @@ export async function completeBilling(orderId, { payments, discount } = {}, outl
   // multiple entries). createPayment already keeps the order's payment
   // status in sync as it goes.
   const createdPayments = [];
-  for (const p of payments) {
+  for (const p of payments || []) {
     const payment = await paymentsService.createPayment(
       orderId,
       {
@@ -160,18 +181,57 @@ export async function completeBilling(orderId, { payments, discount } = {}, outl
       outletId,
     );
     createdPayments.push(payment);
+
+    // Phase 2.1 — Cash Flow: every cash payment collected at billing also
+    // lands as a SALE transaction against whichever cash drawer session is
+    // currently open for this outlet, so end-of-day reconciliation doesn't
+    // have to reconstruct cash sales from the Payment table separately.
+    // Silently no-ops if no session is open (see
+    // cashDrawerService.recordSaleIfSessionOpen) — an unopened drawer
+    // should never block taking a customer's cash.
+    if (p.method === "CASH") {
+      await cashDrawerService.recordSaleIfSessionOpen(p.amount, outletId, performedById);
+    }
   }
 
   const paymentCheck = await paymentsService.syncOrderPaymentStatus(orderId, outletId);
+  let duePayment = null;
+
   if (paymentCheck.paymentStatus !== "PAID") {
-    throw new Error(
-      `Payment is incomplete — received ₹${paymentCheck.totalPaid.toFixed(2)} of ₹${paymentCheck.grandTotal.toFixed(2)}. The order has not been marked completed and the table has not been freed.`,
+    if (!allowDue) {
+      throw new Error(
+        `Payment is incomplete — received ₹${paymentCheck.totalPaid.toFixed(2)} of ₹${paymentCheck.grandTotal.toFixed(2)}. The order has not been marked completed and the table has not been freed.`,
+      );
+    }
+
+    const resolvedCustomerId = customerId || order.customerId;
+    if (!resolvedCustomerId) {
+      throw new Error(
+        "A customer is required to mark the remaining balance as due — this order has no customer attached.",
+      );
+    }
+
+    const remaining = Math.round((paymentCheck.grandTotal - paymentCheck.totalPaid) * 100) / 100;
+    duePayment = await duePaymentsService.createDuePayment(
+      {
+        orderId,
+        customerId: resolvedCustomerId,
+        originalAmount: remaining,
+        // amountPaidUpfront is 0 here deliberately — whatever the customer
+        // DID pay just now was already recorded as a normal Payment above;
+        // the DuePayment only tracks what's actually still outstanding, so
+        // it isn't double-counted in both places.
+        amountPaidUpfront: 0,
+      },
+      outletId,
     );
   }
 
-  // Only now — with a fully-paid order — do we complete the order. This is
-  // what triggers stock consumption AND frees the table (both already live
-  // inside posService.updateOrderStatus for the COMPLETED transition).
+  // Completes the order regardless of whether it was fully paid or partly
+  // put on account — table freed and stock consumed either way. This is
+  // the actual behavior change for Phase 1.2: previously an incomplete
+  // payment always blocked completion; now it only does when allowDue
+  // wasn't requested.
   const completedOrder = await posService.updateOrderStatus(
     orderId,
     "COMPLETED",
@@ -185,5 +245,6 @@ export async function completeBilling(orderId, { payments, discount } = {}, outl
     order: completedOrder,
     payments: createdPayments,
     invoice: fullInvoice,
+    duePayment,
   };
 }

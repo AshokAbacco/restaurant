@@ -55,8 +55,8 @@ enum AlertType {
 
 model Category {
   id            String        @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId      String
+  outlet        Outlet        @relation(fields: [outletId], references: [id])
   name          String
   description   String?
   imageUrl      String?
@@ -73,8 +73,8 @@ model Category {
 
 model SubCategory {
   id         String     @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet     @relation(fields: [outletId], references: [id])
   name       String
   categoryId String
   category   Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -88,22 +88,22 @@ model SubCategory {
 
 model KitchenSection {
   id            String         @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId      String
+  outlet        Outlet         @relation(fields: [outletId], references: [id])
   name          String
   menuItems     MenuItem[]
   kitchenOrders KitchenOrder[]
   createdAt     DateTime       @default(now())
 
-  @@index([outletId])
   @@unique([outletId, name])
+  @@index([outletId])
   @@map("kitchen_sections")
 }
 
 model MenuItem {
   id        String  @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId  String
+  outlet    Outlet  @relation(fields: [outletId], references: [id])
   name      String
   shortName String?
   sku       String
@@ -153,40 +153,40 @@ model MenuItem {
 
 model Unit {
   id           String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
-  name         String    // Kg, Gram, Liter, ml, Piece, Packet, Bottle, Box
+  outletId     String
+  outlet       Outlet   @relation(fields: [outletId], references: [id])
+  name         String // Kg, Gram, Liter, ml, Piece, Packet, Bottle, Box
   abbreviation String?
   createdAt    DateTime @default(now())
 
   purchaseUnitIngredients    Ingredient[] @relation("PurchaseUnit")
   consumptionUnitIngredients Ingredient[] @relation("ConsumptionUnit")
 
-  @@index([outletId])
   @@unique([outletId, name])
+  @@index([outletId])
   @@map("units")
 }
 
 model IngredientCategory {
   id          String       @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
-  name        String        // Vegetables, Meat, Dairy, Beverages, Masala, Oil, Packaging, Cleaning
+  outletId    String
+  outlet      Outlet       @relation(fields: [outletId], references: [id])
+  name        String // Vegetables, Meat, Dairy, Beverages, Masala, Oil, Packaging, Cleaning
   description String?
   isEnabled   Boolean      @default(true)
   ingredients Ingredient[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  @@index([outletId])
   @@unique([outletId, name])
+  @@index([outletId])
   @@map("ingredient_categories")
 }
 
 model Supplier {
   id                 String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId           String
+  outlet             Outlet   @relation(fields: [outletId], references: [id])
   name               String
   contactPerson      String?
   phone              String?
@@ -211,8 +211,8 @@ model Supplier {
 
 model Ingredient {
   id          String  @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId    String
+  outlet      Outlet  @relation(fields: [outletId], references: [id])
   name        String
   itemCode    String
   barcode     String?
@@ -243,15 +243,15 @@ model Ingredient {
   recipeIngredients  RecipeIngredient[]
   inventoryAlerts    InventoryAlert[]
 
-  @@index([outletId])
   @@unique([outletId, itemCode])
+  @@index([outletId])
   @@map("ingredients")
 }
 
 model PurchaseOrder {
   id               String              @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId         String
+  outlet           Outlet              @relation(fields: [outletId], references: [id])
   poNumber         String
   supplierId       String
   supplier         Supplier            @relation(fields: [supplierId], references: [id])
@@ -267,8 +267,8 @@ model PurchaseOrder {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([outletId])
   @@unique([outletId, poNumber])
+  @@index([outletId])
   @@map("purchase_orders")
 }
 
@@ -297,8 +297,8 @@ model PurchaseEntry {
   ingredientId    String
   ingredient      Ingredient     @relation(fields: [ingredientId], references: [id])
 
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId         String
+  outlet           Outlet    @relation(fields: [outletId], references: [id])
   invoiceNumber    String?
   batchNumber      String?
   expiryDate       DateTime?
@@ -322,8 +322,8 @@ model InventoryStock {
   ingredient     Ingredient @relation(fields: [ingredientId], references: [id])
   quantityOnHand Decimal    @default(0) @db.Decimal(14, 4) // consumption units
   averageCost    Decimal    @default(0) @db.Decimal(12, 4) // cost per consumption unit
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId       String
+  outlet         Outlet     @relation(fields: [outletId], references: [id])
   updatedAt      DateTime   @updatedAt
 
   @@index([outletId])
@@ -347,8 +347,8 @@ model StockMovement {
   userId String?
   user   Employee? @relation("StockMovementsByUser", fields: [userId], references: [id])
 
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId  String
+  outlet    Outlet   @relation(fields: [outletId], references: [id])
   createdAt DateTime @default(now())
 
   @@index([ingredientId, createdAt])
@@ -358,8 +358,8 @@ model StockMovement {
 
 model StockAdjustment {
   id           String         @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId     String
+  outlet       Outlet         @relation(fields: [outletId], references: [id])
   ingredientId String
   ingredient   Ingredient     @relation(fields: [ingredientId], references: [id])
   type         AdjustmentType
@@ -377,8 +377,8 @@ model Wastage {
   id           String     @id @default(uuid())
   ingredientId String
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId     String
+  outlet       Outlet     @relation(fields: [outletId], references: [id])
   quantity     Decimal    @db.Decimal(14, 4)
   reason       String
   cost         Decimal    @db.Decimal(12, 2)
@@ -395,8 +395,8 @@ model Wastage {
 
 model ExpiryBatch {
   id                String     @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId          String
+  outlet            Outlet     @relation(fields: [outletId], references: [id])
   ingredientId      String
   ingredient        Ingredient @relation(fields: [ingredientId], references: [id])
   batchNumber       String
@@ -427,8 +427,8 @@ model RecipeIngredient {
 // Pre-computed alert rows so the dashboard doesn't have to scan everything live.
 model InventoryAlert {
   id           String     @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId     String
+  outlet       Outlet     @relation(fields: [outletId], references: [id])
   ingredientId String
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
   type         AlertType
@@ -484,8 +484,8 @@ enum ApprovalLevel {
 
 model ExpenseCategory {
   id          String  @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId    String
+  outlet      Outlet  @relation(fields: [outletId], references: [id])
   name        String
   description String?
   isDefault   Boolean @default(false) // true for seeded defaults (Rent, Electricity, etc.)
@@ -499,8 +499,8 @@ model ExpenseCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([outletId])
   @@unique([outletId, name])
+  @@index([outletId])
   @@map("expense_categories")
 }
 
@@ -513,10 +513,10 @@ model ExpenseCategory {
 // `store String @default("Main Store")` convention -- that field has been
 // removed from every model below in favor of this real relation.
 model Organization {
-  id         String   @id @default(uuid())
+  id         String  @id @default(uuid())
   name       String
-  ownerEmail String   @unique
-  isActive   Boolean  @default(true)
+  ownerEmail String  @unique
+  isActive   Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -525,6 +525,32 @@ model Organization {
   userAccounts UserAccount[]
 
   @@map("organizations")
+}
+
+// Lets each outlet relabel/recolor the system order statuses for display
+// purposes (e.g. "PREPARING" -> "Cooking 👨‍🍳") without touching the actual
+// OrderStatus state machine that drives KDS/billing logic — systemStatus
+// is always one of the real enum values; customLabel/color are purely
+// cosmetic. One row per system status per outlet (an outlet either has a
+// customization for a given status, or the frontend falls back to the
+// plain enum value — see settings.service.js).
+model OrderStatusLabel {
+  id       String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+
+  systemStatus OrderStatus
+  customLabel  String
+  color        String? // hex or Tailwind token, frontend's choice how to use it
+  sortOrder    Int         @default(0)
+  isActive     Boolean     @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([outletId, systemStatus])
+  @@index([outletId])
+  @@map("order_status_labels")
 }
 
 model Outlet {
@@ -536,62 +562,70 @@ model Outlet {
   address         String?
   phone           String?
   gstin           String?
-  timezone        String?  @default("Asia/Kolkata")
-  defaultLanguage String?  @default("en")
-  isActive        Boolean  @default(true)
+  timezone        String? @default("Asia/Kolkata")
+  defaultLanguage String? @default("en")
+  isActive        Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Back-relations -- one array field per model that carries outletId below.
-  categories               Category[]
-  subCategories            SubCategory[]
-  kitchenSections          KitchenSection[]
-  menuItems                MenuItem[]
-  menuVariants             MenuVariant[]
-  addOns                   AddOn[]
-  comboMeals               ComboMeal[]
-  units                    Unit[]
-  ingredientCategories     IngredientCategory[]
-  suppliers                Supplier[]
-  ingredients              Ingredient[]
-  purchaseOrders           PurchaseOrder[]
-  purchaseEntries          PurchaseEntry[]
-  inventoryStocks          InventoryStock[]
-  stockMovements           StockMovement[]
-  stockAdjustments         StockAdjustment[]
-  wastages                 Wastage[]
-  expiryBatches            ExpiryBatch[]
-  inventoryAlerts          InventoryAlert[]
-  expenseCategories        ExpenseCategory[]
-  expenses                 Expense[]
-  recurringExpenses        RecurringExpense[]
-  payrollRecords           PayrollRecord[]
-  salaryExpenses           SalaryExpense[]
-  utilityBills             UtilityBill[]
-  pettyCashSessions        PettyCashSession[]
-  assetPurchases           AssetPurchase[]
-  employees                Employee[]
-  userAccounts             UserAccount[]
-  refreshTokens            RefreshToken[]
-  attendances              Attendance[]
-  shifts                   Shift[]
-  shiftAssignments         ShiftAssignment[]
-  leaveRequests            LeaveRequest[]
-  incentives               Incentive[]
-  performanceRecords       PerformanceRecord[]
-  activityLogs             ActivityLog[]
-  floors                   Floor[]
-  restaurantTables         RestaurantTable[]
-  customers                Customer[]
-  deliveryPartners         DeliveryPartner[]
-  orders                   Order[]
-  kitchenOrders            KitchenOrder[]
-  invoices                 Invoice[]
-  loyaltyTransactions      LoyaltyTransaction[]
-  discounts                Discount[]
-  priceHistories           PriceHistory[]
-  auditLogs                AuditLog[]
+  categories             Category[]
+  subCategories          SubCategory[]
+  kitchenSections        KitchenSection[]
+  menuItems              MenuItem[]
+  menuVariants           MenuVariant[]
+  addOns                 AddOn[]
+  comboMeals             ComboMeal[]
+  units                  Unit[]
+  ingredientCategories   IngredientCategory[]
+  suppliers              Supplier[]
+  ingredients            Ingredient[]
+  purchaseOrders         PurchaseOrder[]
+  purchaseEntries        PurchaseEntry[]
+  inventoryStocks        InventoryStock[]
+  stockMovements         StockMovement[]
+  stockAdjustments       StockAdjustment[]
+  wastages               Wastage[]
+  expiryBatches          ExpiryBatch[]
+  inventoryAlerts        InventoryAlert[]
+  expenseCategories      ExpenseCategory[]
+  expenses               Expense[]
+  recurringExpenses      RecurringExpense[]
+  payrollRecords         PayrollRecord[]
+  salaryExpenses         SalaryExpense[]
+  utilityBills           UtilityBill[]
+  pettyCashSessions      PettyCashSession[]
+  assetPurchases         AssetPurchase[]
+  employees              Employee[]
+  userAccounts           UserAccount[]
+  refreshTokens          RefreshToken[]
+  attendances            Attendance[]
+  shifts                 Shift[]
+  shiftAssignments       ShiftAssignment[]
+  leaveRequests          LeaveRequest[]
+  incentives             Incentive[]
+  performanceRecords     PerformanceRecord[]
+  activityLogs           ActivityLog[]
+  floors                 Floor[]
+  restaurantTables       RestaurantTable[]
+  customers              Customer[]
+  deliveryPartners       DeliveryPartner[]
+  orders                 Order[]
+  kitchenOrders          KitchenOrder[]
+  invoices               Invoice[]
+  loyaltyTransactions    LoyaltyTransaction[]
+  discounts              Discount[]
+  priceHistories         PriceHistory[]
+  auditLogs              AuditLog[]
+  orderStatusLabels      OrderStatusLabel[]
+  duePayments            DuePayment[]
+  duePaymentSettlements  DuePaymentSettlement[]
+  tableReservations      TableReservation[]
+  billingCounters        BillingCounter[]
+  cashDrawerSessions     CashDrawerSession[]
+  cashDrawerTransactions CashDrawerTransaction[]
+
   @@unique([organizationId, name])
   @@map("outlets")
 }
@@ -601,7 +635,7 @@ model Outlet {
 // while UtilityBill/PettyCashSession hold the feature-specific metadata.
 model Expense {
   id            String @id @default(uuid())
-  expenseNumber String  // auto-generated, e.g. EXP-000123
+  expenseNumber String // auto-generated, e.g. EXP-000123
 
   categoryId String
   category   ExpenseCategory @relation(fields: [categoryId], references: [id])
@@ -624,9 +658,9 @@ model Expense {
   paymentDate          DateTime?
   transactionReference String?
 
-  status ExpenseStatus @default(DRAFT)
+  status   ExpenseStatus @default(DRAFT)
   outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outlet   Outlet        @relation(fields: [outletId], references: [id])
 
   isPettyCash        Boolean           @default(false)
   pettyCashSessionId String?
@@ -646,10 +680,10 @@ model Expense {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([outletId, expenseNumber])
   @@index([expenseDate])
   @@index([status])
   @@index([outletId])
-  @@unique([outletId, expenseNumber])
   @@map("expenses")
 }
 
@@ -682,8 +716,8 @@ model RecurringExpense {
 
   supplierId String?
   supplier   Supplier? @relation(fields: [supplierId], references: [id])
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet    @relation(fields: [outletId], references: [id])
 
   expenses Expense[]
 
@@ -717,8 +751,8 @@ model ExpenseApproval {
 // is created below so it lands in the accounting/P&L ledger too.
 model PayrollRecord {
   id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -761,8 +795,8 @@ model SalaryExpense {
 
   paymentStatus PaymentStatus @default(UNPAID)
   paymentDate   DateTime?
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId      String
+  outlet        Outlet        @relation(fields: [outletId], references: [id])
 
   payrollRecord PayrollRecord?
 
@@ -784,8 +818,8 @@ model UtilityBill {
   paymentDate        DateTime?
   amount             Decimal       @db.Decimal(12, 2)
   paymentStatus      PaymentStatus @default(UNPAID)
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId           String
+  outlet             Outlet        @relation(fields: [outletId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -800,8 +834,8 @@ model UtilityBill {
 // linked back here via pettyCashSessionId.
 model PettyCashSession {
   id             String    @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId       String
+  outlet         Outlet    @relation(fields: [outletId], references: [id])
   periodStart    DateTime
   periodEnd      DateTime?
   openingBalance Decimal   @db.Decimal(12, 2)
@@ -817,6 +851,91 @@ model PettyCashSession {
   @@map("petty_cash_sessions")
 }
 
+// A cash drawer/till session — NOT the same concept as PettyCashSession
+// above (that's for tracking small cash purchases as an expense category;
+// this is for reconciling the actual cash sitting in the drawer against
+// what sales+top-ups-withdrawals say should be there). A biller opens one
+// at the start of their shift with a starting float, every cash sale/
+// withdrawal/top-up/conversion during the shift is logged against it (see
+// CashDrawerTransaction), and it's closed out at end of shift by counting
+// the physical cash and comparing to what the ledger expects.
+model CashDrawerSession {
+  id       String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  openedById String?
+  openedBy   Employee? @relation("CashDrawerSessionsOpenedBy", fields: [openedById], references: [id])
+
+  openingFloat Decimal  @db.Decimal(10, 2)
+  openedAt     DateTime @default(now())
+
+  closedById String?
+  closedBy   Employee? @relation("CashDrawerSessionsClosedBy", fields: [closedById], references: [id])
+
+  closedAt              DateTime?
+  closingCounted        Decimal?  @db.Decimal(10, 2)
+  expectedClosingAmount Decimal?  @db.Decimal(10, 2)
+
+  status CashDrawerSessionStatus @default(OPEN)
+  notes  String?
+
+  transactions CashDrawerTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+  @@index([status])
+  @@map("cash_drawer_sessions")
+}
+
+// One float movement against an open session. SALE rows are created
+// automatically whenever a cash payment is recorded at billing (see
+// billing.service.js) — never entered by hand. WITHDRAWAL/TOP_UP/
+// CURRENCY_CONVERSION are the manual actions a biller takes during a
+// shift (e.g. sending cash to the office safe, or breaking a large note).
+model CashDrawerTransaction {
+  id       String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  sessionId String
+  session   CashDrawerSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  type   CashDrawerTransactionType
+  amount Decimal                   @db.Decimal(10, 2)
+  reason String?
+
+  // Only meaningful for type CURRENCY_CONVERSION — a foreign-currency cash
+  // payment logged and converted at a recorded rate, so the drawer's INR
+  // total stays reconcilable even when a customer paid in another currency.
+  fromCurrency String?
+  toCurrency   String?
+  exchangeRate Decimal? @db.Decimal(12, 6)
+
+  performedById String?
+  performedBy   Employee? @relation("CashDrawerTransactionsByEmployee", fields: [performedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([outletId])
+  @@index([sessionId])
+  @@map("cash_drawer_transactions")
+}
+
+enum CashDrawerSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashDrawerTransactionType {
+  SALE
+  WITHDRAWAL
+  TOP_UP
+  CURRENCY_CONVERSION
+}
+
 model AssetPurchase {
   id             String    @id @default(uuid())
   assetName      String
@@ -827,8 +946,8 @@ model AssetPurchase {
 
   supplierId String?
   supplier   Supplier? @relation(fields: [supplierId], references: [id])
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet    @relation(fields: [outletId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -911,7 +1030,7 @@ enum SalaryStatus {
 
 model Employee {
   id               String    @id @default(uuid())
-  employeeCode     String    // auto-generated, e.g. EMP-0001 — unique per outlet, see @@unique below
+  employeeCode     String // auto-generated, e.g. EMP-0001 — unique per outlet, see @@unique below
   fullName         String
   photoUrl         String?
   gender           String?
@@ -925,22 +1044,21 @@ model Employee {
   joiningDate    DateTime
   employmentType String? // free text — full-time / part-time / contract
   status         EmployeeStatus @default(ACTIVE)
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId       String
+  outlet         Outlet         @relation(fields: [outletId], references: [id])
 
-  address             EmployeeAddress?
-  userAccount         UserAccount?
-  attendance          Attendance[]
-  attendanceLogs      AttendanceLog[]
-  shiftAssignments    ShiftAssignment[]
-  leaveRequests       LeaveRequest[]
-  approvedLeaves      LeaveRequest[]      @relation("LeaveApprovedBy")
-  payrollRecords      PayrollRecord[]
-  incentives          Incentive[]
-  approvedIncentives  Incentive[]         @relation("IncentiveApprovedBy")
-  performanceRecords  PerformanceRecord[]
-  activityLogs        ActivityLog[]
-  reservationsCreated TableReservation[]  @relation("ReservationsCreatedBy")
+  address            EmployeeAddress?
+  userAccount        UserAccount?
+  attendance         Attendance[]
+  attendanceLogs     AttendanceLog[]
+  shiftAssignments   ShiftAssignment[]
+  leaveRequests      LeaveRequest[]
+  approvedLeaves     LeaveRequest[]      @relation("LeaveApprovedBy")
+  payrollRecords     PayrollRecord[]
+  incentives         Incentive[]
+  approvedIncentives Incentive[]         @relation("IncentiveApprovedBy")
+  performanceRecords PerformanceRecord[]
+  activityLogs       ActivityLog[]
 
   // reverse relations into existing modules
   stockMovements   StockMovement[]   @relation("StockMovementsByUser")
@@ -954,9 +1072,14 @@ model Employee {
   assignedTables    RestaurantTable[] @relation("TablesByWaiter")
   discountsApproved OrderDiscount[]   @relation("DiscountsApprovedBy")
 
-  kitchenOrdersAsChef  KitchenOrder[]          @relation("KOTsByChef")
-  kitchenStatusChanges KitchenOrderStatusLog[] @relation("KOTStatusChangedBy")
-  kitchenNotes         KitchenNote[]           @relation("KitchenNotesByChef")
+  kitchenOrdersAsChef             KitchenOrder[]          @relation("KOTsByChef")
+  duePaymentSettlements           DuePaymentSettlement[]  @relation("DuePaymentSettlementsByEmployee")
+  reservationsCreated             TableReservation[]      @relation("ReservationsByEmployee")
+  cashDrawerSessionsOpened        CashDrawerSession[]     @relation("CashDrawerSessionsOpenedBy")
+  cashDrawerSessionsClosed        CashDrawerSession[]     @relation("CashDrawerSessionsClosedBy")
+  cashDrawerTransactionsPerformed CashDrawerTransaction[] @relation("CashDrawerTransactionsByEmployee")
+  kitchenStatusChanges            KitchenOrderStatusLog[] @relation("KOTStatusChangedBy")
+  kitchenNotes                    KitchenNote[]           @relation("KitchenNotesByChef")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -985,17 +1108,17 @@ model EmployeeAddress {
 
 // Login schema only — no auth middleware wired yet.
 model UserAccount {
-  id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  id             String       @id @default(uuid())
+  outletId       String
+  outlet         Outlet       @relation(fields: [outletId], references: [id])
   // Denormalized alongside outletId so we can resolve "which orgs can this login
   // access" and switch outlets without a join through Outlet every time (see
   // POST /api/auth/select-outlet). Must always equal outlet.organizationId —
   // enforced in the service layer, not at the DB level.
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  employeeId String   @unique
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId     String       @unique
 
   // Unique per organization, not per outlet — one owner login should be able to
   // use the same username across every outlet they own.
@@ -1050,8 +1173,8 @@ model RefreshToken {
   // this can't be derived from the account alone; it has to be recorded
   // per-session, at login/select-outlet time, and echoed back into the
   // access token on every /refresh (see auth.service.js).
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId      String
+  outlet        Outlet      @relation(fields: [outletId], references: [id])
   tokenHash     String      @unique
   expiresAt     DateTime
   revokedAt     DateTime?
@@ -1074,8 +1197,8 @@ model Attendance {
   workingHours  Decimal?         @db.Decimal(5, 2)
   overtimeHours Decimal?         @db.Decimal(5, 2)
   status        AttendanceStatus @default(PRESENT)
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId      String
+  outlet        Outlet           @relation(fields: [outletId], references: [id])
 
   @@unique([employeeId, date])
   @@index([date])
@@ -1103,8 +1226,8 @@ model Shift {
   name      String // Morning / Afternoon / Night / Custom
   startTime String // "09:00"
   endTime   String // "17:00"
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId  String
+  outlet    Outlet @relation(fields: [outletId], references: [id])
 
   assignments ShiftAssignment[]
 
@@ -1116,8 +1239,8 @@ model Shift {
 
 model ShiftAssignment {
   id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
   shift      Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
@@ -1133,8 +1256,8 @@ model ShiftAssignment {
 
 model LeaveRequest {
   id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -1157,8 +1280,8 @@ model LeaveRequest {
 
 model Incentive {
   id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -1177,8 +1300,8 @@ model Incentive {
 
 model PerformanceRecord {
   id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -1195,8 +1318,8 @@ model PerformanceRecord {
 
 model ActivityLog {
   id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
 
@@ -1239,19 +1362,6 @@ enum TableStatus {
   RESERVED
 }
 
-// Lifecycle for a single TableReservation record. Deliberately separate from
-// TableStatus above — a reservation's status tracks the booking itself,
-// while RestaurantTable.status continues to track live floor occupancy
-// (FREE/OCCUPIED/RESERVED) exactly as it does today. See TableReservation
-// model for how the two relate.
-enum ReservationStatus {
-  BOOKED
-  SEATED
-  CANCELLED
-  NO_SHOW
-  COMPLETED
-}
-
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
@@ -1290,8 +1400,8 @@ enum SplitType {
 // Tables are grouped under a floor for the Tables Management page (floor
 // tabs + per-floor table grid).
 model Floor {
-  id    String  @id @default(uuid())
-  name  String
+  id       String @id @default(uuid())
+  name     String
   outletId String
   outlet   Outlet @relation(fields: [outletId], references: [id])
 
@@ -1311,7 +1421,7 @@ model RestaurantTable {
   section  String? // legacy free-text grouping, kept for back-compat with existing filters
   status   TableStatus @default(FREE)
   outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outlet   Outlet      @relation(fields: [outletId], references: [id])
 
   floorId String?
   floor   Floor?  @relation(fields: [floorId], references: [id])
@@ -1323,10 +1433,7 @@ model RestaurantTable {
   waiter     Employee? @relation("TablesByWaiter", fields: [waiterId], references: [id])
   assignedAt DateTime?
 
-  orders Order[]
-
-  // A table can have many reservations over time (past + future). This is
-  // an additional layer on top of existing occupancy — see TableReservation.
+  orders       Order[]
   reservations TableReservation[]
 
   createdAt DateTime @default(now())
@@ -1339,60 +1446,65 @@ model RestaurantTable {
   @@map("restaurant_tables")
 }
 
-// ==============================================
-// TABLE RESERVATION
-// An additional layer on top of RestaurantTable — booking a table ahead of
-// time. Does NOT replace or drive RestaurantTable.status; the existing
-// FREE/OCCUPIED/RESERVED occupancy flow (driven by orders/KOT/billing) is
-// untouched. A table's upcoming reservation is surfaced alongside its
-// existing status in the tables list API as extra read-only info.
-//
-// "store" follows the same single-string-field convention already used on
-// RestaurantTable/Employee/Expense (no separate outlet/tenant model exists
-// in this schema) and is always taken server-side from req.user.store, the
-// same as every other module — never trusted from the request body.
-// ==============================================
+// A future booking against a specific table. Deliberately keeps its own
+// customerName/customerPhone fields rather than a required Customer FK —
+// a reservation is very often taken over the phone before anyone decides
+// whether to also create a full Customer record, and shouldn't be blocked
+// on that decision. customerId is optional, filled in only when the
+// booking is linked to an existing Customer.
 model TableReservation {
-  id String @id @default(uuid())
+  id       String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
 
   tableId String
   table   RestaurantTable @relation(fields: [tableId], references: [id])
 
-  store String @default("Main Store")
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
 
-  customerName  String
-  customerPhone String
-
+  customerName    String
+  customerPhone   String?
   partySize       Int
-  reservedFor     DateTime // combined reservation date + time
-  durationMinutes Int      @default(60)
+  reservedFor     DateTime
+  durationMinutes Int               @default(90)
+  status          ReservationStatus @default(BOOKED)
+  notes           String?
 
-  status ReservationStatus @default(BOOKED)
-  notes  String?
-
-  // Same pattern as Expense.createdBy / Expense.createdByEmployee
-  createdBy         String?
-  createdByEmployee Employee? @relation("ReservationsCreatedBy", fields: [createdBy], references: [id])
-
+  // Set by the corresponding status-transition endpoint
+  // (seat/cancel/no-show/complete) — each is null until that transition
+  // happens, matching how the other Xat timestamp fields are used
+  // elsewhere in this schema.
   seatedAt    DateTime?
   cancelledAt DateTime?
   noShowAt    DateTime?
   completedAt DateTime?
 
+  createdById String?
+  createdBy   Employee? @relation("ReservationsByEmployee", fields: [createdById], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([outletId])
   @@index([tableId])
-  @@index([status])
   @@index([reservedFor])
-  @@index([store])
+  @@index([status])
   @@map("table_reservations")
+}
+
+enum ReservationStatus {
+  BOOKED
+  SEATED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
 }
 
 model Customer {
   id            String  @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId      String
+  outlet        Outlet  @relation(fields: [outletId], references: [id])
   name          String
   mobile        String
   email         String?
@@ -1402,20 +1514,22 @@ model Customer {
 
   orders              Order[]
   loyaltyTransactions LoyaltyTransaction[]
+  duePayments         DuePayment[]
+  reservations        TableReservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([outletId, mobile])
   @@index([mobile])
   @@index([outletId])
-  @@unique([outletId, mobile])
   @@map("customers")
 }
 
 model DeliveryPartner {
   id       String  @id @default(uuid())
   outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outlet   Outlet  @relation(fields: [outletId], references: [id])
   name     String
   phone    String?
   isActive Boolean @default(true)
@@ -1428,9 +1542,97 @@ model DeliveryPartner {
   @@map("delivery_partners")
 }
 
+// A bill that wasn't fully paid at billing time — the remaining balance is
+// tracked here as outstanding debt against a customer, settled later in
+// full or in installments (see DuePaymentSettlement). One row per Order;
+// an order is either fully paid at billing (no DuePayment row at all) or
+// has exactly one, whose status tracks how much of it has been settled
+// since.
+model DuePayment {
+  id       String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  originalAmount Decimal          @db.Decimal(10, 2)
+  amountPaid     Decimal          @default(0) @db.Decimal(10, 2)
+  status         DuePaymentStatus @default(OUTSTANDING)
+
+  settlements DuePaymentSettlement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+  @@index([customerId])
+  @@index([status])
+  @@map("due_payments")
+}
+
+// One installment/settlement against a DuePayment — a customer can clear
+// their tab in several visits, each one logged here for a full audit
+// trail of who collected what, when, and by which method.
+model DuePaymentSettlement {
+  id           String     @id @default(uuid())
+  outletId     String
+  outlet       Outlet     @relation(fields: [outletId], references: [id])
+  duePaymentId String
+  duePayment   DuePayment @relation(fields: [duePaymentId], references: [id], onDelete: Cascade)
+
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod
+
+  settledById String?
+  settledBy   Employee? @relation("DuePaymentSettlementsByEmployee", fields: [settledById], references: [id])
+
+  settledAt DateTime @default(now())
+  notes     String?
+
+  @@index([outletId])
+  @@index([duePaymentId])
+  @@map("due_payment_settlements")
+}
+
+enum DuePaymentStatus {
+  OUTSTANDING
+  PARTIALLY_PAID
+  SETTLED
+}
+
+// Represents a physical POS terminal/billing station (e.g. "Counter 1",
+// "Captain", "Billing Station") — matches PetPooja's Counter Summary
+// report, which groups sales by which physical device processed them.
+// Deliberately a device-level identity, not a staff-level one: the same
+// physical terminal keeps its counter identity across shifts regardless
+// of who's logged into it, and one staff member's login can be used at
+// different counters at different times (see counter-selection on the
+// client — a per-browser choice, not part of the JWT).
+model BillingCounter {
+  id       String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  name     String
+  isActive Boolean @default(true)
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([outletId, name])
+  @@index([outletId])
+  @@map("billing_counters")
+}
+
 model Order {
   id          String      @id @default(uuid())
-  orderNumber String       // e.g. ORD-000123
+  orderNumber String // e.g. ORD-000123
   orderType   OrderType
   status      OrderStatus @default(NEW)
   holdNumber  String?
@@ -1448,6 +1650,12 @@ model Order {
 
   tableId String?
   table   RestaurantTable? @relation(fields: [tableId], references: [id])
+
+  // Which physical POS terminal/counter this order was billed through —
+  // optional (older orders, or an outlet that hasn't set up counters yet,
+  // simply have null here) — see BillingCounter above.
+  counterId String?
+  counter   BillingCounter? @relation(fields: [counterId], references: [id])
 
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id])
@@ -1476,14 +1684,15 @@ model Order {
   serviceChargeAmount Decimal @default(0) @db.Decimal(12, 2)
   grandTotal          Decimal @db.Decimal(12, 2)
 
-  notes String?
+  notes    String?
   outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outlet   Outlet  @relation(fields: [outletId], references: [id])
 
   items               OrderItem[]
   payments            Payment[]
   kitchenOrders       KitchenOrder[]
   invoice             Invoice?
+  duePayment          DuePayment?
   billSplits          BillSplit[]
   discountsApplied    OrderDiscount[]
   loyaltyTransactions LoyaltyTransaction[]
@@ -1491,12 +1700,12 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([outletId, orderNumber])
+  @@unique([outletId, holdNumber])
   @@index([status])
   @@index([orderType])
   @@index([createdAt])
   @@index([outletId])
-  @@unique([outletId, orderNumber])
-  @@unique([outletId, holdNumber])
   @@map("orders")
 }
 
@@ -1523,8 +1732,8 @@ model OrderItem {
 
 model AddOn {
   id        String  @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId  String
+  outlet    Outlet  @relation(fields: [outletId], references: [id])
   name      String
   price     Decimal @db.Decimal(10, 2)
   isEnabled Boolean @default(true)
@@ -1562,16 +1771,16 @@ model Discount {
   validTo        DateTime?
   usageLimit     Int?
   minOrderAmount Decimal?     @db.Decimal(12, 2)
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId       String
+  outlet         Outlet       @relation(fields: [outletId], references: [id])
 
   orderDiscounts OrderDiscount[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([outletId])
   @@unique([outletId, code])
+  @@index([outletId])
   @@map("discounts")
 }
 
@@ -1631,8 +1840,8 @@ model BillSplit {
 
 model KitchenOrder {
   id        String      @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId  String
+  outlet    Outlet      @relation(fields: [outletId], references: [id])
   orderId   String
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   kotNumber String
@@ -1667,11 +1876,11 @@ model KitchenOrder {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  @@unique([outletId, kotNumber])
   @@index([status])
   @@index([kitchenSectionId, status])
   @@index([isDelayed])
   @@index([outletId])
-  @@unique([outletId, kotNumber])
   @@map("kitchen_orders")
 }
 
@@ -1721,8 +1930,8 @@ model KitchenNote {
 
 model Invoice {
   id            String  @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId      String
+  outlet        Outlet  @relation(fields: [outletId], references: [id])
   orderId       String  @unique
   order         Order   @relation(fields: [orderId], references: [id])
   invoiceNumber String
@@ -1732,15 +1941,15 @@ model Invoice {
 
   createdAt DateTime @default(now())
 
-  @@index([outletId])
   @@unique([outletId, invoiceNumber])
+  @@index([outletId])
   @@map("invoices")
 }
 
 model LoyaltyTransaction {
   id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
   orderId    String?
@@ -1765,8 +1974,8 @@ model LoyaltyTransaction {
 // Small / Medium / Large style variants for a single menu item
 model MenuVariant {
   id              String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId        String
+  outlet          Outlet   @relation(fields: [outletId], references: [id])
   menuItemId      String
   menuItem        MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   name            String // e.g. "Small", "Medium", "Large"
@@ -1799,8 +2008,8 @@ model MenuItemAddOn {
 // Combo meals — bundle several menu items at a fixed price
 model ComboMeal {
   id          String      @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId    String
+  outlet      Outlet      @relation(fields: [outletId], references: [id])
   name        String
   price       Decimal     @db.Decimal(10, 2)
   description String?
@@ -1828,8 +2037,8 @@ model ComboItem {
 // Audit trail — logged automatically whenever MenuItem.sellingPrice changes
 model PriceHistory {
   id         String   @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
   menuItemId String
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   oldPrice   Decimal  @db.Decimal(10, 2)
@@ -1850,8 +2059,8 @@ model PriceHistory {
 // thing it describes (e.g. a deleted Order) no longer exists.
 model AuditLog {
   id         String @id @default(uuid())
-  outletId String
-  outlet   Outlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  outlet     Outlet @relation(fields: [outletId], references: [id])
   action     String // e.g. "ORDER_DELETED", "LOGIN_ACCOUNT_CREATED", "EMPLOYEE_TERMINATED"
   entityType String // e.g. "Order", "Employee", "UserAccount"
   entityId   String
