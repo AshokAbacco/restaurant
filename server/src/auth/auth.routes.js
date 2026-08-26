@@ -4,6 +4,7 @@
 
 import { Router } from "express";
 import {
+  registerHandler,
   loginHandler,
   selectOutletHandler,
   switchOutletHandler,
@@ -23,6 +24,7 @@ import {
   resetPasswordRateLimiter,
 } from "../middleware/rateLimiters.js";
 import {
+  registerSchema,
   loginSchema,
   selectOutletSchema,
   switchOutletSchema,
@@ -33,6 +35,15 @@ import {
 } from "./auth.validation.js";
 
 const router = Router();
+
+// Public Owner self-signup. Role is NOT taken from the body;
+// auth.service.js hardcodes OWNER, and staff accounts are created later by
+// the logged-in owner via the already-protected /api/employees routes.
+//
+// No rate limiter on this one by choice. If you ever want it back, the
+// pattern is the same as /login below — import a limiter from
+// ../middleware/rateLimiters.js and slot it in ahead of validate().
+router.post("/register", validate(registerSchema), registerHandler);
 
 // Public — rate limiting + validation added; previously had neither.
 router.post("/login", loginRateLimiter, validate(loginSchema), loginHandler);

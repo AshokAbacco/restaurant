@@ -113,6 +113,26 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // ==========================================
+  // REGISTER (public Owner signup)
+  // Intentionally a thin pass-through: it does NOT touch `user`,
+  // `isAuthenticated`, or the top-level `loading` flag. Registration
+  // doesn't create a session (the backend returns no token — see
+  // auth.controller.js's registerHandler), so flipping auth state here
+  // would leave the app believing it's logged in with no token to back it
+  // up, and every subsequent request would 401.
+  //
+  // `loading` in particular must stay untouched for the same reason
+  // documented on login() above — the provider renders
+  // `{!loading && children}`, so setting it mid-request would unmount the
+  // Register page that's currently submitting and silently discard its
+  // error state.
+  // ==========================================
+
+  const register = async (payload) => {
+    return authService.register(payload);
+  };
+
+  // ==========================================
   // LOGIN
   // ==========================================
 
@@ -299,6 +319,8 @@ export const AuthProvider = ({ children }) => {
       loading,
 
       isAuthenticated,
+
+      register,
 
       login,
 

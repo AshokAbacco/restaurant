@@ -7,6 +7,34 @@ import { jwtDecode } from "jwt-decode";
 import { apiRequest, setAccessToken, getAccessToken } from "../api/apiClient";
 
 // ==============================================
+// REGISTER (public Owner signup)
+// Deliberately does NOT set an access token on success — the backend
+// doesn't issue one (see auth.controller.js's registerHandler). Registration
+// and login stay separate steps, so the caller should route the new owner to
+// /login rather than treating this as an authenticated session.
+// ==============================================
+
+const register = async (payload) => {
+  const { ok, data } = await apiRequest("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!ok || !data?.success) {
+    return {
+      success: false,
+      message: data?.message || "Registration failed. Please try again.",
+      // validate.js returns a per-field issue list on a 400 — pass it
+      // through so the form can highlight the specific offending input
+      // instead of only showing one generic message.
+      errors: data?.errors || [],
+    };
+  }
+
+  return { success: true, message: data.message, owner: data.owner };
+};
+
+// ==============================================
 // LOGIN
 // FEATURE (multi-tenancy): the backend now supports two shapes here.
 // Most logins (single-outlet staff) get the old shape straight back:
@@ -292,6 +320,7 @@ const resetPassword = async (token, password) => {
 // ==============================================
 
 const authService = {
+  register,
   login,
   selectOutlet,
   switchOutlet,

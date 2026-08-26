@@ -24,6 +24,47 @@ export const loginSchema = z
     path: ["identifier"],
   });
 
+// POST /api/auth/register — the public Owner signup. Unlike loginSchema
+// above, password IS min-length checked here: this is the form that SETS
+// the password, so "too short" is the accurate, actionable message rather
+// than a misleading one.
+//
+// Note there is no `role` field. The service hardcodes role: "OWNER" (see
+// auth.service.js's registerOwner) and never reads one off the body, so a
+// caller can't request a different role by adding it here. Zod strips
+// unknown keys by default, so it wouldn't survive validation anyway.
+export const registerSchema = z.object({
+  restaurantName: z
+    .string()
+    .trim()
+    .min(2, "Restaurant name must be at least 2 characters.")
+    .max(120, "Restaurant name is too long."),
+  fullName: z
+    .string()
+    .trim()
+    .min(2, "Owner name must be at least 2 characters.")
+    .max(120, "Owner name is too long."),
+  // Deliberately permissive on format — international numbers, spaces,
+  // "+91", and hyphens are all legitimate. The digit count is what actually
+  // matters, so that's what's checked.
+  phone: z
+    .string()
+    .trim()
+    .min(7, "Enter a valid phone number.")
+    .max(20, "Enter a valid phone number.")
+    .regex(
+      /^[+]?[\d\s()-]{7,20}$/,
+      "Phone number can only contain digits, spaces, and + ( ) -",
+    ),
+  email: z.string().trim().email("Enter a valid email address."),
+  password: z.string().min(8, "Password must be at least 8 characters."),
+  address: z
+    .string()
+    .trim()
+    .min(5, "Address must be at least 5 characters.")
+    .max(300, "Address is too long."),
+});
+
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
 });

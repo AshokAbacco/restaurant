@@ -523,6 +523,11 @@ model Organization {
 
   outlets      Outlet[]
   userAccounts UserAccount[]
+  // Back-relation for the Owner row created at self-signup (see Owner
+  // below). Optional because organizations created any other way (seeds,
+  // the backfill script, an outlet added later by an existing owner) have
+  // no signup record attached.
+  owner        Owner?
 
   @@map("organizations")
 }
@@ -626,6 +631,7 @@ model Outlet {
   cashDrawerSessions     CashDrawerSession[]
   cashDrawerTransactions CashDrawerTransaction[]
   onlinePlatforms        OnlinePlatform[]
+  owner                  Owner?
 
   @@unique([organizationId, name])
   @@map("outlets")
@@ -1137,6 +1143,7 @@ model UserAccount {
 
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]       @relation("RefreshTokensByUser")
+  owner               Owner?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1146,6 +1153,46 @@ model UserAccount {
   @@index([outletId])
   @@index([organizationId])
   @@map("user_accounts")
+}
+
+// ==============================================
+// OWNER — self-signup record (POST /api/auth/register)
+// ==============================================
+//
+
+model Owner {
+  id String @id @default(uuid())
+
+  // ---- Fields collected on the Register page ----
+  restaurantName String
+  fullName       String
+  phone          String
+  // Globally unique — the same address is also written to
+  // UserAccount.email (the login key) and Organization.ownerEmail, and all
+  // three are created together in one transaction, so they never diverge.
+  email          String @unique
+  address        String
+
+  // ---- What the signup created ----
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // The first outlet, created from the restaurant name/address/phone above.
+  // The owner can add more outlets later; this one stays recorded as the
+  // outlet the account started from.
+  outletId       String       @unique
+  outlet         Outlet       @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  // The OWNER-role login this signup produced. Cascade so deleting the
+  // account doesn't leave an orphaned signup row behind.
+  userAccountId  String       @unique
+  userAccount    UserAccount  @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@map("owners")
 }
 
 // Short-lived token issued for the "forgot password" flow. Only the hash is

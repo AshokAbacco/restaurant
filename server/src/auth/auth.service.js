@@ -171,6 +171,187 @@ const finalizeLogin = async (account, outlet) => {
 };
 
 // ==============================================
+// REGISTER (public self-signup — OWNER role only)
+// ==============================================
+//
+// This is the ONLY endpoint that creates an account without an existing
+// session, and it deliberately hardcodes role: "OWNER". Staff accounts
+// (MANAGER/CASHIER/CHEF/WAITER/...) are created afterwards by the logged-in
+// owner through the Employees module, which is already gated behind
+// requireAuth + requireRole in index.js. Nothing about this endpoint lets a
+// caller choose their own role — the role isn't read from the payload at
+// all, so adding `"role": "ADMIN"` to the request body does nothing.
+//
+// A signup is not one row. Login needs a whole chain to exist before it can
+// issue a session (see login() -> resolveAccessibleOutlets() -> publicUser()):
+//
+//   Organization  — the tenant
+//     └─ Outlet   — the first branch; every outlet-scoped table hangs off this
+//         └─ Employee     — publicUser() reads name/photo/department off this
+//             └─ UserAccount — the actual login (email + passwordHash + role)
+//                 └─ Owner   — the signup record itself
+//
+// All five are created in one $transaction. A partial signup would be worse
+// than a failed one: an Organization with no UserAccount is invisible and
+// unreachable, but it still holds the email on Organization.ownerEmail
+// (@unique), which would then block the user from ever retrying with that
+// same address.
+
+// Derive a login username from the email's local part. Username is only
+// unique per organization (schema.prisma: @@unique([organizationId,
+// username])) and the organization is brand new here, so there's nothing to
+// collide with — but the value still has to be non-empty and stable, hence
+// the fallback for addresses whose local part is entirely punctuation.
+const usernameFromEmail = (email) => {
+  const base = email
+    .split("@")[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "");
+
+  return base || `owner${Date.now()}`;
+};
+
+export const registerOwner = async (payload = {}) => {
+  const { restaurantName, fullName, phone, password, address } = payload;
+
+  // Normalized once here and reused for all three places it's written
+  // (Owner.email, UserAccount.email, Organization.ownerEmail) so a signup
+  // as "Owner@Cafe.com" can still log in as "owner@cafe.com" — login()
+  // lowercases the identifier before looking it up.
+  const email = payload.email.trim().toLowerCase();
+
+  // Pre-flight checks. The unique constraints in the transaction below are
+  // the real guarantee (two simultaneous signups with the same email can
+  // still race past this point), but checking first lets us return a clear
+  // "which field" message instead of a P2002 with a raw column name.
+  const existingAccount = await prisma.userAccount.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+
+  if (existingAccount) {
+    return {
+      success: false,
+      status: 409,
+      message: "An account with this email already exists. Try logging in instead.",
+    };
+  }
+
+  const existingOrganization = await prisma.organization.findUnique({
+    where: { ownerEmail: email },
+    select: { id: true },
+  });
+
+  if (existingOrganization) {
+    return {
+      success: false,
+      status: 409,
+      message: "This email is already registered to a restaurant.",
+    };
+  }
+
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+  try {
+    const created = await prisma.$transaction(async (tx) => {
+      const organization = await tx.organization.create({
+        data: { name: restaurantName, ownerEmail: email },
+      });
+
+      // First outlet is seeded from the restaurant's own details — a
+      // single-location restaurant never has to think about outlets at
+      // all, and login() will skip the outlet picker entirely for them
+      // (accessibleOutlets.length === 1). Additional outlets get added
+      // later from Settings.
+      const outlet = await tx.outlet.create({
+        data: {
+          organizationId: organization.id,
+          name: restaurantName,
+          address,
+          phone,
+        },
+      });
+
+      // EMP-0001 is safe to hardcode rather than going through
+      // employees.service.js's generateEmployeeCode(): the outlet was
+      // created microseconds ago inside this same transaction, so it
+      // provably has no other employees to collide with.
+      const employee = await tx.employee.create({
+        data: {
+          employeeCode: "EMP-0001",
+          fullName,
+          mobile: phone,
+          email,
+          department: "Management",
+          designation: "Owner",
+          joiningDate: new Date(),
+          employmentType: "Full-time",
+          status: "ACTIVE",
+          outletId: outlet.id,
+        },
+      });
+
+      const userAccount = await tx.userAccount.create({
+        data: {
+          outletId: outlet.id,
+          organizationId: organization.id,
+          employeeId: employee.id,
+          username: usernameFromEmail(email),
+          email,
+          passwordHash,
+          role: "OWNER",
+        },
+      });
+
+      const owner = await tx.owner.create({
+        data: {
+          restaurantName,
+          fullName,
+          phone,
+          email,
+          address,
+          organizationId: organization.id,
+          outletId: outlet.id,
+          userAccountId: userAccount.id,
+        },
+      });
+
+      return { organization, outlet, owner };
+    });
+
+    // No session is issued here — registration and login stay separate
+    // steps, so the owner lands on the existing Login page afterwards and
+    // the whole login path (including account lockout and the outlet
+    // picker) has exactly one implementation.
+    return {
+      success: true,
+      message: "Registration successful. You can now log in.",
+      owner: {
+        id: created.owner.id,
+        restaurantName: created.owner.restaurantName,
+        fullName: created.owner.fullName,
+        email: created.owner.email,
+        phone: created.owner.phone,
+        address: created.owner.address,
+        organizationId: created.organization.id,
+        outletId: created.outlet.id,
+      },
+    };
+  } catch (err) {
+    // Lost the race against a concurrent signup on the same email, or hit
+    // a unique constraint the pre-flight checks above don't cover.
+    if (err.code === "P2002") {
+      return {
+        success: false,
+        status: 409,
+        message: "An account with these details already exists.",
+      };
+    }
+    throw err;
+  }
+};
+
+// ==============================================
 // LOGIN
 // ==============================================
 
