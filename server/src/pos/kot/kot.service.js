@@ -35,7 +35,7 @@ export async function sendToKitchen(orderId, orderItemIds, outletId, client = pr
   // rather than trusting the caller already verified orderId.
   const order = await client.order.findFirst({
     where: { id: orderId, outletId },
-    select: { id: true },
+    select: { id: true, onlinePlatformId: true },
   });
   if (!order) throw new Error("Order not found");
 
@@ -100,6 +100,12 @@ export async function sendToKitchen(orderId, orderItemIds, outletId, client = pr
 
         kotNumber,
         status: "NEW",
+        // Online Orders — auto-flag as ONLINE_DELIVERY priority when the
+        // parent order came through a tagged platform (Swiggy, Zomato,
+        // etc.), reusing the priority tier that already existed for this
+        // (see PRIORITY_LABEL/PRIORITY_RANK on the kitchen display) rather
+        // than inventing a second, separate flag.
+        priority: order.onlinePlatformId ? "ONLINE_DELIVERY" : undefined,
 
         kitchenSection: {
           connect: { id: kitchenSectionId }
@@ -170,6 +176,7 @@ export async function getActiveKitchenDisplay(kitchenSectionId, outletId) {
           orderNumber: true,
           orderType: true,
           table: { select: { name: true } },
+          onlinePlatform: { select: { id: true, name: true } },
         },
       },
       kitchenSection: true,
@@ -369,7 +376,13 @@ const PRIORITY_RANK = {
 };
 
 const KITCHEN_ORDER_INCLUDE = {
-  order: { include: { table: true, customer: true } },
+  order: {
+    include: {
+      table: true,
+      customer: true,
+      onlinePlatform: { select: { id: true, name: true } },
+    },
+  },
   kitchenSection: true,
   chef: true,
   items: {

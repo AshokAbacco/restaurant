@@ -222,13 +222,13 @@ const EmployeeForm = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-[#3FA34D] dark:border-[#43B75A] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="min-h-full bg-[#F3F5EE] dark:bg-[#12160F]">
       <PageHeader
         title={isEdit ? "Edit Employee" : "Add Employee"}
         subtitle={
@@ -240,7 +240,7 @@ const EmployeeForm = () => {
         action={
           <Link
             to={isEdit ? `/employees/${id}` : "/employees"}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold transition"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 font-semibold transition"
           >
             <FiArrowLeft />
             Cancel
@@ -249,7 +249,7 @@ const EmployeeForm = () => {
       />
 
       {formError && (
-        <div className="mb-6 rounded-xl bg-red-50 border border-red-200 text-red-600 px-5 py-4 flex items-center gap-3">
+        <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-[#EF5350] dark:text-red-400 px-5 py-4 flex items-center gap-3">
           <FiAlertCircle className="text-xl flex-shrink-0" />
           {formError}
         </div>
@@ -258,17 +258,17 @@ const EmployeeForm = () => {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ================= PERSONAL INFO ================= */}
 
-        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-1">
+        <section className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm p-6">
+          <h3 className="text-lg font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-1">
             Personal Information
           </h3>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mb-6">
             Basic details used to identify this employee across the system.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Full Name *
               </label>
               <input
@@ -279,24 +279,24 @@ const EmployeeForm = () => {
                 placeholder="e.g. Ramesh Kumar"
                 className={`w-full px-4 py-3 rounded-xl border outline-none transition-all ${
                   errors.fullName
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-blue-600"
+                    ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                    : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 }`}
               />
               {errors.fullName && (
-                <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>
+                <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">{errors.fullName}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Gender
               </label>
               <select
                 name="gender"
                 value={formData.gender}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none bg-white"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               >
                 <option value="">Select gender</option>
                 <option value="Male">Male</option>
@@ -306,7 +306,7 @@ const EmployeeForm = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Date of Birth
               </label>
               <input
@@ -314,7 +314,7 @@ const EmployeeForm = () => {
                 name="dob"
                 value={formData.dob}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               />
             </div>
           </div>
@@ -322,18 +322,18 @@ const EmployeeForm = () => {
 
         {/* ================= CONTACT INFO ================= */}
 
-        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-1">
+        <section className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm p-6">
+          <h3 className="text-lg font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-1">
             Contact Details
           </h3>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mb-6">
             How to reach this employee. Email must be unique if you plan to
             create a login account later.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Mobile Number
               </label>
               <input
@@ -344,17 +344,17 @@ const EmployeeForm = () => {
                 placeholder="e.g. 98765 43210"
                 className={`w-full px-4 py-3 rounded-xl border outline-none transition-all ${
                   errors.mobile
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-blue-600"
+                    ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                    : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 }`}
               />
               {errors.mobile && (
-                <p className="text-red-500 text-sm mt-1">{errors.mobile}</p>
+                <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">{errors.mobile}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Email
               </label>
               <input
@@ -365,17 +365,17 @@ const EmployeeForm = () => {
                 placeholder="e.g. ramesh@restaurant.com"
                 className={`w-full px-4 py-3 rounded-xl border outline-none transition-all ${
                   errors.email
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-blue-600"
+                    ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                    : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 }`}
               />
               {errors.email && (
-                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">{errors.email}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Emergency Contact
               </label>
               <input
@@ -384,7 +384,7 @@ const EmployeeForm = () => {
                 value={formData.emergencyContact}
                 onChange={handleChange}
                 placeholder="Name and phone number"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               />
             </div>
           </div>
@@ -392,11 +392,11 @@ const EmployeeForm = () => {
 
         {/* ================= EMPLOYMENT INFO ================= */}
 
-        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-1">
+        <section className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm p-6">
+          <h3 className="text-lg font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-1">
             Employment Details
           </h3>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mb-6">
             Department and designation are free text so you can describe roles
             exactly as they work in your restaurant — pick a suggestion or type
             your own.
@@ -404,7 +404,7 @@ const EmployeeForm = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Department *
               </label>
               <input
@@ -416,8 +416,8 @@ const EmployeeForm = () => {
                 placeholder="e.g. Kitchen"
                 className={`w-full px-4 py-3 rounded-xl border outline-none transition-all ${
                   errors.department
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-blue-600"
+                    ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                    : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 }`}
               />
               <datalist id="department-suggestions">
@@ -426,12 +426,12 @@ const EmployeeForm = () => {
                 ))}
               </datalist>
               {errors.department && (
-                <p className="text-red-500 text-sm mt-1">{errors.department}</p>
+                <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">{errors.department}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Designation *
               </label>
               <input
@@ -443,8 +443,8 @@ const EmployeeForm = () => {
                 placeholder="e.g. Head Chef"
                 className={`w-full px-4 py-3 rounded-xl border outline-none transition-all ${
                   errors.designation
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-blue-600"
+                    ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                    : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 }`}
               />
               <datalist id="designation-suggestions">
@@ -453,14 +453,14 @@ const EmployeeForm = () => {
                 ))}
               </datalist>
               {errors.designation && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">
                   {errors.designation}
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Joining Date *
               </label>
               <input
@@ -470,26 +470,26 @@ const EmployeeForm = () => {
                 onChange={handleChange}
                 className={`w-full px-4 py-3 rounded-xl border outline-none transition-all ${
                   errors.joiningDate
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-blue-600"
+                    ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                    : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 }`}
               />
               {errors.joiningDate && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">
                   {errors.joiningDate}
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Employment Type
               </label>
               <select
                 name="employmentType"
                 value={formData.employmentType}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none bg-white"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               >
                 <option value="">Select type</option>
                 <option value="full-time">Full-time</option>
@@ -499,14 +499,14 @@ const EmployeeForm = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Status
               </label>
               <select
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none bg-white"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               >
                 <option value="ACTIVE">Active</option>
                 <option value="INACTIVE">Inactive</option>
@@ -519,18 +519,18 @@ const EmployeeForm = () => {
 
         {/* ================= ADDRESS (OPTIONAL) ================= */}
 
-        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-1">
+        <section className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm p-6">
+          <h3 className="text-lg font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-1">
             Address (Optional)
           </h3>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mb-6">
             Leave these blank if you don't need to store a home address right
             now — you can always add it later by editing the employee.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 House / Flat No.
               </label>
               <input
@@ -538,12 +538,12 @@ const EmployeeForm = () => {
                 name="houseNo"
                 value={formData.address.houseNo}
                 onChange={handleAddressChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Street
               </label>
               <input
@@ -551,12 +551,12 @@ const EmployeeForm = () => {
                 name="street"
                 value={formData.address.street}
                 onChange={handleAddressChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 City
               </label>
               <input
@@ -564,12 +564,12 @@ const EmployeeForm = () => {
                 name="city"
                 value={formData.address.city}
                 onChange={handleAddressChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 State
               </label>
               <input
@@ -577,12 +577,12 @@ const EmployeeForm = () => {
                 name="state"
                 value={formData.address.state}
                 onChange={handleAddressChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
+                className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                 Pincode
               </label>
               <input
@@ -592,12 +592,12 @@ const EmployeeForm = () => {
                 onChange={handleAddressChange}
                 className={`w-full px-4 py-3 rounded-xl border outline-none transition-all ${
                   errors.pincode
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-blue-600"
+                    ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                    : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 }`}
               />
               {errors.pincode && (
-                <p className="text-red-500 text-sm mt-1">{errors.pincode}</p>
+                <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">{errors.pincode}</p>
               )}
             </div>
           </div>
@@ -605,9 +605,9 @@ const EmployeeForm = () => {
 
         {/* ================= TIP ================= */}
 
-        <div className="rounded-2xl bg-blue-50 border border-blue-100 p-5 flex gap-4">
-          <FiInfo className="text-blue-600 text-xl flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-gray-700 leading-6">
+        <div className="rounded-2xl bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/30 p-5 flex gap-4">
+          <FiInfo className="text-blue-600 dark:text-blue-300 text-xl flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-[#374151] dark:text-[#C3CBC0] leading-6">
             <strong>Good to know:</strong> An employee code (e.g. EMP-0001) is
             generated automatically when you save. A login account for the
             POS/dashboard is optional and can be created afterwards from the
@@ -620,7 +620,7 @@ const EmployeeForm = () => {
         <div className="flex justify-end gap-3">
           <Link
             to={isEdit ? `/employees/${id}` : "/employees"}
-            className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold transition"
+            className="px-6 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 font-semibold transition"
           >
             Cancel
           </Link>
@@ -628,7 +628,7 @@ const EmployeeForm = () => {
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold shadow-lg hover:shadow-xl transition-all"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white font-semibold shadow-lg hover:shadow-xl transition-all"
           >
             {saving ? (
               <>

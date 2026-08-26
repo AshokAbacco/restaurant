@@ -1,18 +1,49 @@
 // src/pos/PosOrderScreen.jsx
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TableStrip from "./components/TableStrip";
 import MenuBrowser from "./components/MenuBrowser";
 import OrderTicket from "./components/OrderTicket";
 import SuccessToast from "./components/SuccessToast";
 import CounterPicker from "./components/CounterPicker";
-import { createOrder } from "./api/posApi";
+import {
+  createOrder,
+  placeOrderAndSendToKitchen,
+  getOnlinePlatforms,
+  createOnlinePlatform,
+} from "./api/posApi";
 import { placeDineInOrder } from "../offline/offlineQueue";
 import { getSelectedCounterId } from "./api/counterContext";
 
 export default function PosOrderScreen() {
   const navigate = useNavigate();
   const [orderType, setOrderType] = useState("DINE_IN");
+
+  // Online Orders (Swiggy, Zomato, etc.) — the platform list is fetched
+  // once on mount (not just when the ONLINE tab is active) so switching
+  // to that tab doesn't show an empty dropdown for a beat while it loads.
+  const [onlinePlatforms, setOnlinePlatforms] = useState([]);
+  const [selectedPlatformId, setSelectedPlatformId] = useState("");
+  const [addingPlatform, setAddingPlatform] = useState(false);
+
+  useEffect(() => {
+    getOnlinePlatforms({ activeOnly: true })
+      .then(setOnlinePlatforms)
+      .catch(() => setOnlinePlatforms([]));
+  }, []);
+
+  async function handleAddPlatform(name) {
+    setAddingPlatform(true);
+    try {
+      const platform = await createOnlinePlatform({ name });
+      setOnlinePlatforms((prev) => [...prev, platform].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedPlatformId(platform.id);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAddingPlatform(false);
+    }
+  }
   // TableStrip's onSelect now hands back the FULL table object (id, status,
   // and its active order if occupied) — not just an id string. Keep the
   // whole object here since we'll need table.order shortly to support
@@ -134,17 +165,54 @@ export default function PosOrderScreen() {
 
     try {
       if (orderType === "TAKEAWAY") {
-        // Takeaway/delivery are NOT offline-capable (see offlineQueue.js's
-        // file header) — billing needs live payment-gateway state, and
-        // this hands off to Billing immediately either way, so it always
-        // goes straight to the network as before.
-        const order = await createOrder({
+        // Takeaway is NOT offline-capable (see offlineQueue.js's file
+        // header) — billing needs live payment-gateway state, so this
+        // always goes straight to the network and hands off to Billing
+        // immediately, same as before.
+        //
+        // FIX: was calling createOrder() alone here, which never sends
+        // the order to the kitchen — Takeaway orders sat at status NEW
+        // with no KitchenOrder ever created, so they never showed up on
+        // the Kitchen Display at all (unlike Dine In, which already went
+        // through the atomic create+send-to-kitchen call via
+        // placeDineInOrder below). Switching to
+        // placeOrderAndSendToKitchen gives it the same KOT — and the
+        // same Ready/Served flow — as Dine In, while still handing off
+        // to Billing immediately after.
+        const order = await placeOrderAndSendToKitchen({
           orderType,
           counterId: getSelectedCounterId(),
           items,
         });
         setCart([]);
         navigate(`/billing?orderId=${order.id}`);
+        return;
+      }
+
+      if (orderType === "ONLINE") {
+        // Online Orders: the backend's OrderType enum has no separate
+        // "ONLINE" value — it's recorded as a normal DELIVERY order,
+        // tagged with which platform via onlinePlatformId. "ONLINE" only
+        // exists as a UI-level distinction (a third tab) on top of that.
+        if (!selectedPlatformId) {
+          throw new Error("Select which platform this order is from.");
+        }
+        // FIX: online/delivery orders should land on the Kitchen Display
+        // like Dine In, NOT jump straight to Billing — payment for these
+        // is collected separately (on delivery, or whenever the platform
+        // settles), not at order-placement time. So this now mirrors the
+        // Dine In success path below (toast + clear cart, stay on this
+        // screen) instead of navigating to /billing.
+        const order = await placeOrderAndSendToKitchen({
+          orderType: "DELIVERY",
+          counterId: getSelectedCounterId(),
+          onlinePlatformId: selectedPlatformId,
+          items,
+        });
+        setLastOrder(order);
+        setShowSuccessToast(true);
+        setCart([]);
+        setSelectedPlatformId("");
         return;
       }
 
@@ -236,6 +304,11 @@ export default function PosOrderScreen() {
           orderType={orderType}
           onChangeOrderType={setOrderType}
           tableSelected={!!tableId}
+          onlinePlatforms={onlinePlatforms}
+          selectedPlatformId={selectedPlatformId}
+          onChangePlatform={setSelectedPlatformId}
+          onAddPlatform={handleAddPlatform}
+          addingPlatform={addingPlatform}
           cart={cart}
           onIncrement={increment}
           onDecrement={decrement}

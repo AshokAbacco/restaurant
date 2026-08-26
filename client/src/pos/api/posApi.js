@@ -59,6 +59,21 @@ export const getCounters = (params = {}) => {
   return request(`/pos/counters${qs ? `?${qs}` : ""}`);
 };
 
+// Online Orders — platform list (Swiggy, Zomato, etc.) for the Online Orders
+// tab's dropdown. Any POS role can add a new one inline, not just Owner/Admin
+// (see onlinePlatforms.routes.js) — unlike counters, this isn't a device
+// identity, just a growing list of names staff tag orders with.
+export const getOnlinePlatforms = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/pos/online-platforms${qs ? `?${qs}` : ""}`);
+};
+
+export const createOnlinePlatform = (payload) =>
+  request("/pos/online-platforms", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
 export const createFloor = (payload) =>
   request("/pos/tables/floors", {
     method: "POST",

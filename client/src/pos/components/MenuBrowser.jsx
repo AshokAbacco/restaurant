@@ -151,7 +151,7 @@ export default function MenuBrowser({ onAddItem }) {
           No items in this category yet.
         </div>
       ) : (
-        <div className="grid flex-1 auto-rows-min content-start grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 xl:grid-cols-4">
+        <div className="grid flex-1 auto-rows-min pt-2 content-start grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 xl:grid-cols-4">
           {visibleItems.map((item) => (
             <button
               key={item.id}
