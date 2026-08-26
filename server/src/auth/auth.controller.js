@@ -18,6 +18,30 @@ const cookieOptions = {
 };
 
 // ==============================================
+// POST /api/auth/register
+// Public Owner signup. Note that no refresh cookie is set and no
+// accessToken is returned — registration does not log the user in. They're
+// sent to the existing Login page afterwards, so there's exactly one code
+// path that creates a session.
+// ==============================================
+
+export const registerHandler = async (req, res) => {
+  const result = await authService.registerOwner(req.body);
+
+  if (!result.success) {
+    return res
+      .status(result.status)
+      .json({ success: false, message: result.message });
+  }
+
+  return res.status(201).json({
+    success: true,
+    message: result.message,
+    owner: result.owner,
+  });
+};
+
+// ==============================================
 // POST /api/auth/login
 // ==============================================
 

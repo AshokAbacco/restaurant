@@ -598,6 +598,24 @@ const Login = () => {
                 Secure login
               </div>
 
+              {/* Entry point to the public Owner signup. Without this link
+                  /register is unreachable from the UI — a new restaurant
+                  owner has no logged-in account to be invited from, so this
+                  is the only way in. Hidden during the outlet-selection
+                  step, where the user is already mid-login and offering
+                  "create an account" would just be confusing. */}
+              {!pendingOutletSelection && (
+                <p className="mt-4 text-center text-sm text-[#5B6B5F] dark:text-[#9FB0A3]">
+                  New to Restaurant ERP?{" "}
+                  <Link
+                    to="/register"
+                    className="font-semibold text-[#22B368] dark:text-[#59C97A] hover:text-[#178F4A] dark:hover:text-[#7BDB98] transition-colors"
+                  >
+                    Create an owner account
+                  </Link>
+                </p>
+              )}
+
               <p className="text-center text-[#5B6B5F] dark:text-[#9FB0A3] text-xs mt-5 leading-6">
                 Restaurant ERP Management System
                 <br />© {new Date().getFullYear()} All Rights Reserved.

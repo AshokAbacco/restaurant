@@ -6,6 +6,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 import AuthLayout from "./auth/AuthLayout";
 import Login from "./auth/Login";
+import Register from "./auth/Register";
 import ForgotPassword from "./auth/ForgotPassword";
 import ResetPassword from "./auth/ResetPassword";
 import ProtectedRoute from "./auth/ProtectedRoute";
@@ -68,6 +69,11 @@ function App() {
 
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
+
+        {/* Public Owner signup. Only the OWNER role can self-register —
+            staff accounts are created from inside the app by the logged-in
+            owner (Employees module), never from here. */}
+        <Route path="/register" element={<Register />} />
 
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
