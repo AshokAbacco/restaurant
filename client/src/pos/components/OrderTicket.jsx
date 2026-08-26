@@ -10,6 +10,13 @@ export default function OrderTicket({
   orderType,
   onChangeOrderType,
   tableSelected,
+  // Online Orders (Swiggy, Zomato, etc.) — all optional; the ticket works
+  // exactly as before when a parent doesn't pass these.
+  onlinePlatforms = [],
+  selectedPlatformId,
+  onChangePlatform,
+  onAddPlatform,
+  addingPlatform = false,
   cart,
   onIncrement,
   onDecrement,
@@ -32,7 +39,22 @@ export default function OrderTicket({
   );
   const total = subtotal + gst;
 
-  const canPlace = cart.length > 0 && (orderType !== "DINE_IN" || tableSelected) && !placing;
+  const canPlace =
+    cart.length > 0 &&
+    (orderType !== "DINE_IN" || tableSelected) &&
+    (orderType !== "ONLINE" || !!selectedPlatformId) &&
+    !placing;
+
+  const [newPlatformName, setNewPlatformName] = useState("");
+  const [showAddPlatform, setShowAddPlatform] = useState(false);
+
+  async function handleAddPlatform() {
+    const name = newPlatformName.trim();
+    if (!name || !onAddPlatform) return;
+    await onAddPlatform(name);
+    setNewPlatformName("");
+    setShowAddPlatform(false);
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] shadow-sm">
@@ -47,7 +69,7 @@ export default function OrderTicket({
         </div>
 
         <div className="mt-3 flex gap-1.5">
-          {["DINE_IN", "TAKEAWAY"].map((type) => (
+          {["DINE_IN", "TAKEAWAY", "ONLINE"].map((type) => (
             <button
               key={type}
               onClick={() => onChangeOrderType(type)}
@@ -57,10 +79,58 @@ export default function OrderTicket({
                   : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
               }`}
             >
-              {type.replace("_", " ")}
+              {{ DINE_IN: "DINE IN", TAKEAWAY: "TAKEAWAY", ONLINE: "ONLINE ORDERS" }[type]}
             </button>
           ))}
         </div>
+
+        {/* Online Orders — platform picker, only shown on that tab */}
+        {orderType === "ONLINE" && (
+          <div className="mt-2.5">
+            <div className="flex gap-1.5">
+              <select
+                value={selectedPlatformId || ""}
+                onChange={(e) => onChangePlatform?.(e.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#262B24] px-2 py-1.5 text-xs text-[#1F2937] dark:text-white focus:border-[#3FA34D] focus:outline-none dark:focus:border-[#43B75A]"
+              >
+                <option value="" disabled>
+                  Select platform…
+                </option>
+                {onlinePlatforms.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowAddPlatform((v) => !v)}
+                className="shrink-0 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] px-2.5 py-1.5 text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+              >
+                + New
+              </button>
+            </div>
+
+            {showAddPlatform && (
+              <div className="mt-1.5 flex gap-1.5">
+                <input
+                  value={newPlatformName}
+                  onChange={(e) => setNewPlatformName(e.target.value)}
+                  placeholder="e.g. Swiggy, Zomato"
+                  className="min-w-0 flex-1 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#262B24] px-2 py-1.5 text-xs text-[#1F2937] dark:text-white placeholder:text-[#9CA3AF] focus:border-[#3FA34D] focus:outline-none dark:focus:border-[#43B75A]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddPlatform}
+                  disabled={addingPlatform || !newPlatformName.trim()}
+                  className="shrink-0 rounded-lg bg-[#3FA34D] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#358F42] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#43B75A]"
+                >
+                  {addingPlatform ? "Adding…" : "Add"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -174,7 +244,7 @@ export default function OrderTicket({
           disabled={!canPlace}
           className="mt-3 w-full rounded-lg bg-[#3FA34D] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] dark:disabled:bg-[#6B7280]"
         >
-          {orderType === "TAKEAWAY"
+          {orderType === "TAKEAWAY" || orderType === "ONLINE"
             ? placing
               ? "Proceeding to billing…"
               : "Proceed to Billing"

@@ -152,17 +152,7 @@ const Header = ({ onMenuClick }) => {
 
 
 
-          {/* Search (desktop / tablet landscape) */}
-
-          <div className="hidden lg:flex items-center relative ml-2">
-            <FiSearch className="absolute left-4 text-[#9CA3AF] dark:text-[#6B7280]" />
-
-            <input
-              type="text"
-              placeholder="Search anything..."
-              className="w-56 xl:w-80 pl-11 pr-4 py-2.5 xl:py-3 rounded-full border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-[#171C17] text-[#1F2937] dark:text-white placeholder-[#9CA3AF] dark:placeholder-[#6B7280] focus:bg-white dark:focus:bg-[#1E241E] focus:border-[#3FA34D] dark:focus:border-[#43B75A] focus:outline-none transition-all"
-            />
-          </div>
+           
         </div>
 
         {/* ================= RIGHT ================= */}

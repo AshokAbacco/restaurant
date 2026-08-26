@@ -35,16 +35,16 @@ import employeesService from "./employeesService";
 // ==========================================
 
 const statusStyles = {
-  ACTIVE: "bg-green-100 text-green-700",
-  INACTIVE: "bg-gray-100 text-gray-600",
-  RESIGNED: "bg-yellow-100 text-yellow-700",
-  TERMINATED: "bg-red-100 text-red-700",
+  ACTIVE: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+  INACTIVE: "bg-[#F3F5EE] text-[#4B5563] dark:bg-white/5 dark:text-[#9CA8A0]",
+  RESIGNED: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  TERMINATED: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
 };
 
 const StatusBadge = ({ status }) => (
   <span
     className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-      statusStyles[status] || "bg-gray-100 text-gray-600"
+      statusStyles[status] || "bg-[#F3F5EE] text-[#4B5563] dark:bg-white/5 dark:text-[#9CA8A0]"
     }`}
   >
     {status}
@@ -56,7 +56,7 @@ const StatusBadge = ({ status }) => (
 // ==========================================
 
 const StatCard = ({ icon, label, value, color }) => (
-  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-center gap-4">
+  <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm p-5 flex items-center gap-4">
     <div
       className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${color}`}
     >
@@ -64,8 +64,8 @@ const StatCard = ({ icon, label, value, color }) => (
     </div>
 
     <div>
-      <p className="text-2xl font-bold text-gray-800">{value ?? "—"}</p>
-      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-2xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">{value ?? "—"}</p>
+      <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">{label}</p>
     </div>
   </div>
 );
@@ -285,7 +285,7 @@ const EmployeesList = () => {
   // ==========================================
  
   return (
-    <div>
+    <div className="min-h-full bg-[#F3F5EE] dark:bg-[#12160F]">
       <PageHeader
         title="Employees"
         subtitle="Manage your staff records — add new hires, update details, track status, and open a profile for attendance, leave, payroll, incentives and performance history."
@@ -296,7 +296,7 @@ const EmployeesList = () => {
         action={
           <OwnerOnly
             fallback={
-              <span className="text-sm text-gray-400 italic">
+              <span className="text-sm text-[#9CA3AF] dark:text-[#6B7280] italic">
                 Only Owners can add or remove employees
               </span>
             }
@@ -306,7 +306,7 @@ const EmployeesList = () => {
                 onClick={handleCloseDay}
                 disabled={closingDay}
                 title="Mark every active employee with no attendance record today as Absent"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-60 font-semibold transition"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 disabled:opacity-60 font-semibold transition"
               >
                 <FiCheckSquare />
                 {closingDay ? "Closing..." : "Close Attendance for Today"}
@@ -314,7 +314,7 @@ const EmployeesList = () => {
 
               <Link
                 to="/employees/new"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white font-semibold shadow-lg hover:shadow-xl transition-all"
               >
                 <FiPlus />
                 Add Employee
@@ -325,7 +325,7 @@ const EmployeesList = () => {
       />
 
       {closeDayMessage && (
-        <div className="mb-6 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 px-5 py-4">
+        <div className="mb-6 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 px-5 py-4">
           {closeDayMessage}
         </div>
       )}
@@ -337,40 +337,40 @@ const EmployeesList = () => {
           icon={<FiUsers />}
           label="Active Employees"
           value={stats?.totalEmployees}
-          color="bg-blue-50 text-blue-600"
+          color="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300"
         />
         <StatCard
           icon={<FiUserCheck />}
           label="Present Today"
           value={stats?.presentToday}
-          color="bg-green-50 text-green-600"
+          color="bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-300"
         />
         <StatCard
           icon={<FiUserX />}
           label="Absent Today"
           value={stats?.absentToday}
-          color="bg-red-50 text-red-600"
+          color="bg-red-50 text-[#EF5350] dark:bg-red-500/10 dark:text-red-300"
         />
         <StatCard
           icon={<FiCalendar />}
           label="On Leave Today"
           value={stats?.onLeaveToday}
-          color="bg-orange-50 text-orange-600"
+          color="bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300"
         />
         <StatCard
           icon={<FiClock />}
           label="Pending Leave Requests"
           value={stats?.pendingLeaveRequests}
-          color="bg-purple-50 text-purple-600"
+          color="bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-300"
         />
       </div>
 
       {/* ================= FILTER BAR ================= */}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-6">
+      <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm p-5 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="relative flex-1">
-            <FiSearch className="absolute left-4 top-3.5 text-gray-400" />
+            <FiSearch className="absolute left-4 top-3.5 text-[#9CA3AF] dark:text-[#6B7280]" />
             <input
               type="text"
               value={search}
@@ -379,7 +379,7 @@ const EmployeesList = () => {
                 setPage(1);
               }}
               placeholder="Search by name, employee code, mobile or email..."
-              className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none transition-all"
+              className="w-full pl-11 pr-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none transition-all"
             />
           </div>
 
@@ -389,7 +389,7 @@ const EmployeesList = () => {
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none bg-white lg:w-48"
+            className="px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none lg:w-48"
           >
             <option value="">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -406,13 +406,13 @@ const EmployeesList = () => {
               setPage(1);
             }}
             placeholder="Filter by department"
-            className="px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none lg:w-56"
+            className="px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none lg:w-56"
           />
 
           {hasFilters && (
             <button
               onClick={resetFilters}
-              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 transition"
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#4B5563] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 transition"
             >
               <FiX />
               Clear
@@ -424,7 +424,7 @@ const EmployeesList = () => {
       {/* ================= ERROR ================= */}
 
       {error && (
-        <div className="mb-6 rounded-xl bg-red-50 border border-red-200 text-red-600 px-5 py-4 flex items-center gap-3">
+        <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-[#EF5350] dark:text-red-400 px-5 py-4 flex items-center gap-3">
           <FiAlertCircle className="text-xl flex-shrink-0" />
           {error}
         </div>
@@ -432,56 +432,56 @@ const EmployeesList = () => {
 
       {/* ================= TABLE ================= */}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-[#F3F5EE] dark:bg-[#1D231C] border-b border-[#E7EAE1] dark:border-[#262B24]">
               <tr>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-600">
+                <th className="px-6 py-4 text-sm font-semibold text-[#4B5563] dark:text-[#9CA8A0]">
                   Employee
                 </th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-600">
+                <th className="px-6 py-4 text-sm font-semibold text-[#4B5563] dark:text-[#9CA8A0]">
                   Department / Role
                 </th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-600">
+                <th className="px-6 py-4 text-sm font-semibold text-[#4B5563] dark:text-[#9CA8A0]">
                   Contact
                 </th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-600">
+                <th className="px-6 py-4 text-sm font-semibold text-[#4B5563] dark:text-[#9CA8A0]">
                   Joined
                 </th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-600">
+                <th className="px-6 py-4 text-sm font-semibold text-[#4B5563] dark:text-[#9CA8A0]">
                   Status
                 </th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-600">
+                <th className="px-6 py-4 text-sm font-semibold text-[#4B5563] dark:text-[#9CA8A0]">
                   Today
                 </th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-600 text-right">
+                <th className="px-6 py-4 text-sm font-semibold text-[#4B5563] dark:text-[#9CA8A0] text-right">
                   Actions
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {loading ? (
                 <tr>
                   <td
                     colSpan={7}
-                    className="px-6 py-14 text-center text-gray-500"
+                    className="px-6 py-14 text-center text-[#6B7280] dark:text-[#9CA8A0]"
                   >
-                    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <div className="w-10 h-10 border-4 border-[#3FA34D] dark:border-[#43B75A] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                     Loading employees...
                   </td>
                 </tr>
               ) : employees.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-16 text-center">
-                    <FiUsers className="mx-auto text-5xl text-gray-300 mb-4" />
-                    <h4 className="text-lg font-semibold text-gray-700">
+                    <FiUsers className="mx-auto text-5xl text-[#C7CCC2] dark:text-[#4A5248] mb-4" />
+                    <h4 className="text-lg font-semibold text-[#374151] dark:text-[#C3CBC0]">
                       {hasFilters
                         ? "No employees match your filters"
                         : "No employees yet"}
                     </h4>
-                    <p className="text-gray-500 mt-1">
+                    <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-1">
                       {hasFilters
                         ? "Try clearing your search or filters."
                         : 'Click "Add Employee" above to create your first staff record.'}
@@ -492,21 +492,21 @@ const EmployeesList = () => {
                 employees.map((emp) => (
                   <tr
                     key={emp.id}
-                    className="hover:bg-gray-50 transition-colors"
+                    className="hover:bg-[#F3F5EE] dark:hover:bg-white/5 transition-colors"
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold flex-shrink-0">
+                        <div className="w-11 h-11 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] text-white flex items-center justify-center font-semibold flex-shrink-0">
                           {emp.fullName?.charAt(0)?.toUpperCase() || "E"}
                         </div>
                         <div>
                           <Link
                             to={`/employees/${emp.id}`}
-                            className="font-semibold text-gray-800 hover:text-blue-600 transition-colors"
+                            className="font-semibold text-[#1F2937] dark:text-[#E4E9E2] hover:text-[#3FA34D] dark:hover:text-[#43B75A] transition-colors"
                           >
                             {emp.fullName}
                           </Link>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-[#6B7280] dark:text-[#9CA8A0]">
                             {emp.employeeCode}
                           </p>
                         </div>
@@ -514,29 +514,29 @@ const EmployeesList = () => {
                     </td>
 
                     <td className="px-6 py-4">
-                      <p className="text-gray-800">{emp.department}</p>
-                      <p className="text-sm text-gray-500">{emp.designation}</p>
+                      <p className="text-[#1F2937] dark:text-[#E4E9E2]">{emp.department}</p>
+                      <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">{emp.designation}</p>
                     </td>
 
                     <td className="px-6 py-4">
                       {emp.mobile && (
-                        <p className="text-sm text-gray-600 flex items-center gap-2">
-                          <FiPhone className="text-gray-400" /> {emp.mobile}
+                        <p className="text-sm text-[#4B5563] dark:text-[#9CA8A0] flex items-center gap-2">
+                          <FiPhone className="text-[#9CA3AF] dark:text-[#6B7280]" /> {emp.mobile}
                         </p>
                       )}
                       {emp.email && (
-                        <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                          <FiMail className="text-gray-400" /> {emp.email}
+                        <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] flex items-center gap-2 mt-1">
+                          <FiMail className="text-[#9CA3AF] dark:text-[#6B7280]" /> {emp.email}
                         </p>
                       )}
                       {!emp.mobile && !emp.email && (
-                        <span className="text-sm text-gray-400">
+                        <span className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
                           Not provided
                         </span>
                       )}
                     </td>
 
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-6 py-4 text-sm text-[#4B5563] dark:text-[#9CA8A0]">
                       {emp.joiningDate
                         ? new Date(emp.joiningDate).toLocaleDateString(
                             "en-IN",
@@ -565,10 +565,10 @@ const EmployeesList = () => {
                             <span
                               className={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap ${
                                 checkedOut
-                                  ? "bg-green-100 text-green-700"
+                                  ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
                                   : checkedIn
-                                    ? "bg-blue-100 text-blue-700"
-                                    : "bg-gray-100 text-gray-500"
+                                    ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                                    : "bg-[#F3F5EE] text-[#6B7280] dark:bg-white/5 dark:text-[#9CA8A0]"
                               }`}
                             >
                               {checkedOut
@@ -586,7 +586,7 @@ const EmployeesList = () => {
                                   ? "Already checked in today"
                                   : "Check in"
                               }
-                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-green-600 hover:bg-green-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                              className="w-8 h-8 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] flex items-center justify-center text-[#3FA34D] dark:text-[#43B75A] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
                             >
                               <FiLogIn size={14} />
                             </button>
@@ -601,7 +601,7 @@ const EmployeesList = () => {
                                     ? "Already checked out today"
                                     : "Check out"
                               }
-                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                              className="w-8 h-8 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] flex items-center justify-center text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition"
                             >
                               <FiLogOut size={14} />
                             </button>
@@ -615,7 +615,7 @@ const EmployeesList = () => {
                         <button
                           onClick={() => navigate(`/employees/${emp.id}`)}
                           title="View profile"
-                          className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition"
+                          className="w-9 h-9 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] flex items-center justify-center text-[#4B5563] dark:text-[#9CA8A0] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10 hover:text-[#3FA34D] dark:hover:text-[#43B75A] transition"
                         >
                           <FiEye />
                         </button>
@@ -626,7 +626,7 @@ const EmployeesList = () => {
                               navigate(`/employees/${emp.id}/edit`)
                             }
                             title="Edit employee"
-                            className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-green-50 hover:text-green-600 transition"
+                            className="w-9 h-9 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] flex items-center justify-center text-[#4B5563] dark:text-[#9CA8A0] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10 hover:text-[#3FA34D] dark:hover:text-[#43B75A] transition"
                           >
                             <FiEdit2 />
                           </button>
@@ -634,7 +634,7 @@ const EmployeesList = () => {
                           <button
                             onClick={() => setDeleteTarget(emp)}
                             title="Remove employee"
-                            className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-red-50 hover:text-red-600 transition"
+                            className="w-9 h-9 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] flex items-center justify-center text-[#4B5563] dark:text-[#9CA8A0] hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-[#EF5350] dark:hover:text-red-400 transition"
                           >
                             <FiTrash2 />
                           </button>
@@ -651,17 +651,17 @@ const EmployeesList = () => {
         {/* ================= PAGINATION ================= */}
 
         {!loading && employees.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
-            <p className="text-sm text-gray-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-[#E7EAE1] dark:border-[#262B24]">
+            <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
               Showing{" "}
-              <span className="font-semibold text-gray-700">
+              <span className="font-semibold text-[#374151] dark:text-[#C3CBC0]">
                 {(page - 1) * limit + 1}
               </span>
               –
-              <span className="font-semibold text-gray-700">
+              <span className="font-semibold text-[#374151] dark:text-[#C3CBC0]">
                 {Math.min(page * limit, total)}
               </span>{" "}
-              of <span className="font-semibold text-gray-700">{total}</span>{" "}
+              of <span className="font-semibold text-[#374151] dark:text-[#C3CBC0]">{total}</span>{" "}
               employees
             </p>
 
@@ -669,19 +669,19 @@ const EmployeesList = () => {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="w-9 h-9 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] flex items-center justify-center text-[#4B5563] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 <FiChevronLeft />
               </button>
 
-              <span className="text-sm font-medium text-gray-700 px-2">
+              <span className="text-sm font-medium text-[#374151] dark:text-[#C3CBC0] px-2">
                 Page {page} of {totalPages}
               </span>
 
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="w-9 h-9 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] flex items-center justify-center text-[#4B5563] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 <FiChevronRight />
               </button>
@@ -693,17 +693,17 @@ const EmployeesList = () => {
       {/* ================= DELETE CONFIRMATION ================= */}
 
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
-            <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-3xl mx-auto">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-white dark:bg-[#171C17] rounded-3xl shadow-2xl max-w-md w-full p-8">
+            <div className="w-16 h-16 rounded-full bg-red-50 text-[#EF5350] dark:bg-red-500/10 dark:text-red-300 flex items-center justify-center text-3xl mx-auto">
               <FiTrash2 />
             </div>
 
-            <h3 className="mt-5 text-xl font-bold text-gray-800 text-center">
+            <h3 className="mt-5 text-xl font-bold text-[#1F2937] dark:text-[#E4E9E2] text-center">
               Remove {deleteTarget.fullName}?
             </h3>
 
-            <p className="mt-2 text-gray-500 text-center leading-6">
+            <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0] text-center leading-6">
               This marks the employee as <strong>TERMINATED</strong> and hides
               them from the active list. Their attendance, payroll and activity
               history are kept for records — this cannot be undone from here.
@@ -713,7 +713,7 @@ const EmployeesList = () => {
               <button
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
-                className="flex-1 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold transition"
+                className="flex-1 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 font-semibold transition"
               >
                 Cancel
               </button>
@@ -721,7 +721,7 @@ const EmployeesList = () => {
               <button
                 onClick={confirmDelete}
                 disabled={deleting}
-                className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold transition"
+                className="flex-1 py-3 rounded-xl bg-[#EF5350] dark:bg-red-500 hover:bg-red-600 dark:hover:bg-red-600 disabled:bg-red-300 dark:disabled:bg-red-500/40 text-white font-semibold transition"
               >
                 {deleting ? "Removing..." : "Yes, Remove"}
               </button>

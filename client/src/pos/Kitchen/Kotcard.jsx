@@ -43,9 +43,9 @@ const PRIORITY_LABEL = {
 };
 
 // Order type gets its own badge (separate from the Pending/Ready/Served
-// status badge) so kitchen staff can tell dine-in and takeaway tickets apart
-// at a glance — both flow through the exact same Pending -> Ready -> Served
-// stages, this is purely a visual identifier.
+// status badge) so kitchen staff can tell dine-in, takeaway, and delivery
+// tickets apart at a glance — all three flow through the exact same
+// Pending -> Ready -> Served stages, this is purely a visual identifier.
 const ORDER_TYPE_BADGE = {
   DINE_IN: {
     label: "🍽️ Dine In",
@@ -56,6 +56,11 @@ const ORDER_TYPE_BADGE = {
     label: "🥡 Takeaway",
     className:
       "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30",
+  },
+  DELIVERY: {
+    label: "🛵 Delivery",
+    className:
+      "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/30",
   },
 };
 
@@ -143,12 +148,20 @@ export default function KotCard({
     }
   }
 
+  // Online Orders (Swiggy, Zomato, etc.) get a visually distinct card so
+  // the kitchen can tell them apart from walk-in/dine-in tickets at a
+  // glance — isOverdue still takes priority when both apply, since a late
+  // ticket is more urgent than which platform it came from.
+  const isOnlineOrder = !!kot.order?.onlinePlatform;
+
   return (
     <div
-      className={`flex flex-col rounded-2xl border bg-white dark:bg-[#171C17] p-4 shadow-sm transition-shadow hover:shadow-md ${
+      className={`flex flex-col rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md ${
         isOverdue
-          ? "border-red-300 ring-1 ring-red-100 dark:border-red-500/40 dark:ring-red-500/20"
-          : "border-[#E7EAE1] dark:border-[#262B24]"
+          ? "bg-white dark:bg-[#171C17] border-red-300 ring-1 ring-red-100 dark:border-red-500/40 dark:ring-red-500/20"
+          : isOnlineOrder
+            ? "bg-violet-50 dark:bg-violet-500/10 border-violet-300 dark:border-violet-500/40 ring-1 ring-violet-100 dark:ring-violet-500/20"
+            : "bg-white dark:bg-[#171C17] border-[#E7EAE1] dark:border-[#262B24]"
       }`}
     >
       <div className="flex items-start justify-between">
@@ -178,6 +191,11 @@ export default function KotCard({
           >
             {(ORDER_TYPE_BADGE[kot.order.orderType] || {}).label ||
               kot.order.orderType.replace("_", " ")}
+          </span>
+        )}
+        {isOnlineOrder && (
+          <span className="rounded-full border border-violet-300 bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:border-violet-500/40 dark:bg-violet-500/20 dark:text-violet-300">
+            🛵 {kot.order.onlinePlatform.name}
           </span>
         )}
         <span

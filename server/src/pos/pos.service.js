@@ -141,11 +141,11 @@ async function resolveAddOnPricing(itemsData, outletId, client = prisma) {
 // existed, letting one outlet's order silently reference another outlet's
 // table/customer/waiter.
 async function validateOrderReferences(
-  { tableId, customerId, waiterId, deliveryPartnerId, counterId },
+  { tableId, customerId, waiterId, deliveryPartnerId, counterId, onlinePlatformId },
   outletId,
   client = prisma,
 ) {
-  const [table, customer, waiter, deliveryPartner, counter] = await Promise.all([
+  const [table, customer, waiter, deliveryPartner, counter, onlinePlatform] = await Promise.all([
     tableId
       ? client.restaurantTable.findFirst({ where: { id: tableId, outletId } })
       : null,
@@ -167,6 +167,10 @@ async function validateOrderReferences(
     counterId
       ? client.billingCounter.findFirst({ where: { id: counterId, outletId, isActive: true } })
       : null,
+    // Online Orders — same optionality/ownership pattern as counterId.
+    onlinePlatformId
+      ? client.onlinePlatform.findFirst({ where: { id: onlinePlatformId, outletId, isActive: true } })
+      : null,
   ]);
 
   if (tableId && !table) throw new Error("Table not found");
@@ -175,6 +179,7 @@ async function validateOrderReferences(
   if (deliveryPartnerId && !deliveryPartner)
     throw new Error("Delivery partner not found");
   if (counterId && !counter) throw new Error("Counter not found");
+  if (onlinePlatformId && !onlinePlatform) throw new Error("Online platform not found");
 }
 
 export async function createOrder(payload, outletId, client = prisma) {
@@ -195,6 +200,7 @@ export async function createOrder(payload, outletId, client = prisma) {
     notes,
     clientRequestId,
     counterId,
+    onlinePlatformId,
   } = payload;
 
   if (!items || items.length === 0)
@@ -218,7 +224,7 @@ export async function createOrder(payload, outletId, client = prisma) {
   }
 
   await validateOrderReferences(
-    { tableId, customerId, waiterId, deliveryPartnerId, counterId },
+    { tableId, customerId, waiterId, deliveryPartnerId, counterId, onlinePlatformId },
     outletId,
     client,
   );
@@ -252,6 +258,7 @@ export async function createOrder(payload, outletId, client = prisma) {
         customerId,
         waiterId,
         counterId,
+        onlinePlatformId,
         numberOfGuests,
         deliveryPartnerId,
         deliveryCharge,
@@ -386,6 +393,7 @@ export async function listOrders(
         customer: true,
         waiter: { select: { fullName: true, employeeCode: true } },
         counter: { select: { id: true, name: true } },
+        onlinePlatform: { select: { id: true, name: true } },
         items: {
           include: { menuItem: true, addOns: { include: { addOn: true } } },
         },
@@ -409,6 +417,7 @@ export async function getOrderById(id, outletId) {
       customer: true,
       waiter: { select: { fullName: true, employeeCode: true } },
       counter: { select: { id: true, name: true } },
+      onlinePlatform: { select: { id: true, name: true } },
       deliveryPartner: true,
       items: {
         include: { menuItem: true, addOns: { include: { addOn: true } } },
@@ -448,7 +457,7 @@ export async function updateOrderStatus(id, status, outletId) {
   });
 
   if (status === "COMPLETED") {
-    await consumeStockForOrder(id);
+    await consumeStockForOrder(id, outletId);
   }
 
   if (status === "COMPLETED" && order.tableId) {
@@ -463,7 +472,7 @@ export async function updateOrderStatus(id, status, outletId) {
 
 // Decrements InventoryStock per recipe ingredient and writes an audit
 // StockMovement row, same pattern used elsewhere for SALE_CONSUMPTION.
-async function consumeStockForOrder(orderId) {
+async function consumeStockForOrder(orderId, outletId) {
   const items = await prisma.orderItem.findMany({
     where: { orderId },
     include: { menuItem: { include: { recipeIngredients: true } } },
@@ -479,15 +488,25 @@ async function consumeStockForOrder(orderId) {
       const previousStock = Number(stock?.quantityOnHand || 0);
       const newStock = previousStock - consumeQty;
 
+      // InventoryStock.outletId is required with no default — this row may
+      // not exist yet for an ingredient that's never been stocked, so the
+      // upsert's create branch has to supply it explicitly.
       await prisma.inventoryStock.upsert({
         where: { ingredientId: recipe.ingredientId },
-        create: { ingredientId: recipe.ingredientId, quantityOnHand: newStock },
+        create: {
+          ingredientId: recipe.ingredientId,
+          outletId,
+          quantityOnHand: newStock,
+        },
         update: { quantityOnHand: newStock },
       });
 
+      // StockMovement.outletId is also required with no default — same
+      // gap as InventoryStock above, just missed the first time around.
       await prisma.stockMovement.create({
         data: {
           ingredientId: recipe.ingredientId,
+          outletId,
           type: "SALE_CONSUMPTION",
           quantity: -consumeQty,
           previousStock,

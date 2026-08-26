@@ -94,26 +94,26 @@ const LiveDuration = ({ since }) => {
 };
 
 const statusStyles = {
-  ACTIVE: "bg-green-100 text-green-700",
-  INACTIVE: "bg-gray-100 text-gray-600",
-  RESIGNED: "bg-yellow-100 text-yellow-700",
-  TERMINATED: "bg-red-100 text-red-700",
-  PRESENT: "bg-green-100 text-green-700",
-  ABSENT: "bg-red-100 text-red-700",
-  HALF_DAY: "bg-orange-100 text-orange-700",
-  LEAVE: "bg-yellow-100 text-yellow-700",
-  HOLIDAY: "bg-blue-100 text-blue-700",
-  PENDING: "bg-yellow-100 text-yellow-700",
-  APPROVED: "bg-green-100 text-green-700",
-  REJECTED: "bg-red-100 text-red-700",
-  PAID: "bg-green-100 text-green-700",
-  UNPAID: "bg-red-100 text-red-700",
+  ACTIVE: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+  INACTIVE: "bg-[#F3F5EE] text-[#4B5563] dark:bg-white/5 dark:text-[#9CA8A0]",
+  RESIGNED: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  TERMINATED: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+  PRESENT: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+  ABSENT: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+  HALF_DAY: "bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300",
+  LEAVE: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  HOLIDAY: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+  PENDING: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  APPROVED: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+  REJECTED: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+  PAID: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+  UNPAID: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
 };
 
 const Badge = ({ value }) => (
   <span
     className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-      statusStyles[value] || "bg-gray-100 text-gray-600"
+      statusStyles[value] || "bg-[#F3F5EE] text-[#4B5563] dark:bg-white/5 dark:text-[#9CA8A0]"
     }`}
   >
     {value}
@@ -121,34 +121,34 @@ const Badge = ({ value }) => (
 );
 
 const InfoRow = ({ icon, label, value }) => (
-  <div className="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0">
-    <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+  <div className="flex items-start gap-3 py-3 border-b border-[#E7EAE1] dark:border-[#262B24] last:border-0">
+    <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300 flex items-center justify-center flex-shrink-0">
       {icon}
     </div>
     <div>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-sm font-medium text-gray-800">{value || "—"}</p>
+      <p className="text-xs text-[#6B7280] dark:text-[#9CA8A0]">{label}</p>
+      <p className="text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">{value || "—"}</p>
     </div>
   </div>
 );
 
 const EmptyState = ({ text }) => (
-  <div className="py-12 text-center text-gray-500">
-    <FiAlertCircle className="mx-auto text-3xl text-gray-300 mb-3" />
+  <div className="py-12 text-center text-[#6B7280] dark:text-[#9CA8A0]">
+    <FiAlertCircle className="mx-auto text-3xl text-[#C7CCC2] dark:text-[#4A5248] mb-3" />
     {text}
   </div>
 );
 
 const TabLoader = () => (
   <div className="py-12 flex justify-center">
-    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <div className="w-8 h-8 border-4 border-[#3FA34D] dark:border-[#43B75A] border-t-transparent rounded-full animate-spin" />
   </div>
 );
 
 // Small inline error banner used inside the action forms below
 const InlineError = ({ message }) =>
   message ? (
-    <div className="rounded-xl bg-red-50 border border-red-200 text-red-600 px-4 py-3 text-sm mb-4">
+    <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-[#EF5350] dark:text-red-400 px-4 py-3 text-sm mb-4">
       {message}
     </div>
   ) : null;
@@ -208,22 +208,22 @@ const EmployeeDetails = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-[#3FA34D] dark:border-[#43B75A] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error || !employee) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
-        <FiAlertCircle className="mx-auto text-5xl text-red-300 mb-4" />
-        <h3 className="text-xl font-bold text-gray-800">Employee not found</h3>
-        <p className="text-gray-500 mt-2">
+      <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm p-12 text-center">
+        <FiAlertCircle className="mx-auto text-5xl text-red-300 dark:text-red-500/50 mb-4" />
+        <h3 className="text-xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">Employee not found</h3>
+        <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-2">
           {error || "This employee record could not be loaded."}
         </p>
         <Link
           to="/employees"
-          className="inline-flex items-center gap-2 mt-6 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+          className="inline-flex items-center gap-2 mt-6 px-5 py-3 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white font-semibold"
         >
           <FiArrowLeft />
           Back to Employees
@@ -233,7 +233,7 @@ const EmployeeDetails = () => {
   }
 
   return (
-    <div>
+    <div className="min-h-full bg-[#F3F5EE] dark:bg-[#12160F]">
       <PageHeader
         title={employee.fullName}
         subtitle={`${employee.designation} · ${employee.department} · ${employee.employeeCode}`}
@@ -242,7 +242,7 @@ const EmployeeDetails = () => {
           <div className="flex items-center gap-3">
             <Link
               to="/employees"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold transition"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 font-semibold transition"
             >
               <FiArrowLeft />
               Back
@@ -251,7 +251,7 @@ const EmployeeDetails = () => {
             <OwnerOnly>
               <Link
                 to={`/employees/${id}/edit`}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg transition"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white font-semibold shadow-lg transition"
               >
                 <FiEdit2 />
                 Edit
@@ -263,18 +263,18 @@ const EmployeeDetails = () => {
 
       {/* ================= PROFILE SUMMARY CARD ================= */}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
+      <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm p-6 mb-6">
         <div className="flex flex-col md:flex-row items-start md:items-center gap-5 justify-between">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg flex-shrink-0">
+            <div className="w-20 h-20 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] text-white flex items-center justify-center text-3xl font-bold shadow-lg flex-shrink-0">
               {employee.fullName?.charAt(0)?.toUpperCase() || "E"}
             </div>
 
             <div>
-              <h2 className="text-xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
                 {employee.fullName}
               </h2>
-              <p className="text-gray-500">{employee.employeeCode}</p>
+              <p className="text-[#6B7280] dark:text-[#9CA8A0]">{employee.employeeCode}</p>
               <div className="mt-2">
                 <Badge value={employee.status} />
               </div>
@@ -283,20 +283,20 @@ const EmployeeDetails = () => {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
             <div>
-              <p className="text-gray-500">Mobile</p>
-              <p className="font-semibold text-gray-800">
+              <p className="text-[#6B7280] dark:text-[#9CA8A0]">Mobile</p>
+              <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                 {employee.mobile || "—"}
               </p>
             </div>
             <div>
-              <p className="text-gray-500">Email</p>
-              <p className="font-semibold text-gray-800">
+              <p className="text-[#6B7280] dark:text-[#9CA8A0]">Email</p>
+              <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                 {employee.email || "—"}
               </p>
             </div>
             <div>
-              <p className="text-gray-500">Joined</p>
-              <p className="font-semibold text-gray-800">
+              <p className="text-[#6B7280] dark:text-[#9CA8A0]">Joined</p>
+              <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                 {formatDate(employee.joiningDate)}
               </p>
             </div>
@@ -306,16 +306,16 @@ const EmployeeDetails = () => {
 
       {/* ================= TABS ================= */}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex overflow-x-auto border-b border-gray-200 bg-gray-50">
+      <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm overflow-hidden">
+        <div className="flex overflow-x-auto border-b border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-[#1D231C]">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold whitespace-nowrap transition-all border-b-2 ${
                 activeTab === tab.key
-                  ? "border-blue-600 text-blue-600 bg-white"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-[#3FA34D] dark:border-[#43B75A] text-[#3FA34D] dark:text-[#43B75A] bg-white dark:bg-[#171C17]"
+                  : "border-transparent text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#374151] dark:hover:text-[#E4E9E2]"
               }`}
             >
               {tab.icon}
@@ -366,7 +366,7 @@ const EmployeeDetails = () => {
 const OverviewTab = ({ employee }) => (
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div>
-      <h4 className="font-bold text-gray-800 mb-2">Personal & Contact</h4>
+      <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-2">Personal & Contact</h4>
       <InfoRow icon={<FiUser />} label="Gender" value={employee.gender} />
       <InfoRow
         icon={<FiCalendar />}
@@ -383,7 +383,7 @@ const OverviewTab = ({ employee }) => (
     </div>
 
     <div>
-      <h4 className="font-bold text-gray-800 mb-2">Employment</h4>
+      <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-2">Employment</h4>
       <InfoRow
         icon={<FiBriefcase />}
         label="Department"
@@ -412,9 +412,9 @@ const OverviewTab = ({ employee }) => (
     </div>
 
     <div className="lg:col-span-2">
-      <h4 className="font-bold text-gray-800 mb-2">Address</h4>
+      <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-2">Address</h4>
       {employee.address ? (
-        <p className="text-sm text-gray-700 leading-6">
+        <p className="text-sm text-[#374151] dark:text-[#C3CBC0] leading-6">
           {[
             employee.address.houseNo,
             employee.address.street,
@@ -426,7 +426,7 @@ const OverviewTab = ({ employee }) => (
             .join(", ") || "No address on file"}
         </p>
       ) : (
-        <p className="text-sm text-gray-500">No address on file.</p>
+        <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">No address on file.</p>
       )}
     </div>
   </div>
@@ -493,11 +493,11 @@ const AccountTab = ({ employee, onAccountCreated }) => {
   if (account) {
     return (
       <div className="max-w-lg">
-        <div className="rounded-2xl bg-green-50 border border-green-200 p-6 flex gap-4">
-          <FiCheckCircle className="text-green-600 text-2xl flex-shrink-0" />
+        <div className="rounded-2xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 p-6 flex gap-4">
+          <FiCheckCircle className="text-[#3FA34D] dark:text-[#43B75A] text-2xl flex-shrink-0" />
           <div>
-            <h4 className="font-bold text-gray-800">Login account active</h4>
-            <p className="text-sm text-gray-600 mt-1">
+            <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2]">Login account active</h4>
+            <p className="text-sm text-[#4B5563] dark:text-[#9CA8A0] mt-1">
               This employee can sign in to the dashboard / POS with the
               credentials below.
             </p>
@@ -529,16 +529,16 @@ const AccountTab = ({ employee, onAccountCreated }) => {
   return (
     <div className="max-w-lg">
       {!showForm ? (
-        <div className="rounded-2xl bg-blue-50 border border-blue-100 p-6">
-          <h4 className="font-bold text-gray-800">No login account yet</h4>
-          <p className="text-sm text-gray-600 mt-1 leading-6">
+        <div className="rounded-2xl bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/30 p-6">
+          <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2]">No login account yet</h4>
+          <p className="text-sm text-[#4B5563] dark:text-[#9CA8A0] mt-1 leading-6">
             This employee currently cannot sign in to the dashboard or POS.
             Create a login account below if they need system access (e.g.
             Cashiers, Kitchen staff, Managers).
           </p>
           <button
             onClick={() => setShowForm(true)}
-            className="mt-4 inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+            className="mt-4 inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white font-semibold transition"
           >
             <FiLock />
             Create Login Account
@@ -547,13 +547,13 @@ const AccountTab = ({ employee, onAccountCreated }) => {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
           {submitError && (
-            <div className="rounded-xl bg-red-50 border border-red-200 text-red-600 px-4 py-3 text-sm">
+            <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-[#EF5350] dark:text-red-400 px-4 py-3 text-sm">
               {submitError}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
               Username *
             </label>
             <input
@@ -564,17 +564,17 @@ const AccountTab = ({ employee, onAccountCreated }) => {
               placeholder="e.g. ramesh.k"
               className={`w-full px-4 py-3 rounded-xl border outline-none transition-all ${
                 errors.username
-                  ? "border-red-500"
-                  : "border-gray-300 focus:border-blue-600"
+                  ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                  : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
               }`}
             />
             {errors.username && (
-              <p className="text-red-500 text-sm mt-1">{errors.username}</p>
+              <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">{errors.username}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
               Login Email (optional)
             </label>
             <input
@@ -582,12 +582,12 @@ const AccountTab = ({ employee, onAccountCreated }) => {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
+              className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
               Password *
             </label>
             <div className="relative">
@@ -599,25 +599,25 @@ const AccountTab = ({ employee, onAccountCreated }) => {
                 placeholder="Minimum 6 characters"
                 className={`w-full px-4 py-3 pr-12 rounded-xl border outline-none transition-all ${
                   errors.password
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-blue-600"
+                    ? "border-[#EF5350] dark:border-red-500/60 bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark]"
+                    : "border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A]"
                 }`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-3.5 text-gray-500"
+                className="absolute right-4 top-3.5 text-[#6B7280] dark:text-[#9CA8A0]"
               >
                 {showPassword ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+              <p className="text-[#EF5350] dark:text-red-400 text-sm mt-1">{errors.password}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
               POS Quick-Login PIN (optional)
             </label>
             <input
@@ -627,19 +627,19 @@ const AccountTab = ({ employee, onAccountCreated }) => {
               onChange={handleChange}
               placeholder="4-digit PIN for fast POS login"
               maxLength={6}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none"
+              className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
               Role *
             </label>
             <select
               name="role"
               value={formData.role}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-600 outline-none bg-white"
+              className="w-full px-4 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none"
             >
               <option value="OWNER">Owner</option>
               <option value="ADMIN">Admin</option>
@@ -650,7 +650,7 @@ const AccountTab = ({ employee, onAccountCreated }) => {
               <option value="WAITER">Waiter</option>
               <option value="STORE_KEEPER">Store Keeper</option>
             </select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-[#6B7280] dark:text-[#9CA8A0] mt-1">
               This controls what this employee can see and do after logging in.
             </p>
           </div>
@@ -659,14 +659,14 @@ const AccountTab = ({ employee, onAccountCreated }) => {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="flex-1 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold transition"
+              className="flex-1 py-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 font-semibold transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold transition"
+              className="flex-1 py-3 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white font-semibold transition"
             >
               {saving ? "Creating..." : "Create Account"}
             </button>
@@ -766,14 +766,14 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
     <div>
       {/* ---- Quick actions ---- */}
       <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-start">
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex-1">
-          <h4 className="font-bold text-gray-800 mb-1">Today's attendance</h4>
+        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/30 rounded-2xl p-5 flex-1">
+          <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-1">Today's attendance</h4>
 
           {/* Live status line */}
           <div className="mb-4 text-sm">
             {checkedOut ? (
-              <p className="text-gray-700">
-                <span className="font-semibold text-green-700">
+              <p className="text-[#374151] dark:text-[#C3CBC0]">
+                <span className="font-semibold text-[#358F42] dark:text-[#43B75A]">
                   Completed for today.
                 </span>{" "}
                 Clocked in {formatDate(todayRecord.clockIn, true)}, out{" "}
@@ -781,13 +781,13 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
                 <strong>{todayRecord.workingHours ?? "—"}</strong> hrs.
               </p>
             ) : checkedIn ? (
-              <p className="text-gray-700">
-                <span className="font-semibold text-blue-700">Checked in</span>{" "}
+              <p className="text-[#374151] dark:text-[#C3CBC0]">
+                <span className="font-semibold text-blue-700 dark:text-blue-300">Checked in</span>{" "}
                 at {formatDate(todayRecord.clockIn, true)} — working for{" "}
                 <LiveDuration since={todayRecord.clockIn} />
               </p>
             ) : (
-              <p className="text-gray-600">Not checked in yet today.</p>
+              <p className="text-[#4B5563] dark:text-[#9CA8A0]">Not checked in yet today.</p>
             )}
           </div>
 
@@ -796,7 +796,7 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
               onClick={handleCheckIn}
               disabled={actionLoading || checkedIn}
               title={checkedIn ? "Already checked in today" : "Check in"}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] disabled:cursor-not-allowed text-white text-sm font-semibold transition"
             >
               <FiLogIn />
               Check In
@@ -811,7 +811,7 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
                     ? "Already checked out today"
                     : "Check out"
               }
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#4B5563] dark:bg-[#2C332B] hover:bg-[#374151] dark:hover:bg-[#3A423A] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] disabled:cursor-not-allowed text-white text-sm font-semibold transition"
             >
               <FiLogOut />
               Check Out
@@ -822,12 +822,12 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
         {isOwner && (
           <form
             onSubmit={handleManualSubmit}
-            className="bg-white border border-gray-200 rounded-2xl p-5 flex-1"
+            className="bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-2xl p-5 flex-1"
           >
-            <h4 className="font-bold text-gray-800 mb-1">
+            <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2] mb-1">
               Set status manually
             </h4>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mb-4">
               For holidays, corrections, or marking a day directly.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -835,12 +835,12 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
                 type="date"
                 value={manualDate}
                 onChange={(e) => setManualDate(e.target.value)}
-                className="px-3 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                className="px-3 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
               />
               <select
                 value={manualStatus}
                 onChange={(e) => setManualStatus(e.target.value)}
-                className="px-3 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm bg-white"
+                className="px-3 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
               >
                 {ATTENDANCE_STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>
@@ -851,7 +851,7 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
               <button
                 type="submit"
                 disabled={actionLoading}
-                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold transition"
+                className="px-4 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white text-sm font-semibold transition"
               >
                 Save
               </button>
@@ -871,7 +871,7 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-200">
+              <tr className="text-[#6B7280] dark:text-[#9CA8A0] border-b border-[#E7EAE1] dark:border-[#262B24]">
                 <th className="py-3 pr-4">Date</th>
                 <th className="py-3 pr-4">Clock In</th>
                 <th className="py-3 pr-4">Clock Out</th>
@@ -879,7 +879,7 @@ const AttendanceTab = ({ employeeId, isOwner }) => {
                 <th className="py-3 pr-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {rows.map((row) => {
                 const isToday = isSameDay(row.date, new Date());
                 const stillWorking = isToday && row.clockIn && !row.clockOut;
@@ -992,7 +992,7 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
         {!showForm ? (
           <button
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white text-sm font-semibold transition"
           >
             <FiPlus />
             Apply for Leave
@@ -1000,14 +1000,14 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="bg-white border border-gray-200 rounded-2xl p-5"
+            className="bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-2xl p-5"
           >
             <div className="flex items-center justify-between mb-4">
-              <h4 className="font-bold text-gray-800">New Leave Request</h4>
+              <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2]">New Leave Request</h4>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-[#9CA3AF] dark:text-[#6B7280] hover:text-[#4B5563] dark:hover:text-[#C3CBC0]"
               >
                 <FiX />
               </button>
@@ -1017,14 +1017,14 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                   Type
                 </label>
                 <select
                   name="type"
                   value={form.type}
                   onChange={handleFormChange}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none bg-white text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                 >
                   {LEAVE_TYPES.map((t) => (
                     <option key={t} value={t}>
@@ -1037,7 +1037,7 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
               <div />
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                   From
                 </label>
                 <input
@@ -1045,12 +1045,12 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
                   name="fromDate"
                   value={form.fromDate}
                   onChange={handleFormChange}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                   To
                 </label>
                 <input
@@ -1058,12 +1058,12 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
                   name="toDate"
                   value={form.toDate}
                   onChange={handleFormChange}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                   Reason
                 </label>
                 <textarea
@@ -1072,7 +1072,7 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
                   onChange={handleFormChange}
                   rows={2}
                   placeholder="Optional"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                 />
               </div>
             </div>
@@ -1081,14 +1081,14 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold transition"
+                className="px-5 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 text-sm font-semibold transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold transition"
+                className="px-5 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white text-sm font-semibold transition"
               >
                 {submitting ? "Submitting..." : "Submit Request"}
               </button>
@@ -1105,7 +1105,7 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-200">
+              <tr className="text-[#6B7280] dark:text-[#9CA8A0] border-b border-[#E7EAE1] dark:border-[#262B24]">
                 <th className="py-3 pr-4">Type</th>
                 <th className="py-3 pr-4">From</th>
                 <th className="py-3 pr-4">To</th>
@@ -1114,7 +1114,7 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
                 {isOwner && <th className="py-3 pr-4 text-right">Actions</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="py-3 pr-4">{row.type}</td>
@@ -1131,20 +1131,20 @@ const LeavesTab = ({ employeeId, approverId, isOwner }) => {
                           <button
                             disabled={actingId === row.id}
                             onClick={() => handleDecision(row.id, "approve")}
-                            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition"
+                            className="px-3 py-1.5 rounded-lg bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white text-xs font-semibold transition"
                           >
                             Approve
                           </button>
                           <button
                             disabled={actingId === row.id}
                             onClick={() => handleDecision(row.id, "reject")}
-                            className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition"
+                            className="px-3 py-1.5 rounded-lg bg-[#EF5350] dark:bg-red-500 hover:bg-red-600 dark:hover:bg-red-600 text-white text-xs font-semibold transition"
                           >
                             Reject
                           </button>
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-xs">Decided</span>
+                        <span className="text-[#9CA3AF] dark:text-[#6B7280] text-xs">Decided</span>
                       )}
                     </td>
                   )}
@@ -1246,7 +1246,7 @@ const PayrollTab = ({ employeeId, isOwner }) => {
           {!showForm ? (
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white text-sm font-semibold transition"
             >
               <FiPlus />
               Generate Payroll
@@ -1254,16 +1254,16 @@ const PayrollTab = ({ employeeId, isOwner }) => {
           ) : (
             <form
               onSubmit={handleSubmit}
-              className="bg-white border border-gray-200 rounded-2xl p-5"
+              className="bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-2xl p-5"
             >
               <div className="flex items-center justify-between mb-4">
-                <h4 className="font-bold text-gray-800">
+                <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2]">
                   Generate Payroll Record
                 </h4>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-[#9CA3AF] dark:text-[#6B7280] hover:text-[#4B5563] dark:hover:text-[#C3CBC0]"
                 >
                   <FiX />
                 </button>
@@ -1273,7 +1273,7 @@ const PayrollTab = ({ employeeId, isOwner }) => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Month
                   </label>
                   <input
@@ -1281,11 +1281,11 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                     name="month"
                     value={form.month}
                     onChange={handleFormChange}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Basic Salary *
                   </label>
                   <input
@@ -1295,11 +1295,11 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                     onChange={handleFormChange}
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Allowances
                   </label>
                   <input
@@ -1309,11 +1309,11 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                     onChange={handleFormChange}
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Bonus
                   </label>
                   <input
@@ -1323,11 +1323,11 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                     onChange={handleFormChange}
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Overtime Pay
                   </label>
                   <input
@@ -1337,11 +1337,11 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                     onChange={handleFormChange}
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Deductions
                   </label>
                   <input
@@ -1351,7 +1351,7 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                     onChange={handleFormChange}
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
               </div>
@@ -1360,14 +1360,14 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold transition"
+                  className="px-5 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 text-sm font-semibold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold transition"
+                  className="px-5 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white text-sm font-semibold transition"
                 >
                   {submitting ? "Generating..." : "Generate"}
                 </button>
@@ -1385,7 +1385,7 @@ const PayrollTab = ({ employeeId, isOwner }) => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-200">
+              <tr className="text-[#6B7280] dark:text-[#9CA8A0] border-b border-[#E7EAE1] dark:border-[#262B24]">
                 <th className="py-3 pr-4">Month</th>
                 <th className="py-3 pr-4">Basic</th>
                 <th className="py-3 pr-4">Allowances</th>
@@ -1396,7 +1396,7 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                 {isOwner && <th className="py-3 pr-4 text-right">Actions</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="py-3 pr-4">{row.month}</td>
@@ -1414,12 +1414,12 @@ const PayrollTab = ({ employeeId, isOwner }) => {
                         <button
                           disabled={payingId === row.id}
                           onClick={() => handlePay(row.id)}
-                          className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white text-xs font-semibold transition"
+                          className="px-3 py-1.5 rounded-lg bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white text-xs font-semibold transition"
                         >
                           {payingId === row.id ? "Marking..." : "Mark as Paid"}
                         </button>
                       ) : (
-                        <span className="text-gray-400 text-xs">Paid</span>
+                        <span className="text-[#9CA3AF] dark:text-[#6B7280] text-xs">Paid</span>
                       )}
                     </td>
                   )}
@@ -1508,7 +1508,7 @@ const IncentivesTab = ({ employeeId, approverId, isOwner }) => {
           {!showForm ? (
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white text-sm font-semibold transition"
             >
               <FiPlus />
               Add Incentive
@@ -1516,14 +1516,14 @@ const IncentivesTab = ({ employeeId, approverId, isOwner }) => {
           ) : (
             <form
               onSubmit={handleSubmit}
-              className="bg-white border border-gray-200 rounded-2xl p-5"
+              className="bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-2xl p-5"
             >
               <div className="flex items-center justify-between mb-4">
-                <h4 className="font-bold text-gray-800">Add Incentive</h4>
+                <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2]">Add Incentive</h4>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-[#9CA3AF] dark:text-[#6B7280] hover:text-[#4B5563] dark:hover:text-[#C3CBC0]"
                 >
                   <FiX />
                 </button>
@@ -1533,7 +1533,7 @@ const IncentivesTab = ({ employeeId, approverId, isOwner }) => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Type *
                   </label>
                   <input
@@ -1542,11 +1542,11 @@ const IncentivesTab = ({ employeeId, approverId, isOwner }) => {
                     value={form.type}
                     onChange={handleFormChange}
                     placeholder="e.g. Sales Target Bonus"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Amount *
                   </label>
                   <input
@@ -1556,11 +1556,11 @@ const IncentivesTab = ({ employeeId, approverId, isOwner }) => {
                     onChange={handleFormChange}
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Reason
                   </label>
                   <textarea
@@ -1569,7 +1569,7 @@ const IncentivesTab = ({ employeeId, approverId, isOwner }) => {
                     onChange={handleFormChange}
                     rows={2}
                     placeholder="Optional"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
               </div>
@@ -1578,14 +1578,14 @@ const IncentivesTab = ({ employeeId, approverId, isOwner }) => {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold transition"
+                  className="px-5 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 text-sm font-semibold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold transition"
+                  className="px-5 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white text-sm font-semibold transition"
                 >
                   {submitting ? "Saving..." : "Add Incentive"}
                 </button>
@@ -1603,14 +1603,14 @@ const IncentivesTab = ({ employeeId, approverId, isOwner }) => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-200">
+              <tr className="text-[#6B7280] dark:text-[#9CA8A0] border-b border-[#E7EAE1] dark:border-[#262B24]">
                 <th className="py-3 pr-4">Type</th>
                 <th className="py-3 pr-4">Amount</th>
                 <th className="py-3 pr-4">Reason</th>
                 <th className="py-3 pr-4">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="py-3 pr-4">{row.type}</td>
@@ -1697,7 +1697,7 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
           {!showForm ? (
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white text-sm font-semibold transition"
             >
               <FiPlus />
               Add / Update Performance
@@ -1705,28 +1705,28 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
           ) : (
             <form
               onSubmit={handleSubmit}
-              className="bg-white border border-gray-200 rounded-2xl p-5"
+              className="bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-2xl p-5"
             >
               <div className="flex items-center justify-between mb-4">
-                <h4 className="font-bold text-gray-800">Performance Record</h4>
+                <h4 className="font-bold text-[#1F2937] dark:text-[#E4E9E2]">Performance Record</h4>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-[#9CA3AF] dark:text-[#6B7280] hover:text-[#4B5563] dark:hover:text-[#C3CBC0]"
                 >
                   <FiX />
                 </button>
               </div>
 
               <InlineError message={submitError} />
-              <p className="text-xs text-gray-500 mb-4">
+              <p className="text-xs text-[#6B7280] dark:text-[#9CA8A0] mb-4">
                 Saving again for the same period updates that record instead of
                 creating a duplicate.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Period
                   </label>
                   <input
@@ -1734,11 +1734,11 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
                     name="period"
                     value={form.period}
                     onChange={handleFormChange}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Orders Served
                   </label>
                   <input
@@ -1747,11 +1747,11 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
                     value={form.ordersServed}
                     onChange={handleFormChange}
                     min="0"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Sales Generated
                   </label>
                   <input
@@ -1761,11 +1761,11 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
                     onChange={handleFormChange}
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Customer Rating (0–5)
                   </label>
                   <input
@@ -1776,11 +1776,11 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
                     min="0"
                     max="5"
                     step="0.01"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
                     Late Arrivals
                   </label>
                   <input
@@ -1789,7 +1789,7 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
                     value={form.lateArrivals}
                     onChange={handleFormChange}
                     min="0"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
                   />
                 </div>
               </div>
@@ -1798,14 +1798,14 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold transition"
+                  className="px-5 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 text-sm font-semibold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold transition"
+                  className="px-5 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white text-sm font-semibold transition"
                 >
                   {submitting ? "Saving..." : "Save"}
                 </button>
@@ -1823,7 +1823,7 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-200">
+              <tr className="text-[#6B7280] dark:text-[#9CA8A0] border-b border-[#E7EAE1] dark:border-[#262B24]">
                 <th className="py-3 pr-4">Period</th>
                 <th className="py-3 pr-4">Orders Served</th>
                 <th className="py-3 pr-4">Sales Generated</th>
@@ -1831,7 +1831,7 @@ const PerformanceTab = ({ employeeId, isOwner }) => {
                 <th className="py-3 pr-4">Late Arrivals</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="py-3 pr-4">{row.period}</td>
@@ -1909,7 +1909,7 @@ const ActivityTab = ({ employeeId }) => {
         {!showForm ? (
           <button
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white text-sm font-semibold transition"
           >
             <FiPlus />
             Add Note
@@ -1917,10 +1917,10 @@ const ActivityTab = ({ employeeId }) => {
         ) : (
           <form
             onSubmit={handleAddNote}
-            className="bg-white border border-gray-200 rounded-2xl p-5"
+            className="bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-2xl p-5"
           >
             <InlineError message={submitError} />
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-[#374151] dark:text-[#C3CBC0] mb-2">
               Manual activity entry
             </label>
             <textarea
@@ -1928,7 +1928,7 @@ const ActivityTab = ({ employeeId }) => {
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               placeholder="e.g. Verbal warning given for late arrival"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-600 outline-none text-sm"
+              className="w-full px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none text-sm"
             />
             <div className="flex gap-3 mt-4">
               <button
@@ -1938,14 +1938,14 @@ const ActivityTab = ({ employeeId }) => {
                   setNote("");
                   setSubmitError("");
                 }}
-                className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold transition"
+                className="px-5 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#374151] dark:text-[#C3CBC0] hover:bg-[#F3F5EE] dark:hover:bg-white/5 text-sm font-semibold transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting || !note.trim()}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold transition"
+                className="px-5 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280] text-white text-sm font-semibold transition"
               >
                 {submitting ? "Saving..." : "Save Note"}
               </button>
@@ -1961,16 +1961,16 @@ const ActivityTab = ({ employeeId }) => {
           {rows.map((row) => (
             <div
               key={row.id}
-              className="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0"
+              className="flex items-start gap-3 py-3 border-b border-[#E7EAE1] dark:border-[#262B24] last:border-0"
             >
-              <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-300 flex items-center justify-center flex-shrink-0">
                 <FiActivity />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-800">
+                <p className="text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                   {row.action}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[#6B7280] dark:text-[#9CA8A0]">
                   {formatDate(row.createdAt, true)}
                 </p>
               </div>

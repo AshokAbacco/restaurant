@@ -625,6 +625,7 @@ model Outlet {
   billingCounters        BillingCounter[]
   cashDrawerSessions     CashDrawerSession[]
   cashDrawerTransactions CashDrawerTransaction[]
+  onlinePlatforms        OnlinePlatform[]
 
   @@unique([organizationId, name])
   @@map("outlets")
@@ -1630,6 +1631,30 @@ model BillingCounter {
   @@map("billing_counters")
 }
 
+// Online Orders — list of aggregator names (Swiggy, Zomato, etc.) a
+// manually-keyed-in order can be tagged with. This is NOT a live
+// aggregator integration (no menu sync, no webhooks, no automatic order
+// import) — see onlinePlatforms.service.js. Soft-deactivated only
+// (isActive), never hard-deleted, so past orders stay attributable to a
+// real platform name in reports.
+model OnlinePlatform {
+  id       String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  name     String
+  isActive Boolean @default(true)
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([outletId, name])
+  @@index([outletId])
+  @@map("online_platforms")
+}
+
 model Order {
   id          String      @id @default(uuid())
   orderNumber String // e.g. ORD-000123
@@ -1656,6 +1681,12 @@ model Order {
   // simply have null here) — see BillingCounter above.
   counterId String?
   counter   BillingCounter? @relation(fields: [counterId], references: [id])
+
+  // Online Orders — optionally tags this order as having come in from an
+  // aggregator (Swiggy, Zomato, etc.). Purely a label for display/reports;
+  // see OnlinePlatform above for why this isn't a live integration.
+  onlinePlatformId String?
+  onlinePlatform   OnlinePlatform? @relation(fields: [onlinePlatformId], references: [id])
 
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id])
