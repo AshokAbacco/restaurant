@@ -1,4 +1,5 @@
 // server/src/pos/pos.service.js
+import { randomUUID } from "node:crypto";
 import prisma from "../config/prisma.js";
 import * as kotService from "./kot/kot.service.js";
 import { writeAuditLog } from "../lib/auditLog.service.js";
@@ -64,11 +65,20 @@ const STATUS_FLOW = {
   REFUNDED: [],
 };
 
-async function computeItemPricing(items, outletId, client = prisma) {
-  const menuItemIds = items.map((i) => i.menuItemId);
-  const menuItems = await client.menuItem.findMany({
-    where: { id: { in: menuItemIds }, outletId },
-  });
+// `prefetched` lets a caller that has ALREADY loaded the menu items (see
+// buildOrderPlan, which loads them in parallel with everything else) reuse
+// them instead of paying for a second identical findMany.
+async function computeItemPricing(
+  items,
+  outletId,
+  client = prisma,
+  prefetched = null,
+) {
+  const menuItems =
+    prefetched ??
+    (await client.menuItem.findMany({
+      where: { id: { in: items.map((i) => i.menuItemId) }, outletId },
+    }));
   const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));
 
   let subtotal = 0;
@@ -107,16 +117,23 @@ async function computeItemPricing(items, outletId, client = prisma) {
     };
   });
 
-  return { itemsData, subtotal, gstAmount };
+  return { itemsData, subtotal, gstAmount, menuItemMap };
 }
 
-async function resolveAddOnPricing(itemsData, outletId, client = prisma) {
+async function resolveAddOnPricing(
+  itemsData,
+  outletId,
+  client = prisma,
+  prefetched = null,
+) {
   const addOnIds = itemsData.flatMap((i) => i.addOns.map((a) => a.addOnId));
   if (addOnIds.length === 0) return { itemsData, addOnTotal: 0 };
 
-  const addOns = await client.addOn.findMany({
-    where: { id: { in: addOnIds }, outletId },
-  });
+  const addOns =
+    prefetched ??
+    (await client.addOn.findMany({
+      where: { id: { in: addOnIds }, outletId },
+    }));
   const addOnMap = new Map(addOns.map((a) => [a.id, a]));
 
   let addOnTotal = 0;
@@ -182,7 +199,17 @@ async function validateOrderReferences(
   if (onlinePlatformId && !onlinePlatform) throw new Error("Online platform not found");
 }
 
-export async function createOrder(payload, outletId, client = prisma) {
+// Does ALL the reading and arithmetic an order needs — validation, pricing,
+// numbering — and returns a ready-to-insert write payload with every id
+// already generated. It performs no writes, so it is safe (and much
+// faster) to run OUTSIDE a transaction.
+//
+// Every read that doesn't depend on another read is issued in parallel.
+// This is the single biggest win in this file: inside an interactive
+// transaction Prisma pins one connection and runs queries strictly
+// one-at-a-time, so a Promise.all in there is a lie — it still costs one
+// full network round trip per query. Out here it genuinely is parallel.
+async function buildOrderPlan(payload, outletId, client = prisma) {
   const {
     orderType,
     tableId,
@@ -201,10 +228,123 @@ export async function createOrder(payload, outletId, client = prisma) {
     clientRequestId,
     counterId,
     onlinePlatformId,
+    status = "NEW",
   } = payload;
 
   if (!items || items.length === 0)
     throw new Error("Order must have at least one item");
+
+  const menuItemIds = [...new Set(items.map((i) => i.menuItemId))];
+  const addOnIds = [
+    ...new Set(
+      items.flatMap((i) => (i.addOns || []).map((a) => a.addOnId)),
+    ),
+  ];
+
+  const [, menuItems, addOns, orderNumber] = await Promise.all([
+    validateOrderReferences(
+      { tableId, customerId, waiterId, deliveryPartnerId, counterId, onlinePlatformId },
+      outletId,
+      client,
+    ),
+    client.menuItem.findMany({
+      where: { id: { in: menuItemIds }, outletId },
+    }),
+    addOnIds.length
+      ? client.addOn.findMany({ where: { id: { in: addOnIds }, outletId } })
+      : Promise.resolve([]),
+    generateOrderNumber(outletId, client),
+  ]);
+
+  const { itemsData, subtotal, gstAmount, menuItemMap } =
+    await computeItemPricing(items, outletId, client, menuItems);
+  const { addOnTotal } = await resolveAddOnPricing(
+    itemsData,
+    outletId,
+    client,
+    addOns,
+  );
+
+  const grandTotal =
+    subtotal +
+    gstAmount +
+    addOnTotal +
+    Number(serviceChargeAmount || 0) +
+    Number(deliveryCharge || 0) +
+    Number(packagingCharge || 0);
+
+  // Pre-generated ids — see buildKitchenOrderCreates in kot.service.js for
+  // why. Knowing the OrderItem ids up front is what lets the kitchen
+  // tickets be built and inserted in the SAME batch as the order itself,
+  // rather than having to insert the order, read its items back, and only
+  // then create the tickets.
+  const orderId = randomUUID();
+  const itemPlans = itemsData.map((item) => ({
+    ...item,
+    id: randomUUID(),
+    menuItem: menuItemMap.get(item.menuItemId),
+  }));
+
+  const orderData = {
+    id: orderId,
+    outletId,
+    orderNumber,
+    orderType,
+    status,
+    tableId,
+    customerId,
+    waiterId,
+    counterId,
+    onlinePlatformId,
+    numberOfGuests,
+    deliveryPartnerId,
+    deliveryCharge,
+    deliveryAddress,
+    estimatedDeliveryTime,
+    pickupTime,
+    packagingCharge,
+    subtotal,
+    gstAmount,
+    serviceChargeAmount,
+    grandTotal,
+    notes,
+    clientRequestId,
+    items: {
+      create: itemPlans.map((item) => ({
+        id: item.id,
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        notes: item.notes,
+        addOns: {
+          create: item.addOns.map((a) => ({
+            id: randomUUID(),
+            addOnId: a.addOnId,
+            quantity: a.quantity,
+            unitPrice: a.unitPrice,
+            totalPrice: a.totalPrice,
+          })),
+        },
+      })),
+    },
+  };
+
+  return {
+    orderId,
+    orderNumber,
+    orderData,
+    itemPlans,
+    // Dine-in orders occupy the table immediately
+    tableUpdate:
+      orderType === "DINE_IN" && tableId
+        ? { where: { id: tableId }, data: { status: "OCCUPIED" } }
+        : null,
+  };
+}
+
+export async function createOrder(payload, outletId, client = prisma) {
+  const { clientRequestId } = payload;
 
   // FEATURE: offline mode idempotency (phase 1, step 6). If this exact
   // clientRequestId already produced an order — e.g. the offline queue's
@@ -223,73 +363,19 @@ export async function createOrder(payload, outletId, client = prisma) {
     if (existing) return existing;
   }
 
-  await validateOrderReferences(
-    { tableId, customerId, waiterId, deliveryPartnerId, counterId, onlinePlatformId },
+  // `status` is forced here rather than read off the payload — buildOrderPlan
+  // accepts one only so createOrderAndSendToKitchen can open straight at
+  // ACCEPTED. A client must never be able to post its own order status.
+  const plan = await buildOrderPlan(
+    { ...payload, status: "NEW" },
     outletId,
     client,
   );
-
-  const { itemsData, subtotal, gstAmount } = await computeItemPricing(
-    items,
-    outletId,
-    client,
-  );
-  const { addOnTotal } = await resolveAddOnPricing(itemsData, outletId, client);
-
-  const grandTotal =
-    subtotal +
-    gstAmount +
-    addOnTotal +
-    Number(serviceChargeAmount || 0) +
-    Number(deliveryCharge || 0) +
-    Number(packagingCharge || 0);
-
-  const orderNumber = await generateOrderNumber(outletId, client);
 
   let order;
   try {
     order = await client.order.create({
-      data: {
-        outletId,
-        orderNumber,
-        orderType,
-        status: "NEW",
-        tableId,
-        customerId,
-        waiterId,
-        counterId,
-        onlinePlatformId,
-        numberOfGuests,
-        deliveryPartnerId,
-        deliveryCharge,
-        deliveryAddress,
-        estimatedDeliveryTime,
-        pickupTime,
-        packagingCharge,
-        subtotal,
-        gstAmount,
-        serviceChargeAmount,
-        grandTotal,
-        notes,
-        clientRequestId,
-        items: {
-          create: itemsData.map((item) => ({
-            menuItemId: item.menuItemId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.totalPrice,
-            notes: item.notes,
-            addOns: {
-              create: item.addOns.map((a) => ({
-                addOnId: a.addOnId,
-                quantity: a.quantity,
-                unitPrice: a.unitPrice,
-                totalPrice: a.totalPrice,
-              })),
-            },
-          })),
-        },
-      },
+      data: plan.orderData,
       include: { items: { include: { addOns: true } } },
     });
   } catch (err) {
@@ -312,57 +398,121 @@ export async function createOrder(payload, outletId, client = prisma) {
     throw err;
   }
 
-  // Dine-in orders occupy the table immediately
-  if (orderType === "DINE_IN" && tableId) {
-    await client.restaurantTable.update({
-      where: { id: tableId },
-      data: { status: "OCCUPIED" },
-    });
+  if (plan.tableUpdate) {
+    await client.restaurantTable.update(plan.tableUpdate);
   }
 
   return order;
 }
 
 // Creates the order AND sends it to the kitchen as a single atomic unit.
-// If sendToKitchen fails for any reason (e.g. an item has no kitchen section),
-// the whole transaction rolls back — no Order, no OrderItem, no table status
-// change ever gets committed. This is the endpoint the POS UI should call
-// instead of createOrder + sendToKitchen as two separate requests, since that
-// two-step version can leave a real Order behind even when the kitchen send fails.
+// If any part fails, the whole transaction rolls back — no Order, no
+// OrderItem, no KOT, no table status change ever gets committed. This is the
+// endpoint the POS UI should call instead of createOrder + sendToKitchen as
+// two separate requests, since that two-step version can leave a real Order
+// behind even when the kitchen send fails.
+//
+// ─────────────────────────────────────────────────────────────────────
+// FIX: "Transaction already closed ... 15000 ms" on Send to Kitchen.
+//
+// The old version ran EVERYTHING — idempotency lookup, six ownership
+// checks, menu-item pricing, add-on pricing, order numbering, the order
+// insert, the table update, then sendToKitchen's own re-reads and one KOT
+// insert per section — inside a single interactive `$transaction(async
+// (tx) => ...)`.
+//
+// Two things made that fatal rather than merely slow:
+//
+//   1. An interactive transaction holds ONE pinned connection and executes
+//      its queries strictly in sequence. Even the `Promise.all` in
+//      validateOrderReferences degraded into six separate round trips.
+//      All told this path made 30-plus sequential round trips.
+//   2. DATABASE_URL points at a Render Postgres instance in Oregon while
+//      the app runs from India. That is roughly 350-500 ms per round trip,
+//      so 30-plus of them is 12-18 seconds — which is exactly the
+//      "15263 ms passed" in the error.
+//
+// Raising the timeout would only hide it (and hold a pooled connection
+// hostage for 30 s per order while the POS looks frozen). The real fix is
+// to stop doing read work inside the transaction:
+//
+//   * Phase 1 does every read OUTSIDE any transaction, in parallel, where
+//     Promise.all actually parallelises. ~2 round trips instead of ~25.
+//   * Phase 2 hands the writes to prisma.$transaction([...]) in ARRAY
+//     form. Prisma pipelines a batch like that as BEGIN + statements +
+//     COMMIT, so it is one round trip, it is still fully atomic, and the
+//     interactive-transaction timeout does not apply to it at all.
+//
+// Reads moving outside the transaction costs nothing in correctness: they
+// were only ever validation, and every genuine race they could lose is
+// already caught by a database constraint and handled below.
+// ─────────────────────────────────────────────────────────────────────
 export async function createOrderAndSendToKitchen(payload, outletId) {
-  return prisma
-    .$transaction(
-      async (tx) => {
-        // FEATURE: offline-sync idempotency guard. If this
-        // clientRequestId already produced an order, it was also already
-        // sent to the kitchen the first time — return it as-is rather
-        // than calling createOrder+sendToKitchen again. This MUST be
-        // checked here (not just inside createOrder) because
-        // kot.service.js's sendToKitchen deliberately THROWS on items
-        // that are already ticketed (that's its own duplicate-KOT guard
-        // for double-clicks) — without this early return, a harmless
-        // retried sync would surface as a hard failure instead of a
-        // silent no-op.
-        if (payload.clientRequestId) {
-          const existing = await tx.order.findFirst({
-            where: { clientRequestId: payload.clientRequestId, outletId },
-            select: { id: true },
-          });
-          if (existing) return existing.id;
-        }
+  // ── PHASE 1: reads only, no transaction ──────────────────────────────
 
-        const order = await createOrder(payload, outletId, tx);
+  // FEATURE: offline-sync idempotency guard. If this clientRequestId
+  // already produced an order, it was also already sent to the kitchen the
+  // first time — return it as-is rather than creating anything.
+  // kot.service.js's sendToKitchen deliberately THROWS on items that are
+  // already ticketed (its own duplicate-KOT guard for double-clicks), so
+  // without this early return a harmless retried sync would surface as a
+  // hard failure instead of a silent no-op.
+  if (payload.clientRequestId) {
+    const existing = await prisma.order.findFirst({
+      where: { clientRequestId: payload.clientRequestId, outletId },
+      select: { id: true },
+    });
+    if (existing) return getOrderById(existing.id, outletId);
+  }
 
-        const orderItemIds = order.items.map((i) => i.id);
-        if (orderItemIds.length > 0) {
-          await kotService.sendToKitchen(order.id, orderItemIds, outletId, tx);
-        }
+  const [plan, lastKotSequence] = await Promise.all([
+    // Created straight into ACCEPTED: this order is going to the kitchen
+    // in the same breath, so the old create-as-NEW-then-update-to-ACCEPTED
+    // dance was a wasted write and a state nobody ever observed.
+    buildOrderPlan({ ...payload, status: "ACCEPTED" }, outletId),
+    kotService.getLastKotSequence(outletId),
+  ]);
 
-        return order.id;
-      },
-      { timeout: 15000 },
-    )
-    .then((orderId) => getOrderById(orderId, outletId));
+  const kotCreates = kotService.buildKitchenOrderCreates({
+    orderId: plan.orderId,
+    outletId,
+    orderItems: plan.itemPlans,
+    isOnlineOrder: Boolean(payload.onlinePlatformId),
+    lastKotSequence,
+  });
+
+  // ── PHASE 2: writes only, one batched atomic transaction ─────────────
+  const writes = [
+    prisma.order.create({ data: plan.orderData }),
+    ...(plan.tableUpdate
+      ? [prisma.restaurantTable.update(plan.tableUpdate)]
+      : []),
+    ...kotCreates.map((data) => prisma.kitchenOrder.create({ data })),
+  ];
+
+  try {
+    await prisma.$transaction(writes);
+  } catch (err) {
+    // Same narrow race createOrder guards against, just at batch level:
+    // two simultaneous syncs of the SAME clientRequestId both pass the
+    // lookup above before either inserts. The @unique constraint catches
+    // the loser; return the winner's row rather than a confusing
+    // constraint-violation error.
+    if (
+      err.code === "P2002" &&
+      err.meta?.target?.includes("clientRequestId") &&
+      payload.clientRequestId
+    ) {
+      const winner = await prisma.order.findFirst({
+        where: { clientRequestId: payload.clientRequestId, outletId },
+        select: { id: true },
+      });
+      if (winner) return getOrderById(winner.id, outletId);
+    }
+    throw err;
+  }
+
+  return getOrderById(plan.orderId, outletId);
 }
 
 export async function listOrders(
@@ -397,6 +547,14 @@ export async function listOrders(
         items: {
           include: { menuItem: true, addOns: { include: { addOn: true } } },
         },
+        // The Orders page derives a card's live kitchen status from these
+        // (same rows the Kitchen Display reads), exactly as the tables
+        // board does — without them a takeaway/delivery card could only
+        // fall back to Order.status and would drift from the kitchen.
+        // The id is needed too: a takeaway order is already COMPLETED by
+        // the time it reaches the board (billed up front), so "Order
+        // Delivered" closes out its kitchen tickets rather than the order.
+        kitchenOrders: { select: { id: true, status: true } },
         payments: true,
       },
       orderBy: { createdAt: "desc" },

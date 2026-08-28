@@ -8,7 +8,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { WifiOff } from "lucide-react";
 import InvoiceView from "./InvoiceView";
-import { getOrders, getBillingSummary, sendToKitchen } from "../pos/api/posApi";
+import {
+  getOrders,
+  getBillingSummary,
+  sendToKitchen,
+  getKotsForOrder,
+} from "../pos/api/posApi";
 import { fetchWithOfflineFallback } from "../offline/offlineCache";
 import {
   completeBillingOffline,
@@ -305,12 +310,23 @@ export default function Billings() {
         { cashOnly: isCashOnly },
       );
 
-      // Takeaway → Billing → Payment Completed → Send to Kitchen → Invoice.
-      // Dine-in orders were already fired to the kitchen at placement, so
-      // only takeaway needs this step, and only now that payment cleared.
-      // Skipped entirely for a queued-offline billing — there's no
-      // connection to send the kitchen ticket over yet either; it'll go
-      // out once this order's billing actually syncs.
+      // FIX: "These items have already been sent to the kitchen".
+      //
+      // This block used to fire EVERY takeaway item at the kitchen after
+      // payment, on the assumption that takeaway orders hadn't been sent
+      // yet. That stopped being true — PosOrderScreen.jsx now places
+      // takeaway through placeOrderAndSendToKitchen (it was changed so
+      // takeaway would stop being invisible on the Kitchen Display), so by
+      // the time we get here the tickets already exist. sendToKitchen's
+      // duplicate-KOT guard then correctly refused the second send, and the
+      // refusal surfaced as a scary warning on a payment that had in fact
+      // completely succeeded.
+      //
+      // Re-sending is still needed in one real case: items added to the
+      // order AFTER it was placed (addItemsToOrder) that never got a
+      // ticket. So instead of guessing, ask what's already ticketed and
+      // send only the remainder — which is nothing at all in the normal
+      // flow, and exactly the new items when there are some.
       if (isTakeaway && !data.queuedOffline) {
         // Careful: data.order is a lean object (just enough to refresh the
         // active-orders list) — it does NOT reliably carry the item array.
@@ -322,9 +338,30 @@ export default function Billings() {
           summary?.items ||
           []
         ).map((i) => i.id);
+
         if (orderItemIds.length) {
           try {
-            await sendToKitchen(selectedOrderId, orderItemIds);
+            const existingKots = await getKotsForOrder(selectedOrderId);
+            const alreadyTicketed = new Set(
+              (existingKots || [])
+                // A cancelled ticket doesn't count — those items genuinely
+                // do need to go back to the kitchen.
+                .filter((k) => k.status !== "CANCELLED")
+                .flatMap((k) =>
+                  (k.items || []).map((i) => i.orderItemId || i.orderItem?.id),
+                )
+                .filter(Boolean),
+            );
+
+            const unticketedIds = orderItemIds.filter(
+              (id) => !alreadyTicketed.has(id),
+            );
+
+            if (unticketedIds.length) {
+              await sendToKitchen(selectedOrderId, unticketedIds);
+            }
+            // Either we just sent the stragglers, or everything was already
+            // on a ticket from placement. Both are success.
             setSentToKitchen(true);
           } catch (kitchenErr) {
             // Payment already succeeded — don't lose that. Surface the

@@ -1,5 +1,24 @@
-// src/pos/components/KotCard.jsx
-import { useEffect, useState } from "react";
+// src/pos/Kitchen/Kotcard.jsx
+//
+// ONE CARD = ONE CUSTOMER ORDER.
+//
+// The backend still stores one KitchenOrder row per kitchen section — it has
+// to, since KitchenOrder.kitchenSectionId is required and the station tabs,
+// the per-station prep-time reports and the station routing all depend on
+// it. A three-item order spanning grill, beverage and dessert is genuinely
+// three physical tickets down in the database.
+//
+// What was wrong was showing those rows as three separate CARDS: the kitchen
+// saw "ORD-000006 · Chicken Shawarma" and "ORD-000006 · Arabic Coffee" as
+// two unrelated jobs with no way to tell they belonged to one customer.
+//
+// So this component now takes a `ticket` — a group of KitchenOrder rows that
+// share an orderId, assembled by KitchenDisplayScreen's groupKotsByOrder —
+// and renders them as a single card carrying every item in the order. When
+// the order spans more than one station, the items are sub-grouped under a
+// small station heading so the routing information the split used to convey
+// isn't lost.
+import { useEffect, useMemo, useState } from "react";
 
 // Simplified workflow: NEW is shown as "Pending" and set automatically when
 // the order is sent to the kitchen — no button for it. Staff only ever click
@@ -64,7 +83,16 @@ const ORDER_TYPE_BADGE = {
   },
 };
 
-// Ticks live while the ticket is active. Once the kitchen order has a
+// Every card is the same height regardless of how many items it holds, so a
+// nine-item order can't stretch its whole grid row and leave two-item cards
+// full of dead space. Anything that doesn't fit scrolls inside the item list;
+// the header, badges, note form and action button stay pinned so Ready/Served
+// is always reachable without scrolling first.
+//
+// Tune here — it's the one place the height is set.
+const CARD_HEIGHT = "h-[26rem]";
+
+// Ticks while the order is active. Once every ticket in it has a
 // servedAt/completedAt timestamp, the timer freezes at that exact moment
 // instead of continuing to count — no interval even gets set up, so it's
 // not just visually frozen, it stops doing any work too.
@@ -91,25 +119,27 @@ function useElapsedMinutes(since, frozenAt) {
 // logged-in user isn't KITCHEN), the whole add-note form is simply not
 // rendered. Existing notes still show for everyone, read-only.
 export default function KotCard({
-  kot,
+  ticket,
   onAdvance,
   updating,
   onAddNote,
   pendingSync = false,
-  // This order was placed offline and hasn't reached the server yet —
-  // it's a preview built entirely from what the POS terminal had queued
-  // locally (see getQueuedKots() in offlineQueue.js), not a real
-  // KitchenOrder row. Ready/Served still work on it (see
-  // advanceQueuedKotStatus in offlineQueue.js) — the status is just
-  // tracked locally and replayed onto the real KOT once this order
-  // syncs. This flag now only drives the informational "Awaiting sync"
-  // badge below, nothing else.
-  awaitingCreate = false,
 }) {
-  const elapsedMinutes = useElapsedMinutes(
-    kot.createdAt,
-    kot.completedAt || kot.servedAt,
-  );
+  const {
+    order,
+    kots,
+    status,
+    priority,
+    createdAt,
+    frozenAt,
+    targetPrepMinutes,
+    sections,
+    notes,
+    awaitingCreate,
+    kotNumbers,
+  } = ticket;
+
+  const elapsedMinutes = useElapsedMinutes(createdAt, frozenAt);
   const elapsedSeconds = Math.floor(elapsedMinutes * 60);
   const hh = Math.floor(elapsedSeconds / 3600);
   const mm = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, "0");
@@ -118,15 +148,27 @@ export default function KotCard({
   // "6:11:47") instead of letting the minutes column run past 60.
   const timerLabel = hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
 
-  const isOverdue =
-    kot.targetPrepMinutes && elapsedMinutes > kot.targetPrepMinutes;
+  const isOverdue = targetPrepMinutes && elapsedMinutes > targetPrepMinutes;
   const timerColor = isOverdue
     ? "text-[#EF5350] dark:text-red-400"
     : elapsedMinutes > 8
       ? "text-amber-600 dark:text-amber-400"
       : "text-[#3FA34D] dark:text-[#43B75A]";
 
-  const action = NEXT_STATUS[kot.status];
+  const action = NEXT_STATUS[status];
+
+  // Only worth labelling which station cooks what when the order actually
+  // spans more than one — a single-station order would just get a redundant
+  // heading over its only list.
+  const showSectionHeadings = sections.length > 1;
+  const totalItemCount = useMemo(
+    () =>
+      sections.reduce(
+        (sum, s) => sum + s.items.reduce((n, i) => n + (i.quantity || 0), 0),
+        0,
+      ),
+    [sections],
+  );
 
   const [noteText, setNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
@@ -139,7 +181,7 @@ export default function KotCard({
     setAddingNote(true);
     setNoteError(null);
     try {
-      await onAddNote(kot.id, text);
+      await onAddNote(ticket, text);
       setNoteText("");
     } catch (err) {
       setNoteError(err.message);
@@ -152,11 +194,11 @@ export default function KotCard({
   // the kitchen can tell them apart from walk-in/dine-in tickets at a
   // glance — isOverdue still takes priority when both apply, since a late
   // ticket is more urgent than which platform it came from.
-  const isOnlineOrder = !!kot.order?.onlinePlatform;
+  const isOnlineOrder = !!order?.onlinePlatform;
 
   return (
     <div
-      className={`flex flex-col rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md ${
+      className={`${CARD_HEIGHT} flex flex-col overflow-hidden rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md ${
         isOverdue
           ? "bg-white dark:bg-[#171C17] border-red-300 ring-1 ring-red-100 dark:border-red-500/40 dark:ring-red-500/20"
           : isOnlineOrder
@@ -164,48 +206,53 @@ export default function KotCard({
             : "bg-white dark:bg-[#171C17] border-[#E7EAE1] dark:border-[#262B24]"
       }`}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="font-mono text-sm font-bold text-[#1F2937] dark:text-white">
-            {kot.kotNumber}
+      <div className="flex shrink-0 items-start justify-between gap-2">
+        <div className="min-w-0">
+          {/* The ORDER is the headline now, not the KOT — one customer
+              order is one card, however many station tickets back it. */}
+          <p className="truncate font-mono text-sm font-bold text-[#1F2937] dark:text-white">
+            {order?.orderNumber || "Pending sync"}
+            {order?.table?.name ? ` · ${order.table.name}` : ""}
           </p>
-          <p className="mt-0.5 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
-            {kot.order?.orderNumber}
-            {kot.order?.table?.name ? ` · ${kot.order.table.name}` : ""}
+          <p className="mt-0.5 truncate text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+            {kotNumbers.join(" · ")}
+            {totalItemCount > 0
+              ? ` · ${totalItemCount} item${totalItemCount === 1 ? "" : "s"}`
+              : ""}
           </p>
         </div>
         <span
-          className={`font-mono text-lg font-bold tabular-nums ${timerColor}`}
+          className={`shrink-0 font-mono text-lg font-bold tabular-nums ${timerColor}`}
         >
           {timerLabel}
         </span>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {kot.order?.orderType && (
+      <div className="mt-2 flex shrink-0 flex-wrap items-center gap-1.5">
+        {order?.orderType && (
           <span
             className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
-              (ORDER_TYPE_BADGE[kot.order.orderType] || {}).className ||
+              (ORDER_TYPE_BADGE[order.orderType] || {}).className ||
               "bg-[#F3F5EE] text-[#6B7280] border-[#E7EAE1] dark:bg-white/5 dark:text-[#9CA8A0] dark:border-[#262B24]"
             }`}
           >
-            {(ORDER_TYPE_BADGE[kot.order.orderType] || {}).label ||
-              kot.order.orderType.replace("_", " ")}
+            {(ORDER_TYPE_BADGE[order.orderType] || {}).label ||
+              order.orderType.replace("_", " ")}
           </span>
         )}
         {isOnlineOrder && (
           <span className="rounded-full border border-violet-300 bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:border-violet-500/40 dark:bg-violet-500/20 dark:text-violet-300">
-            🛵 {kot.order.onlinePlatform.name}
+            🛵 {order.onlinePlatform.name}
           </span>
         )}
         <span
-          className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[kot.status] || "bg-[#F3F5EE] text-[#6B7280] border-[#E7EAE1] dark:bg-white/5 dark:text-[#9CA8A0] dark:border-[#262B24]"}`}
+          className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[status] || "bg-[#F3F5EE] text-[#6B7280] border-[#E7EAE1] dark:bg-white/5 dark:text-[#9CA8A0] dark:border-[#262B24]"}`}
         >
-          {STATUS_LABEL[kot.status] || kot.status}
+          {STATUS_LABEL[status] || status}
         </span>
-        {kot.priority !== "NORMAL" && (
+        {priority !== "NORMAL" && (
           <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300">
-            {PRIORITY_LABEL[kot.priority] || kot.priority}
+            {PRIORITY_LABEL[priority] || priority}
           </span>
         )}
         {isOverdue && (
@@ -228,26 +275,44 @@ export default function KotCard({
         )}
       </div>
 
-      <ul className="mt-3 flex-1 space-y-2 border-t border-[#E7EAE1] dark:border-[#262B24] pt-3">
-        {kot.items.map((item) => (
-          <li key={item.id} className="text-sm">
-            <div className="flex justify-between text-[#1F2937] dark:text-[#E4E9E2]">
-              <span className="font-medium">
-                {item.quantity} × {item.orderItem.menuItem.name}
-              </span>
-            </div>
-            {item.orderItem.notes && (
-              <p className="mt-0.5 text-xs italic text-amber-600 dark:text-amber-400">
-                "{item.orderItem.notes}"
+      {/* Every item in the order, in one list. Sub-grouped by station only
+          when the order actually spans several, so the kitchen still knows
+          which pass each dish belongs to. */}
+      {/* The only scrollable region. min-h-0 is what actually makes it
+          scroll: a flex child defaults to min-height:auto, which refuses to
+          shrink below its content and would push the card taller instead of
+          overflowing. */}
+      <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto border-t border-[#E7EAE1] dark:border-[#262B24] pt-3">
+        {sections.map((section) => (
+          <div key={section.id}>
+            {showSectionHeadings && (
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
+                {section.name}
               </p>
             )}
-          </li>
+            <ul className="space-y-2">
+              {section.items.map((item) => (
+                <li key={item.id} className="text-sm">
+                  <div className="flex justify-between text-[#1F2937] dark:text-[#E4E9E2]">
+                    <span className="font-medium">
+                      {item.quantity} × {item.orderItem?.menuItem?.name}
+                    </span>
+                  </div>
+                  {item.orderItem?.notes && (
+                    <p className="mt-0.5 text-xs italic text-amber-600 dark:text-amber-400">
+                      "{item.orderItem.notes}"
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </div>
 
-      {kot.notes && kot.notes.length > 0 && (
-        <ul className="mt-3 space-y-1.5 border-t border-[#E7EAE1] dark:border-[#262B24] pt-3">
-          {kot.notes.map((n) => (
+      {notes.length > 0 && (
+        <ul className="mt-3 max-h-24 shrink-0 space-y-1.5 overflow-y-auto border-t border-[#E7EAE1] dark:border-[#262B24] pt-3">
+          {notes.map((n) => (
             <li
               key={n.id}
               className="rounded-lg bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-300"
@@ -262,7 +327,7 @@ export default function KotCard({
       )}
 
       {onAddNote && (
-        <form onSubmit={handleAddNote} className="mt-3 flex gap-1.5">
+        <form onSubmit={handleAddNote} className="mt-3 flex shrink-0 gap-1.5">
           <input
             type="text"
             value={noteText}
@@ -287,12 +352,20 @@ export default function KotCard({
 
       {action && (
         <button
-          onClick={() => onAdvance(kot, action.next)}
+          onClick={() => onAdvance(ticket, action.next)}
           disabled={updating}
-          className="mt-4 w-full rounded-xl bg-[#3FA34D] py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] disabled:cursor-not-allowed disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280]"
+          className="mt-4 w-full shrink-0 rounded-xl bg-[#3FA34D] py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] disabled:cursor-not-allowed disabled:bg-[#D5DAD0] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280]"
         >
           {updating ? "Updating…" : action.label}
         </button>
+      )}
+      {/* One tap moves every station ticket in this order forward, so the
+          kitchen never has to remember it tapped Ready on two of three
+          cards for the same customer. */}
+      {action && kots.length > 1 && (
+        <p className="mt-1.5 shrink-0 text-center text-[11px] text-[#9CA3AF] dark:text-[#6B7280]">
+          Applies to all {kots.length} station tickets
+        </p>
       )}
     </div>
   );
