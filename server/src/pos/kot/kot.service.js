@@ -49,6 +49,12 @@ export function buildKitchenOrderCreates({
   orderItems,
   isOnlineOrder = false,
   lastKotSequence = 0,
+  // Which PHYSICAL kitchen cooks this order. Stamped onto every ticket so the
+  // Kitchen Display can filter without joining through Order, and so
+  // re-routing the order later can't yank tickets out from under a kitchen
+  // that has already started cooking them. Null = unrouted, which every
+  // kitchen sees (the correct behaviour for single-kitchen outlets).
+  kitchenBranchId = null,
 }) {
   const unassigned = orderItems.filter((i) => !i.menuItem?.kitchenSectionId);
   if (unassigned.length > 0) {
@@ -84,6 +90,7 @@ export function buildKitchenOrderCreates({
       orderId,
       kotNumber: formatKotNumber(sequence),
       status: "NEW",
+      kitchenBranchId,
       // Online Orders — auto-flag as ONLINE_DELIVERY priority when the
       // parent order came through a tagged platform (Swiggy, Zomato,
       // etc.), reusing the priority tier that already existed for this
@@ -136,7 +143,7 @@ export async function sendToKitchen(orderId, orderItemIds, outletId, client = pr
   const [order, orderItems, lastKotSequence] = await Promise.all([
     client.order.findFirst({
       where: { id: orderId, outletId },
-      select: { id: true, onlinePlatformId: true },
+      select: { id: true, onlinePlatformId: true, kitchenBranchId: true },
     }),
     client.orderItem.findMany({
       where: { id: { in: orderItemIds }, orderId },
@@ -172,6 +179,10 @@ export async function sendToKitchen(orderId, orderItemIds, outletId, client = pr
     orderItems,
     isOnlineOrder: Boolean(order.onlinePlatformId),
     lastKotSequence,
+    // Items added to an existing order go to the SAME kitchen the order was
+    // originally routed to — the customer's food shouldn't get split across
+    // two kitchens because a second round was ordered.
+    kitchenBranchId: order.kitchenBranchId,
   });
 
   // PERF: all the writes go out as ONE batch instead of an awaited create
@@ -218,12 +229,36 @@ export async function listKotsForOrder(orderId, outletId) {
 
 // Kitchen display screen — everything not finished, oldest first.
 // Pass kitchenSectionId to scope this to one station's screen (grill, dessert, etc.).
-export async function getActiveKitchenDisplay(kitchenSectionId, outletId) {
+// kitchenBranchId narrows the display to ONE physical kitchen. Tickets with a
+// null kitchenBranchId are always included: they're either pre-feature tickets
+// or from a single-kitchen outlet, and hiding them would make live orders
+// silently disappear from every screen.
+// Returns the physical kitchen an employee is pinned to, or null if they can
+// see every kitchen. Only KITCHEN/CHEF staff are ever pinned in practice, but
+// the lookup is role-agnostic: whoever has an Employee.kitchenBranchId set is
+// restricted to it.
+export async function getEmployeeKitchenBranchId(employeeId, outletId) {
+  if (!employeeId) return null;
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, outletId },
+    select: { kitchenBranchId: true },
+  });
+  return employee?.kitchenBranchId || null;
+}
+
+export async function getActiveKitchenDisplay(
+  kitchenSectionId,
+  outletId,
+  kitchenBranchId = null,
+) {
   return prisma.kitchenOrder.findMany({
     where: {
       outletId,
       status: { notIn: ["COMPLETED", "CANCELLED"] },
       ...(kitchenSectionId ? { kitchenSectionId } : {}),
+      ...(kitchenBranchId
+        ? { OR: [{ kitchenBranchId }, { kitchenBranchId: null }] }
+        : {}),
     },
     include: {
       order: {
@@ -241,6 +276,7 @@ export async function getActiveKitchenDisplay(kitchenSectionId, outletId) {
         },
       },
       kitchenSection: true,
+      kitchenBranch: { select: { id: true, name: true } },
       chef: { select: { fullName: true } },
       items: { include: { orderItem: { include: { menuItem: true } } } },
       notes: {

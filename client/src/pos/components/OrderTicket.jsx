@@ -17,6 +17,13 @@ export default function OrderTicket({
   onChangePlatform,
   onAddPlatform,
   addingPlatform = false,
+  // Kitchen Branches — the PHYSICAL kitchen this order goes to ("Ground
+  // Floor Kitchen"). Applies to every order type, not just dine-in.
+  // Optional: an outlet that hasn't created any kitchens passes an empty
+  // list and the picker doesn't render at all.
+  kitchenBranches = [],
+  selectedKitchenBranchId,
+  onChangeKitchenBranch,
   cart,
   onIncrement,
   onDecrement,
@@ -39,10 +46,16 @@ export default function OrderTicket({
   );
   const total = subtotal + gst;
 
+  // Only force a kitchen choice when there's actually a choice to make. With
+  // zero kitchens configured the feature is dormant; with exactly one the
+  // parent preselects it, so this never blocks a single-kitchen restaurant.
+  const kitchenRequired = kitchenBranches.length > 1;
+
   const canPlace =
     cart.length > 0 &&
     (orderType !== "DINE_IN" || tableSelected) &&
     (orderType !== "ONLINE" || !!selectedPlatformId) &&
+    (!kitchenRequired || !!selectedKitchenBranchId) &&
     !placing;
 
   const [newPlatformName, setNewPlatformName] = useState("");
@@ -83,6 +96,33 @@ export default function OrderTicket({
             </button>
           ))}
         </div>
+
+        {/* Kitchen picker — shown for EVERY order type (dine-in, takeaway,
+            delivery, online), since all of them get cooked somewhere. Hidden
+            entirely when the outlet has no kitchens configured, so nothing
+            changes for restaurants that don't use this. */}
+        {kitchenBranches.length > 0 && (
+          <div className="mt-2.5">
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
+              Send to kitchen
+            </label>
+            <select
+              value={selectedKitchenBranchId || ""}
+              onChange={(e) => onChangeKitchenBranch?.(e.target.value)}
+              className="w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#262B24] px-2 py-1.5 text-xs text-[#1F2937] dark:text-white focus:border-[#3FA34D] focus:outline-none dark:focus:border-[#43B75A]"
+            >
+              <option value="" disabled>
+                Select kitchen…
+              </option>
+              {kitchenBranches.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                  {k.floor?.name ? ` · ${k.floor.name}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Online Orders — platform picker, only shown on that tab */}
         {orderType === "ONLINE" && (

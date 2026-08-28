@@ -11,6 +11,9 @@ import SettingsDashboard from "./SettingsDashboard";
 // Restaurant
 import RestaurantProfile from "./restaurant/RestaurantProfile";
 
+// Branches (outlets)
+import BranchesSettings from "./branches/BranchesSettings";
+
 // Users
 import UsersRoles from "./users/UsersRoles";
 import UserForm from "./users/UserForm";
@@ -58,6 +61,13 @@ const SettingsRoutes = () => {
 
       {/* Restaurant */}
       <Route path="restaurant" element={<RestaurantProfile />} />
+
+      {/* Branches — the outlets that appear on the login picker and in the
+          header switcher. Not role-guarded at the route level: ADMIN and
+          MANAGER can legitimately view/edit, and the page itself hides the
+          Add/Delete controls for non-owners to match the extra
+          requireRole("OWNER") on POST/DELETE in stores.routes.js. */}
+      <Route path="branches" element={<BranchesSettings />} />
 
       {/* Users */}
       <Route path="users" element={<UsersRoles />} />

@@ -40,6 +40,15 @@ const SETTINGS = [
     path: "/settings/restaurant",
   },
   {
+    id: 20,
+    title: "Branches",
+    description:
+      "Add and manage outlets. These are what appear on the login outlet picker.",
+    icon: FiMapPin,
+    color: "bg-emerald-500",
+    path: "/settings/branches",
+  },
+  {
     id: 2,
     title: "Users & Roles",
     description: "Manage users, staff accounts and permissions.",

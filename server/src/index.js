@@ -16,6 +16,7 @@ import posRoutes from "./pos/pos.routes.js";
 import reservationsRoutes from "./reservations/reservations.routes.js"; // lives as its own top-level module, not nested under pos/
 import kdsRoutes from "./kds/kds.routes.js";
 import storesRoutes from "./stores/stores.routes.js";
+import kitchenBranchesRoutes from "./kitchen-branches/kitchenBranches.routes.js";
 import settingsRoutes from "./settings/settings.routes.js";
 import kioskRoutes from "./kiosk/kiosk.routes.js";
 import ReportsRoutes from "./reports/reports.routes.js";
@@ -112,6 +113,17 @@ app.use(
   requireOutletContext,
   requireRole("OWNER", "ADMIN", "MANAGER"),
   storesRoutes,
+);
+// Physical kitchens. WAITER and CASHIER are included because the POS
+// Send-to-Kitchen picker needs to list them; KITCHEN/CHEF because the
+// Kitchen Display filters by them. Write access is narrowed again inside
+// kitchenBranches.routes.js.
+app.use(
+  "/api/kitchen-branches",
+  requireAuth,
+  requireOutletContext,
+  requireRole("OWNER", "ADMIN", "MANAGER", "CASHIER", "WAITER", "CHEF", "KITCHEN"),
+  kitchenBranchesRoutes,
 );
 app.use(
   "/api/settings",

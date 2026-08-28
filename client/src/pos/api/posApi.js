@@ -192,10 +192,40 @@ export const moveItemsWise = ({ orderItemIds, destinationTableId }) =>
     body: JSON.stringify({ orderItemIds, destinationTableId }),
   });
 
-export const getKitchenDisplay = (kitchenSectionId) => {
-  const qs = kitchenSectionId ? `?kitchenSectionId=${kitchenSectionId}` : "";
-  return request(`/pos/kot/display${qs}`);
+export const getKitchenDisplay = (kitchenSectionId, kitchenBranchId) => {
+  const params = new URLSearchParams();
+  if (kitchenSectionId) params.set("kitchenSectionId", kitchenSectionId);
+  // Physical-kitchen filter. Note the server IGNORES this for staff pinned to
+  // a kitchen via Employee.kitchenBranchId — their assignment wins, so a chef
+  // can't widen their view by editing the URL.
+  if (kitchenBranchId) params.set("kitchenBranchId", kitchenBranchId);
+  const qs = params.toString();
+  return request(`/pos/kot/display${qs ? `?${qs}` : ""}`);
 };
+
+// ==============================================
+// KITCHEN BRANCHES (physical kitchens)
+// Distinct from kitchen SECTIONS (Grill/Beverage stations) — a branch is a
+// whole kitchen, e.g. "Ground Floor Kitchen".
+// ==============================================
+
+export const getKitchenBranches = (includeInactive = false) =>
+  request(`/kitchen-branches${includeInactive ? "?includeInactive=true" : ""}`);
+
+export const createKitchenBranch = (payload) =>
+  request("/kitchen-branches", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateKitchenBranch = (id, payload) =>
+  request(`/kitchen-branches/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+export const deleteKitchenBranch = (id) =>
+  request(`/kitchen-branches/${id}`, { method: "DELETE" });
 
 export const updateKotStatus = (id, status, reason) =>
   request(`/pos/kot/${id}/status`, {

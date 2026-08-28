@@ -99,6 +99,7 @@ function orderToBoardItem(order) {
         totalPrice: Number(i.totalPrice),
       })),
       kitchenOrderIds: (order.kitchenOrders || []).map((k) => k.id),
+      kitchenBranchName: order.kitchenBranch?.name || null,
       // Online Orders are stored as ordinary DELIVERY orders tagged with a
       // platform (see PosOrderScreen.jsx — the OrderType enum has no
       // "ONLINE" member). This flattened name is what the card badges.
@@ -166,7 +167,7 @@ const FILTERS = [
   // an online order is a delivery order, so it belongs here too. Online
   // then narrows that to just the aggregator-tagged ones.
   { key: "DELIVERY", label: "Delivery" },
-  // { key: "ONLINE", label: "Online Orders" },
+  { key: "ONLINE", label: "Online Orders" },
 ];
 
 // Tabs that show a flat list of orders rather than the table grid.

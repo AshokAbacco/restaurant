@@ -100,6 +100,43 @@ model KitchenSection {
   @@map("kitchen_sections")
 }
 
+// A PHYSICAL kitchen — "Ground Floor Kitchen", "Rooftop Kitchen". Distinct
+// from KitchenSection above, which is a FUNCTIONAL station (Grill, Beverage)
+// that menu items route to automatically via MenuItem.kitchenSectionId.
+//
+// The two are orthogonal on purpose: a Rooftop Kitchen can have its own grill
+// and its own beverage station. A KitchenOrder therefore carries both — the
+// branch says WHICH kitchen cooks it, the section says WHICH station inside
+// that kitchen. Branch is chosen by the operator at Send-to-Kitchen time;
+// section is still derived from the menu item, untouched.
+//
+// Everything referencing this is nullable, so a single-kitchen restaurant can
+// ignore the feature entirely and behaves exactly as before.
+model KitchenBranch {
+  id       String  @id @default(uuid())
+  outletId String
+  outlet   Outlet  @relation(fields: [outletId], references: [id])
+  name     String
+  isActive Boolean @default(true)
+
+  // Optional convenience link to the dining floor this kitchen serves.
+  // Deliberately optional and NOT used for routing: takeaway, delivery and
+  // online orders have no floor at all but still need a kitchen.
+  floorId String?
+  floor   Floor?  @relation(fields: [floorId], references: [id])
+
+  orders        Order[]
+  kitchenOrders KitchenOrder[]
+  staff         Employee[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([outletId, name])
+  @@index([outletId])
+  @@map("kitchen_branches")
+}
+
 model MenuItem {
   id        String  @id @default(uuid())
   outletId  String
@@ -578,6 +615,7 @@ model Outlet {
   categories             Category[]
   subCategories          SubCategory[]
   kitchenSections        KitchenSection[]
+  kitchenBranches        KitchenBranch[]
   menuItems              MenuItem[]
   menuVariants           MenuVariant[]
   addOns                 AddOn[]
@@ -1054,6 +1092,12 @@ model Employee {
   outletId       String
   outlet         Outlet         @relation(fields: [outletId], references: [id])
 
+  // Kitchen staff assigned to a specific physical kitchen only see that
+  // kitchen's tickets on the Kitchen Display. Null = sees every kitchen,
+  // which is the right default for owners, managers and single-kitchen sites.
+  kitchenBranchId String?
+  kitchenBranch   KitchenBranch? @relation(fields: [kitchenBranchId], references: [id])
+
   address            EmployeeAddress?
   userAccount        UserAccount?
   attendance         Attendance[]
@@ -1453,7 +1497,8 @@ model Floor {
   outletId String
   outlet   Outlet @relation(fields: [outletId], references: [id])
 
-  tables RestaurantTable[]
+  tables          RestaurantTable[]
+  kitchenBranches KitchenBranch[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1735,6 +1780,11 @@ model Order {
   onlinePlatformId String?
   onlinePlatform   OnlinePlatform? @relation(fields: [onlinePlatformId], references: [id])
 
+  // Which physical kitchen this order was routed to. Nullable: orders placed
+  // before this feature, and outlets with a single kitchen, simply have none.
+  kitchenBranchId String?
+  kitchenBranch   KitchenBranch? @relation(fields: [kitchenBranchId], references: [id])
+
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id])
 
@@ -1928,6 +1978,13 @@ model KitchenOrder {
 
   kitchenSectionId String
   kitchenSection   KitchenSection @relation(fields: [kitchenSectionId], references: [id])
+
+  // Denormalised from Order.kitchenBranchId at ticket-creation time. Stored
+  // here as well so the Kitchen Display can filter tickets without joining
+  // through Order, and so re-routing an order later can't silently move
+  // tickets that a kitchen has already started cooking.
+  kitchenBranchId String?
+  kitchenBranch   KitchenBranch? @relation(fields: [kitchenBranchId], references: [id])
 
   chefId String?
   chef   Employee? @relation("KOTsByChef", fields: [chefId], references: [id])
