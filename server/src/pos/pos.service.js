@@ -158,11 +158,27 @@ async function resolveAddOnPricing(
 // existed, letting one outlet's order silently reference another outlet's
 // table/customer/waiter.
 async function validateOrderReferences(
-  { tableId, customerId, waiterId, deliveryPartnerId, counterId, onlinePlatformId },
+  {
+    tableId,
+    customerId,
+    waiterId,
+    deliveryPartnerId,
+    counterId,
+    onlinePlatformId,
+    kitchenBranchId,
+  },
   outletId,
   client = prisma,
 ) {
-  const [table, customer, waiter, deliveryPartner, counter, onlinePlatform] = await Promise.all([
+  const [
+    table,
+    customer,
+    waiter,
+    deliveryPartner,
+    counter,
+    onlinePlatform,
+    kitchenBranch,
+  ] = await Promise.all([
     tableId
       ? client.restaurantTable.findFirst({ where: { id: tableId, outletId } })
       : null,
@@ -188,6 +204,12 @@ async function validateOrderReferences(
     onlinePlatformId
       ? client.onlinePlatform.findFirst({ where: { id: onlinePlatformId, outletId, isActive: true } })
       : null,
+    // Kitchen Branches — same optionality/ownership pattern again. Must be
+    // active: routing an order to a kitchen that's been shut down would put
+    // the ticket on a display nobody is watching.
+    kitchenBranchId
+      ? client.kitchenBranch.findFirst({ where: { id: kitchenBranchId, outletId, isActive: true } })
+      : null,
   ]);
 
   if (tableId && !table) throw new Error("Table not found");
@@ -197,6 +219,8 @@ async function validateOrderReferences(
     throw new Error("Delivery partner not found");
   if (counterId && !counter) throw new Error("Counter not found");
   if (onlinePlatformId && !onlinePlatform) throw new Error("Online platform not found");
+  if (kitchenBranchId && !kitchenBranch)
+    throw new Error("Kitchen not found, or it has been deactivated");
 }
 
 // Does ALL the reading and arithmetic an order needs — validation, pricing,
@@ -228,6 +252,9 @@ async function buildOrderPlan(payload, outletId, client = prisma) {
     clientRequestId,
     counterId,
     onlinePlatformId,
+    // Which physical kitchen cooks this order. Applies to EVERY order type —
+    // dine-in, takeaway, delivery and online all get routed the same way.
+    kitchenBranchId,
     status = "NEW",
   } = payload;
 
@@ -243,7 +270,15 @@ async function buildOrderPlan(payload, outletId, client = prisma) {
 
   const [, menuItems, addOns, orderNumber] = await Promise.all([
     validateOrderReferences(
-      { tableId, customerId, waiterId, deliveryPartnerId, counterId, onlinePlatformId },
+      {
+        tableId,
+        customerId,
+        waiterId,
+        deliveryPartnerId,
+        counterId,
+        onlinePlatformId,
+        kitchenBranchId,
+      },
       outletId,
       client,
     ),
@@ -296,6 +331,7 @@ async function buildOrderPlan(payload, outletId, client = prisma) {
     waiterId,
     counterId,
     onlinePlatformId,
+    kitchenBranchId: kitchenBranchId || null,
     numberOfGuests,
     deliveryPartnerId,
     deliveryCharge,
@@ -479,6 +515,9 @@ export async function createOrderAndSendToKitchen(payload, outletId) {
     orderItems: plan.itemPlans,
     isOnlineOrder: Boolean(payload.onlinePlatformId),
     lastKotSequence,
+    // Routes every ticket for this order to the chosen physical kitchen.
+    // Applies uniformly to dine-in, takeaway, delivery and online.
+    kitchenBranchId: payload.kitchenBranchId || null,
   });
 
   // ── PHASE 2: writes only, one batched atomic transaction ─────────────
@@ -555,6 +594,7 @@ export async function listOrders(
         // the time it reaches the board (billed up front), so "Order
         // Delivered" closes out its kitchen tickets rather than the order.
         kitchenOrders: { select: { id: true, status: true } },
+        kitchenBranch: { select: { id: true, name: true } },
         payments: true,
       },
       orderBy: { createdAt: "desc" },

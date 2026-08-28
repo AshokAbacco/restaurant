@@ -261,6 +261,14 @@ export default function TableOrderCard({
                 {typeBadge.label}
               </span>
             )}
+            {/* Which physical kitchen this order was routed to. Only shown
+                when the outlet actually routes orders — a single-kitchen
+                restaurant leaves this null and sees no badge. */}
+            {(order?.kitchenBranchName || order?.kitchenBranch?.name) && (
+              <span className="inline-flex w-fit items-center rounded-full border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                {order.kitchenBranchName || order.kitchenBranch?.name}
+              </span>
+            )}
             {platformName && (
               <span className="inline-flex w-fit items-center rounded-full border border-violet-200 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:text-violet-400">
                 {platformName}

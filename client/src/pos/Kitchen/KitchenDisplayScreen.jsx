@@ -2,7 +2,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { WifiOff } from "lucide-react";
 import KotCard from "./Kotcard";
-import { getKitchenDisplay, addKitchenNote } from "../api/posApi";
+import {
+  getKitchenDisplay,
+  addKitchenNote,
+  getKitchenBranches,
+} from "../api/posApi";
 import { useAuth } from "../../auth/AuthContext";
 import { fetchWithOfflineFallback } from "../../offline/offlineCache";
 import {
@@ -184,6 +188,28 @@ export default function KitchenDisplayScreen() {
   // fetch/cache-miss never wipes these out.
   const [queuedKots, setQueuedKots] = useState([]);
   const [activeSectionId, setActiveSectionId] = useState("ALL");
+  // Which PHYSICAL kitchen this screen is showing. Persisted per-device: a
+  // display mounted in the rooftop kitchen should still be showing the
+  // rooftop after a browser restart, without anyone reconfiguring it.
+  //
+  // This is only a convenience filter. Staff pinned to a kitchen via
+  // Employee.kitchenBranchId are enforced SERVER-side (see
+  // kot.controller.js) — their assignment overrides whatever is chosen here,
+  // so this control can't be used to peek at another kitchen.
+  const [kitchenBranches, setKitchenBranches] = useState([]);
+  const [activeKitchenBranchId, setActiveKitchenBranchId] = useState(
+    () => localStorage.getItem("kds:kitchenBranchId") || "ALL",
+  );
+
+  useEffect(() => {
+    getKitchenBranches()
+      .then((b) => setKitchenBranches(Array.isArray(b) ? b : []))
+      .catch(() => setKitchenBranches([]));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("kds:kitchenBranchId", activeKitchenBranchId);
+  }, [activeKitchenBranchId]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
@@ -195,9 +221,13 @@ export default function KitchenDisplayScreen() {
 
   const load = useCallback(async () => {
     try {
+      const branchId =
+        activeKitchenBranchId === "ALL" ? null : activeKitchenBranchId;
       const { data, fromCache } = await fetchWithOfflineFallback(
-        "kds:display",
-        getKitchenDisplay,
+        // Cache key includes the kitchen, or switching kitchens offline would
+        // show the previous kitchen's tickets from cache.
+        `kds:display:${branchId || "all"}`,
+        () => getKitchenDisplay(undefined, branchId),
       );
       setKots(data);
       setIsOffline(fromCache);
@@ -207,7 +237,7 @@ export default function KitchenDisplayScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeKitchenBranchId]);
 
   const loadQueued = useCallback(async () => {
     setQueuedKots(await getQueuedKots());
@@ -398,6 +428,39 @@ export default function KitchenDisplayScreen() {
           </div>
         )}
       </header>
+
+      {/* Physical-kitchen selector. Only rendered when the outlet actually has
+          more than one kitchen — a single-kitchen restaurant never sees it. */}
+      {kitchenBranches.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#E7EAE1] dark:border-[#262B24] bg-[#F8FAF6] dark:bg-[#12160F] px-6 py-2">
+          <span className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
+            Kitchen
+          </span>
+          <button
+            onClick={() => setActiveKitchenBranchId("ALL")}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              activeKitchenBranchId === "ALL"
+                ? "bg-[#1F2937] text-white dark:bg-white dark:text-[#12160F]"
+                : "bg-white dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
+            }`}
+          >
+            All Kitchens
+          </button>
+          {kitchenBranches.map((k) => (
+            <button
+              key={k.id}
+              onClick={() => setActiveKitchenBranchId(k.id)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeKitchenBranchId === k.id
+                  ? "bg-[#1F2937] text-white dark:bg-white dark:text-[#12160F]"
+                  : "bg-white dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
+              }`}
+            >
+              {k.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {sections.length > 0 && (
         <div className="flex gap-2 border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-2">

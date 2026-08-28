@@ -47,6 +47,15 @@ export const updateOutlet = async (id, data, organizationId) => {
       address: data.address || null,
       phone: data.phone || null,
       gstin: data.gstin || null,
+      // Without this, deleteOutlet's soft-delete (isActive: false) was a
+      // one-way door: getAllOutlets returns inactive outlets too, so a
+      // deactivated branch stayed visible in the Branches list forever with
+      // no way to bring it back short of editing the database by hand.
+      // Only applied when the caller explicitly sends a boolean, so a normal
+      // name/address edit leaves isActive exactly as it was.
+      ...(typeof data.isActive === "boolean"
+        ? { isActive: data.isActive }
+        : {}),
     },
   });
 };

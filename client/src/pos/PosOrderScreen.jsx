@@ -11,6 +11,7 @@ import {
   placeOrderAndSendToKitchen,
   getOnlinePlatforms,
   createOnlinePlatform,
+  getKitchenBranches,
 } from "./api/posApi";
 import { placeDineInOrder } from "../offline/offlineQueue";
 import { getSelectedCounterId } from "./api/counterContext";
@@ -24,6 +25,24 @@ export default function PosOrderScreen() {
   // to that tab doesn't show an empty dropdown for a beat while it loads.
   const [onlinePlatforms, setOnlinePlatforms] = useState([]);
   const [selectedPlatformId, setSelectedPlatformId] = useState("");
+
+  // Kitchen Branches — the physical kitchens this outlet has configured.
+  const [kitchenBranches, setKitchenBranches] = useState([]);
+  const [selectedKitchenBranchId, setSelectedKitchenBranchId] = useState("");
+
+  useEffect(() => {
+    getKitchenBranches()
+      .then((branches) => {
+        const list = Array.isArray(branches) ? branches : [];
+        setKitchenBranches(list);
+        // With exactly one kitchen there's no decision to make, so preselect
+        // it. That's what keeps this feature invisible to single-kitchen
+        // restaurants — OrderTicket only *requires* a choice when
+        // kitchenBranches.length > 1.
+        if (list.length === 1) setSelectedKitchenBranchId(list[0].id);
+      })
+      .catch(() => setKitchenBranches([]));
+  }, []);
   const [addingPlatform, setAddingPlatform] = useState(false);
 
   useEffect(() => {
@@ -182,6 +201,7 @@ export default function PosOrderScreen() {
         const order = await placeOrderAndSendToKitchen({
           orderType,
           counterId: getSelectedCounterId(),
+          kitchenBranchId: selectedKitchenBranchId || null,
           items,
         });
         setCart([]);
@@ -207,6 +227,7 @@ export default function PosOrderScreen() {
           orderType: "DELIVERY",
           counterId: getSelectedCounterId(),
           onlinePlatformId: selectedPlatformId,
+          kitchenBranchId: selectedKitchenBranchId || null,
           items,
         });
         setLastOrder(order);
@@ -223,6 +244,10 @@ export default function PosOrderScreen() {
       const ticketMeta = {
         orderType,
         tableName: selectedTable?.name || null,
+        kitchenBranchId: selectedKitchenBranchId || null,
+        kitchenBranchName:
+          kitchenBranches.find((k) => k.id === selectedKitchenBranchId)?.name ||
+          null,
         items: cart.map((i) => ({
           name: i.name,
           quantity: i.quantity,
@@ -243,6 +268,7 @@ export default function PosOrderScreen() {
           orderType,
           tableId,
           counterId: getSelectedCounterId(),
+          kitchenBranchId: selectedKitchenBranchId || null,
           items,
         },
         ticketMeta,
@@ -304,6 +330,9 @@ export default function PosOrderScreen() {
           orderType={orderType}
           onChangeOrderType={setOrderType}
           tableSelected={!!tableId}
+          kitchenBranches={kitchenBranches}
+          selectedKitchenBranchId={selectedKitchenBranchId}
+          onChangeKitchenBranch={setSelectedKitchenBranchId}
           onlinePlatforms={onlinePlatforms}
           selectedPlatformId={selectedPlatformId}
           onChangePlatform={setSelectedPlatformId}

@@ -24,10 +24,21 @@ export async function getKotsForOrder(req, res) {
 
 export async function getKitchenDisplay(req, res) {
   try {
+    // A kitchen employee pinned to one physical kitchen (Employee.
+    // kitchenBranchId) is LOCKED to it — their own assignment wins over any
+    // ?kitchenBranchId in the query string, so a chef can't widen their view
+    // to another kitchen by editing the URL. Everyone else (owner, manager,
+    // an unassigned screen) may pass one to filter voluntarily.
+    const pinned = await kotService.getEmployeeKitchenBranchId(
+      req.user?.employeeId,
+      req.tenant.outletId,
+    );
+
     res.json(
       await kotService.getActiveKitchenDisplay(
         req.query.kitchenSectionId,
         req.tenant.outletId,
+        pinned || req.query.kitchenBranchId || null,
       ),
     );
   } catch (err) {
