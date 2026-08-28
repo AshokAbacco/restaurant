@@ -7,7 +7,7 @@ import TableOrderCard, {
   CATEGORY_RANK,
 } from "./components/TableOrderCard";
 import MoveKotItemsModal from "./components/MoveKotItemsModal";
-import { getTablesBoard, getOrders } from "./api/posApi";
+import { getTablesBoard, getOrders, updateKotStatus } from "./api/posApi";
 import { fetchWithOfflineFallback } from "../offline/offlineCache";
 import {
   markOrderDeliveredOffline,
@@ -28,9 +28,10 @@ import { subscribeToKdsQueue } from "../offline/kdsQueue";
 
 const POLL_INTERVAL_MS = 8000;
 
-// Statuses that mean "still on the board" for a takeaway order — mirrors
-// Billings.jsx's ACTIVE_STATUSES. COMPLETED/CANCELLED/REFUNDED fall off.
-const ACTIVE_TAKEAWAY_STATUSES = [
+// Statuses that mean "still on the board" for a takeaway or delivery
+// order — mirrors Billings.jsx's ACTIVE_STATUSES. COMPLETED/CANCELLED/
+// REFUNDED fall off.
+const ACTIVE_ORDER_STATUSES = [
   "NEW",
   "ACCEPTED",
   "PREPARING",
@@ -40,18 +41,119 @@ const ACTIVE_TAKEAWAY_STATUSES = [
   "OUT_FOR_DELIVERY",
 ];
 
-// Normalizes a raw takeaway Order into the same shape TableOrderCard expects
-// for a table: { id, name, section, capacity, order }. There's no real table
-// backing a takeaway order, so section/capacity are just left blank —
-// TableOrderCard already knows to hide them once it sees orderType TAKEAWAY.
-function takeawayToBoardItem(order) {
+// Mirrors deriveKitchenStatus in server/src/pos/tables/tables.service.js.
+// The tables board computes this server-side, but /pos/orders returns raw
+// orders, so takeaway and delivery cards derive it here from the same
+// KitchenOrder rows the Kitchen Display reads. Showing the LEAST advanced
+// ticket is deliberate — an order isn't really "Ready" until every kitchen
+// section's ticket is ready.
+const KITCHEN_STAGE_RANK = {
+  NEW: 0,
+  ACCEPTED: 1,
+  PREPARING: 2,
+  READY: 3,
+  SERVED: 4,
+  COMPLETED: 5,
+};
+
+function deriveKitchenStatus(kitchenOrders) {
+  const active = (kitchenOrders || []).filter((k) => k.status !== "CANCELLED");
+  if (active.length === 0) return null;
+  return active.reduce((least, k) =>
+    (KITCHEN_STAGE_RANK[k.status] ?? 99) <
+    (KITCHEN_STAGE_RANK[least.status] ?? 99)
+      ? k
+      : least,
+  ).status;
+}
+
+// Normalizes a raw Order (takeaway or delivery) into the same shape
+// TableOrderCard expects for a table: { id, name, section, capacity, order }.
+// There's no real table backing these, so section/capacity are left blank —
+// TableOrderCard already knows to hide them once it sees the order type.
+//
+// The `order` sub-object is also topped up with the three derived fields the
+// tables board sends but /pos/orders doesn't: kitchenStatus, customerName
+// and itemCount. Without itemCount the card's "Items" row rendered blank.
+function orderToBoardItem(order) {
   return {
     id: order.id,
     name: order.orderNumber,
     section: null,
     capacity: null,
-    order,
+    order: {
+      ...order,
+      kitchenStatus: deriveKitchenStatus(order.kitchenOrders),
+      customerName: order.customer?.name || null,
+      itemCount: (order.items || []).reduce(
+        (sum, i) => sum + (i.quantity || 0),
+        0,
+      ),
+      // Same shape the tables board sends (see tables.service.js) so the
+      // hover tooltip in TableOrderCard works identically for every card.
+      itemLines: (order.items || []).map((i) => ({
+        id: i.id,
+        name: i.menuItem?.name || "Item",
+        quantity: i.quantity,
+        unitPrice: Number(i.unitPrice),
+        totalPrice: Number(i.totalPrice),
+      })),
+      kitchenOrderIds: (order.kitchenOrders || []).map((k) => k.id),
+      // Online Orders are stored as ordinary DELIVERY orders tagged with a
+      // platform (see PosOrderScreen.jsx — the OrderType enum has no
+      // "ONLINE" member). This flattened name is what the card badges.
+      platformName: order.onlinePlatform?.name || null,
+    },
   };
+}
+
+// An "online order" is a DELIVERY order that came in through an aggregator
+// (Swiggy, Zomato, ...) rather than the restaurant's own delivery.
+function isOnlineOrder(order) {
+  return Boolean(order?.onlinePlatformId || order?.onlinePlatform);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// FIX: takeaway orders never appeared on this page.
+//
+// Takeaway is billed UP FRONT: PosOrderScreen hands off to /billing the
+// moment the order is placed, and billing.service.js's completeBilling ends
+// with updateOrderStatus(orderId, "COMPLETED"). So by the time the order
+// reaches this board it is already COMPLETED — and the old filter kept only
+// ACTIVE_ORDER_STATUSES, which excludes COMPLETED. Every takeaway order was
+// therefore filtered out the instant it was paid for, which is why the
+// header read "0 takeaway" while the Kitchen Display was still showing live
+// takeaway tickets for the very same orders.
+//
+// Paid is not the same as finished. The food still has to be cooked and
+// handed over, so the right question isn't "is the order still open?" but
+// "is the KITCHEN still done with it?" — which is exactly what the Kitchen
+// Display already tracks.
+//
+// Note this is not a problem for dine-in, which is billed at the END of
+// service: a dine-in order goes COMPLETED only once it's genuinely finished,
+// and it comes from the tables board anyway, not from this filter.
+function isOnBoard(order) {
+  if (["CANCELLED", "REFUNDED"].includes(order.status)) return false;
+  if (ACTIVE_ORDER_STATUSES.includes(order.status)) return true;
+
+  // Already billed. Keep it until the kitchen tickets are closed out —
+  // which is what "Order Delivered" does (see handleOrderDelivered).
+  if (order.status === "COMPLETED") {
+    const kitchenStatus = deriveKitchenStatus(order.kitchenOrders);
+    return kitchenStatus !== null && kitchenStatus !== "COMPLETED";
+  }
+  return false;
+}
+
+// Only today's orders are candidates. Without this bound, every takeaway
+// order ever paid for whose tickets were left at SERVED would come back onto
+// the board — the KDS's last button is "Served", so tickets don't reach
+// COMPLETED on their own.
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
 }
 
 const FILTERS = [
@@ -60,12 +162,27 @@ const FILTERS = [
   { key: "PENDING", label: "Pending" },
   { key: "AVAILABLE", label: "Available" },
   { key: "TAKEAWAY", label: "Takeaway" },
+  // Delivery shows EVERY delivery order, own-fleet and aggregator alike —
+  // an online order is a delivery order, so it belongs here too. Online
+  // then narrows that to just the aggregator-tagged ones.
+  { key: "DELIVERY", label: "Delivery" },
+  // { key: "ONLINE", label: "Online Orders" },
 ];
+
+// Tabs that show a flat list of orders rather than the table grid.
+const ORDER_LIST_TABS = ["TAKEAWAY", "DELIVERY", "ONLINE"];
+
+const EMPTY_MESSAGE = {
+  TAKEAWAY: "No active takeaway orders.",
+  DELIVERY: "No active delivery orders.",
+  ONLINE: "No active online orders. Orders placed from the POS \u201cOnline Orders\u201d tab appear here.",
+};
 
 export default function OrdersPage() {
   const navigate = useNavigate();
   const [tables, setTables] = useState([]);
   const [takeawayOrders, setTakeawayOrders] = useState([]);
+  const [deliveryOrders, setDeliveryOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("ALL");
@@ -100,10 +217,32 @@ export default function OrdersPage() {
     const { data, fromCache } = await fetchWithOfflineFallback(
       "orders:takeaway",
       async () => {
-        const res = await getOrders({ orderType: "TAKEAWAY", limit: 100 });
-        return (res?.data || []).filter((o) =>
-          ACTIVE_TAKEAWAY_STATUSES.includes(o.status),
-        );
+        const res = await getOrders({
+          orderType: "TAKEAWAY",
+          from: startOfToday(),
+          limit: 100,
+        });
+        return (res?.data || []).filter(isOnBoard);
+      },
+    );
+    if (fromCache) setIsOffline(true);
+    return data;
+  }, []);
+
+  // FIX: delivery orders were never fetched at all, which is why nothing
+  // placed from the POS "Online Orders" tab ever appeared on this page —
+  // those are saved as DELIVERY orders tagged with an onlinePlatformId, and
+  // this board only ever asked for tables and TAKEAWAY.
+  const loadDelivery = useCallback(async () => {
+    const { data, fromCache } = await fetchWithOfflineFallback(
+      "orders:delivery",
+      async () => {
+        const res = await getOrders({
+          orderType: "DELIVERY",
+          from: startOfToday(),
+          limit: 100,
+        });
+        return (res?.data || []).filter(isOnBoard);
       },
     );
     if (fromCache) setIsOffline(true);
@@ -111,10 +250,8 @@ export default function OrdersPage() {
   }, []);
 
   const load = useCallback(async () => {
-    const [tablesResult, takeawayResult] = await Promise.allSettled([
-      loadTables(),
-      loadTakeaway(),
-    ]);
+    const [tablesResult, takeawayResult, deliveryResult] =
+      await Promise.allSettled([loadTables(), loadTakeaway(), loadDelivery()]);
 
     if (tablesResult.status === "fulfilled") {
       setTables(tablesResult.value);
@@ -122,13 +259,16 @@ export default function OrdersPage() {
     if (takeawayResult.status === "fulfilled") {
       setTakeawayOrders(takeawayResult.value);
     }
+    if (deliveryResult.status === "fulfilled") {
+      setDeliveryOrders(deliveryResult.value);
+    }
 
-    const failure = [tablesResult, takeawayResult].find(
+    const failure = [tablesResult, takeawayResult, deliveryResult].find(
       (r) => r.status === "rejected",
     );
     setError(failure ? failure.reason.message : null);
     setLoading(false);
-  }, [loadTables, loadTakeaway]);
+  }, [loadTables, loadTakeaway, loadDelivery]);
 
   const refreshPendingIds = useCallback(async () => {
     setPendingOrderIds(await getPendingOrderIds());
@@ -184,12 +324,34 @@ export default function OrdersPage() {
   // to the local queue (+ an optimistic cache patch) on a genuine
   // connectivity failure — see ordersQueue.js.
   async function handleOrderDelivered(orderId) {
+    const order = [...takeawayOrders, ...deliveryOrders].find(
+      (o) => o.id === orderId,
+    );
+
     setCompletingOrderId(orderId);
     try {
-      await markOrderDeliveredOffline(orderId);
-      // Drop it from the active takeaway list immediately rather than
-      // waiting up to POLL_INTERVAL_MS for the next poll.
+      if (order?.status === "COMPLETED") {
+        // Already billed and closed (takeaway/online are paid up front), so
+        // there's no order status left to change — marking it delivered
+        // means closing out the kitchen tickets. That's also what takes it
+        // off this board, via isOnBoard above.
+        const openKotIds = (order.kitchenOrders || [])
+          .filter((k) => k.status !== "COMPLETED" && k.status !== "CANCELLED")
+          .map((k) => k.id);
+        await Promise.all(
+          openKotIds.map((id) =>
+            updateKotStatus(id, "COMPLETED", "Handed to customer"),
+          ),
+        );
+      } else {
+        await markOrderDeliveredOffline(orderId);
+      }
+      // Drop it from the active lists immediately rather than waiting up to
+      // POLL_INTERVAL_MS for the next poll. Delivery orders close out the
+      // same way takeaway does — see TableOrderCard for which order types
+      // get the "Mark Delivered" button versus a trip to Billing.
       setTakeawayOrders((prev) => prev.filter((o) => o.id !== orderId));
+      setDeliveryOrders((prev) => prev.filter((o) => o.id !== orderId));
       if (showCompletedTakeaway) loadCompletedTakeaway();
       await refreshPendingIds();
       setError(null);
@@ -201,13 +363,20 @@ export default function OrdersPage() {
   }
 
   const occupiedTableCount = tables.filter((t) => t.order).length;
+  const onlineOrderCount = deliveryOrders.filter(isOnlineOrder).length;
 
   const visibleItems = useMemo(() => {
-    const takeawayItems = takeawayOrders.map(takeawayToBoardItem);
+    const takeawayItems = takeawayOrders.map(orderToBoardItem);
+    const deliveryItems = deliveryOrders.map(orderToBoardItem);
 
+    // The three order-list tabs are flat lists, not the table grid, so they
+    // short-circuit before any table gets mixed in.
     if (filter === "TAKEAWAY") return takeawayItems;
+    if (filter === "DELIVERY") return deliveryItems;
+    if (filter === "ONLINE")
+      return deliveryItems.filter((i) => isOnlineOrder(i.order));
 
-    const combined = [...tables, ...takeawayItems];
+    const combined = [...tables, ...takeawayItems, ...deliveryItems];
     const filtered =
       filter === "ALL"
         ? combined
@@ -220,9 +389,10 @@ export default function OrdersPage() {
           CATEGORY_RANK[deriveTableCategory(a)] -
           CATEGORY_RANK[deriveTableCategory(b)],
       );
-  }, [tables, takeawayOrders, filter]);
+  }, [tables, takeawayOrders, deliveryOrders, filter]);
 
   const isTakeawayTab = filter === "TAKEAWAY";
+  const isOrderListTab = ORDER_LIST_TABS.includes(filter);
 
   return (
     <div className="flex h-screen flex-col bg-[#F3F5EE] dark:bg-[#12160F]">
@@ -249,8 +419,9 @@ export default function OrdersPage() {
               <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                 {occupiedTableCount} active table
                 {occupiedTableCount === 1 ? "" : "s"} of {tables.length} ·{" "}
-                {takeawayOrders.length} active takeaway order
-                {takeawayOrders.length === 1 ? "" : "s"}
+                {takeawayOrders.length} takeaway ·{" "}
+                {deliveryOrders.length} delivery
+                {onlineOrderCount > 0 ? ` (${onlineOrderCount} online)` : ""}
               </p>
             </div>
           </div>
@@ -296,25 +467,24 @@ export default function OrdersPage() {
           <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">Loading orders…</p>
         ) : visibleItems.length === 0 ? (
           <div className="flex h-40 items-center justify-center">
-            <p className="text-[#9CA3AF] dark:text-[#6B7280]">
-              {isTakeawayTab
-                ? "No active takeaway orders."
-                : "No tables match this filter."}
+            <p className="text-center text-[#9CA3AF] dark:text-[#6B7280]">
+              {EMPTY_MESSAGE[filter] || "No orders match this filter."}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visibleItems.map((item) => {
-              const isTakeawayCard = item.order?.orderType === "TAKEAWAY";
+              const type = item.order?.orderType;
+              const isOrderCard = type === "TAKEAWAY" || type === "DELIVERY";
               return (
                 <TableOrderCard
-                  key={`${isTakeawayCard ? "takeaway" : "table"}-${item.id}`}
+                  key={`${isOrderCard ? "order" : "table"}-${item.id}`}
                   table={item}
                   onCompleteService={handleCompleteService}
                   onOrderDelivered={handleOrderDelivered}
                   completing={completingOrderId === item.order?.id}
                   pendingSync={
-                    isTakeawayCard && pendingOrderIds.has(item.order?.id)
+                    isOrderCard && pendingOrderIds.has(item.order?.id)
                   }
                 />
               );

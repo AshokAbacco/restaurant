@@ -31,6 +31,144 @@ const POLL_INTERVAL_MS = 8000;
 // workflow only exposes Pending -> Ready -> Served as visible stages.
 const DISPLAY_RANK = { NEW: 0, ACCEPTED: 0, PREPARING: 0, READY: 1, SERVED: 2 };
 
+// True lifecycle order, used to pick a group's status. Distinct from
+// DISPLAY_RANK above, which deliberately flattens NEW/ACCEPTED/PREPARING
+// into one visible "Pending" bucket for sorting.
+const STAGE_RANK = {
+  NEW: 0,
+  ACCEPTED: 1,
+  PREPARING: 2,
+  READY: 3,
+  SERVED: 4,
+  COMPLETED: 5,
+};
+
+// Most urgent first — matches PRIORITY_RANK in server/src/pos/kot/kot.service.js.
+const PRIORITY_RANK = {
+  VIP: 1,
+  EXPRESS: 2,
+  SENIOR_CITIZEN: 3,
+  ONLINE_DELIVERY: 4,
+  SPECIAL_REQUEST: 5,
+  NORMAL: 99,
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// FIX: one customer order was rendering as several cards.
+//
+// kot.service.js creates one KitchenOrder per kitchen section, because
+// KitchenOrder.kitchenSectionId is required and the station tabs, station
+// routing and per-station prep reports all depend on that split. An order
+// with a grill item, a drink and a dessert is three rows in the database,
+// and this screen was rendering one card per row — so ORD-000006 showed up
+// as KOT-000008 (Arabic Coffee) and KOT-000009 (Chicken Shawarma, Mixed
+// Grill Platter), with nothing tying them together for the kitchen.
+//
+// The database split is correct and stays. What changes is the display:
+// tickets are collapsed by orderId into a single card carrying every item.
+// Grouping here rather than in the API also means the station tabs keep
+// working untouched — filter first, group second, so the Grill Station tab
+// still shows one card per order containing only that station's items.
+// ─────────────────────────────────────────────────────────────────────────
+function groupKotsByOrder(kots) {
+  const groups = new Map();
+
+  for (const kot of kots) {
+    // Real tickets group on orderId. Offline placeholders (see
+    // getQueuedKots in offlineQueue.js) have no server order yet, so they
+    // group on the clientRequestId that will become one.
+    const key =
+      kot.orderId ||
+      kot.order?.id ||
+      (kot.clientRequestId ? `offline-${kot.clientRequestId}` : kot.id);
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        orderId: kot.orderId || kot.order?.id || null,
+        clientRequestId: kot.clientRequestId || null,
+        order: kot.order,
+        kots: [],
+        kotNumbers: [],
+        sections: [],
+        notes: [],
+        awaitingCreate: false,
+      });
+    }
+
+    const group = groups.get(key);
+    group.kots.push(kot);
+    group.kotNumbers.push(kot.kotNumber);
+    group.sections.push({
+      id: kot.kitchenSectionId,
+      name: kot.kitchenSection?.name || "Kitchen",
+      items: kot.items || [],
+    });
+    group.notes.push(...(kot.notes || []));
+    if (kot.awaitingCreate) group.awaitingCreate = true;
+    // A queued placeholder carries less order detail than a real ticket;
+    // keep whichever object actually has an orderNumber.
+    if (!group.order?.orderNumber && kot.order?.orderNumber) {
+      group.order = kot.order;
+    }
+  }
+
+  for (const group of groups.values()) {
+    const { kots: rows } = group;
+
+    // The card shows the LEAST advanced ticket — the same rule the tables
+    // board uses. An order isn't Ready until every station's ticket is,
+    // and tapping Ready with a station still cooking would lie to the
+    // waiter.
+    group.status = rows.reduce(
+      (least, k) =>
+        (STAGE_RANK[k.status] ?? 99) < (STAGE_RANK[least] ?? 99)
+          ? k.status
+          : least,
+      rows[0].status,
+    );
+
+    group.priority = rows.reduce(
+      (top, k) =>
+        (PRIORITY_RANK[k.priority] ?? 99) < (PRIORITY_RANK[top] ?? 99)
+          ? k.priority
+          : top,
+      "NORMAL",
+    );
+
+    // Timer runs from when the order first hit the kitchen...
+    group.createdAt = rows.reduce(
+      (earliest, k) =>
+        new Date(k.createdAt) < new Date(earliest) ? k.createdAt : earliest,
+      rows[0].createdAt,
+    );
+
+    // ...and only freezes once EVERY station is done, at the last one's
+    // timestamp. Freezing on the first would stop the clock while food was
+    // still being cooked.
+    const endTimes = rows.map((k) => k.completedAt || k.servedAt);
+    group.frozenAt = endTimes.every(Boolean)
+      ? endTimes.reduce((latest, t) =>
+          new Date(t) > new Date(latest) ? t : latest,
+        )
+      : null;
+
+    // Stations cook in parallel, so the order is due when the SLOWEST
+    // station's target elapses — hence max, not sum.
+    const targets = rows
+      .map((k) => k.targetPrepMinutes)
+      .filter((t) => typeof t === "number");
+    group.targetPrepMinutes = targets.length ? Math.max(...targets) : null;
+
+    group.sections.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    group.notes.sort(
+      (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+    );
+  }
+
+  return Array.from(groups.values());
+}
+
 export default function KitchenDisplayScreen() {
   const { isKitchen } = useAuth();
   // Only kitchen staff can write notes — owner/manager/cashier land on this
@@ -107,7 +245,7 @@ export default function KitchenDisplayScreen() {
 
   // Combine server-confirmed tickets with still-queued (offline) ones.
   // Concatenation order here doesn't matter — the Pending/Ready/Served +
-  // createdAt sort in visibleKots below re-orders everything anyway, so a
+  // createdAt sort in visibleTickets below re-orders everything anyway, so a
   // queued ticket lands wherever its timestamp actually puts it.
   const allKots = useMemo(() => [...queuedKots, ...kots], [queuedKots, kots]);
 
@@ -122,27 +260,28 @@ export default function KitchenDisplayScreen() {
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [allKots]);
 
-  const visibleKots = useMemo(() => {
+  // Station filter FIRST, then group — so the Grill Station tab shows one
+  // card per order containing only the grill items, rather than the whole
+  // order's contents under a grill heading.
+  const visibleTickets = useMemo(() => {
     const filtered =
       activeSectionId === "ALL"
         ? allKots
         : allKots.filter((k) => k.kitchenSectionId === activeSectionId);
 
-    return filtered.slice().sort((a, b) => {
+    return groupKotsByOrder(filtered).sort((a, b) => {
       // Pending -> Ready -> Served
       const rankDiff =
         (DISPLAY_RANK[a.status] ?? 0) - (DISPLAY_RANK[b.status] ?? 0);
 
       if (rankDiff !== 0) return rankDiff;
 
-      // SERVED: newest completed first
+      // SERVED: newest completed first. Groups expose a single frozenAt
+      // (the moment the LAST station finished) rather than the per-ticket
+      // completedAt/servedAt the ungrouped list used to sort on.
       if (a.status === "SERVED" && b.status === "SERVED") {
-        const aTime = new Date(
-          a.completedAt || a.servedAt || a.updatedAt || a.createdAt,
-        ).getTime();
-        const bTime = new Date(
-          b.completedAt || b.servedAt || b.updatedAt || b.createdAt,
-        ).getTime();
+        const aTime = new Date(a.frozenAt || a.createdAt).getTime();
+        const bTime = new Date(b.frozenAt || b.createdAt).getTime();
 
         return bTime - aTime;
       }
@@ -152,30 +291,47 @@ export default function KitchenDisplayScreen() {
     });
   }, [allKots, activeSectionId]);
 
-  async function handleAdvance(kot, nextStatus) {
-    // Queued/not-yet-synced tickets (awaitingCreate) don't exist on the
-    // server yet — there's no real kotId to PATCH. Advance the status
-    // LOCALLY instead (see advanceQueuedKotStatus in offlineQueue.js) so
-    // Ready/Served genuinely work while still offline; it's replayed onto
-    // the real KOT automatically once the underlying order syncs.
-    if (kot.awaitingCreate) {
-      await advanceQueuedKotStatus(
-        kot.clientRequestId,
-        kot.kitchenSectionId,
-        nextStatus,
-      );
-      await loadQueued();
-      return;
-    }
+  // Advancing acts on the whole ORDER: every station ticket in the card that
+  // hasn't already reached the target status moves forward together. The
+  // server's own KOT_STAGE_RANK guard makes a redundant call a harmless
+  // no-op, but filtering here saves the round trips.
+  async function handleAdvance(ticket, nextStatus) {
+    const behind = ticket.kots.filter(
+      (k) => (STAGE_RANK[k.status] ?? 0) < (STAGE_RANK[nextStatus] ?? 0),
+    );
+    if (behind.length === 0) return;
 
-    setUpdatingId(kot.id);
+    setUpdatingId(ticket.key);
     try {
+      // Queued/not-yet-synced tickets (awaitingCreate) don't exist on the
+      // server yet — there's no real kotId to PATCH. Advance the status
+      // LOCALLY instead (see advanceQueuedKotStatus in offlineQueue.js) so
+      // Ready/Served genuinely work while still offline; it's replayed onto
+      // the real KOT automatically once the underlying order syncs.
+      const queued = behind.filter((k) => k.awaitingCreate);
+      const live = behind.filter((k) => !k.awaitingCreate);
+
+      for (const k of queued) {
+        await advanceQueuedKotStatus(
+          k.clientRequestId,
+          k.kitchenSectionId,
+          nextStatus,
+        );
+      }
+
       // updateKotStatusOffline tries the network first, and only falls
       // back to the local queue (+ an optimistic cache patch) on a
       // genuine connectivity failure — see kdsQueue.js.
-      await updateKotStatusOffline(kot.id, nextStatus);
-      await load();
-      await refreshPendingIds();
+      await Promise.all(
+        live.map((k) => updateKotStatusOffline(k.id, nextStatus)),
+      );
+
+      if (queued.length) await loadQueued();
+      if (live.length) {
+        await load();
+        await refreshPendingIds();
+      }
+      setError(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -183,13 +339,17 @@ export default function KitchenDisplayScreen() {
     }
   }
 
-  // Adding a note doesn't touch `updating`/the button-disabled state — it's a
-  // side conversation on the ticket, not a status change, so the Ready/Served
-  // button stays clickable while a note is being typed elsewhere on the card.
-  async function handleAddNote(id, note) {
-    await addKitchenNote(id, note);
+  // Notes belong to a single KitchenOrder row in the schema, so a note added
+  // from a grouped card is attached to the order's first station ticket. The
+  // card merges notes from every ticket for display, so it shows up either
+  // way.
+  async function handleAddNote(ticket, note) {
+    const target = ticket.kots.find((k) => !k.awaitingCreate);
+    if (!target) return;
+    await addKitchenNote(target.id, note);
     await load();
   }
+
 
   return (
     <div className="flex h-screen flex-col bg-[#F3F5EE] dark:bg-[#12160F]">
@@ -219,8 +379,8 @@ export default function KitchenDisplayScreen() {
                 Kitchen Display
               </h1>
               <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
-                {visibleKots.length} active ticket
-                {visibleKots.length === 1 ? "" : "s"}
+                {visibleTickets.length} active order
+                {visibleTickets.length === 1 ? "" : "s"}
               </p>
             </div>
           </div>
@@ -272,7 +432,7 @@ export default function KitchenDisplayScreen() {
           <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
             Loading tickets…
           </p>
-        ) : visibleKots.length === 0 ? (
+        ) : visibleTickets.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-[#9CA3AF] dark:text-[#6B7280]">
               No active tickets. All caught up.
@@ -280,17 +440,20 @@ export default function KitchenDisplayScreen() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {visibleKots.map((kot) => (
+            {visibleTickets.map((ticket) => (
               <KotCard
-                key={kot.id}
-                kot={kot}
+                key={ticket.key}
+                ticket={ticket}
                 onAdvance={handleAdvance}
                 onAddNote={
-                  canAddNotes && !kot.awaitingCreate ? handleAddNote : undefined
+                  canAddNotes && !ticket.awaitingCreate
+                    ? handleAddNote
+                    : undefined
                 }
-                updating={updatingId === kot.id}
-                pendingSync={pendingKotIds.has(kot.id)}
-                awaitingCreate={kot.awaitingCreate}
+                updating={updatingId === ticket.key}
+                // Any station ticket in this order awaiting sync marks the
+                // whole card, since the card is the order.
+                pendingSync={ticket.kots.some((k) => pendingKotIds.has(k.id))}
               />
             ))}
           </div>

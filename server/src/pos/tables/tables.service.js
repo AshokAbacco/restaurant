@@ -129,8 +129,20 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
         take: 1,
         include: {
           customer: { select: { name: true } },
-          items: { select: { id: true, quantity: true } },
-          kitchenOrders: { select: { status: true } },
+          // unitPrice/totalPrice/name feed the Orders page's hover tooltip
+          // (item lines, quantities, costs). They're a snapshot on OrderItem
+          // already, so this doesn't cost an extra query — just more columns
+          // on a row we were reading anyway.
+          items: {
+            select: {
+              id: true,
+              quantity: true,
+              unitPrice: true,
+              totalPrice: true,
+              menuItem: { select: { name: true } },
+            },
+          },
+          kitchenOrders: { select: { id: true, status: true } },
         },
       },
     },
@@ -166,6 +178,17 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
             kitchenStatus: deriveKitchenStatus(order.kitchenOrders),
             customerName: order.customer?.name || null,
             itemCount: order.items.reduce((sum, i) => sum + i.quantity, 0),
+            // Flattened here rather than client-side so the Orders page gets
+            // the same `itemLines` shape whether a card came from this board
+            // or from /pos/orders (takeaway/delivery).
+            itemLines: order.items.map((i) => ({
+              id: i.id,
+              name: i.menuItem?.name || "Item",
+              quantity: i.quantity,
+              unitPrice: Number(i.unitPrice),
+              totalPrice: Number(i.totalPrice),
+            })),
+            kitchenOrderIds: order.kitchenOrders.map((k) => k.id),
             grandTotal: order.grandTotal,
             createdAt: order.createdAt,
           }

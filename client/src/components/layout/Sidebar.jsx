@@ -98,11 +98,6 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       path: "/tables",
       icon: <TableProperties />,
     },
-    {
-      name: "Tables Reservations",
-      path: "/table-reservations",
-      icon: <MdOutlineTableRestaurant  />,
-    },
 
     {
       name: "Kitchen Orders",
@@ -126,6 +121,11 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
     //   path: "/tables",
     //   icon: <FiGrid />,
     // },
+    {
+      name: "Tables Reservations",
+      path: "/table-reservations",
+      icon: <MdOutlineTableRestaurant  />,
+    },
 
     {
       name: "Menu",

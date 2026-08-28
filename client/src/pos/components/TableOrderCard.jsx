@@ -35,6 +35,15 @@ const ORDER_TYPE_BADGE = {
     label: "🥡 Takeaway",
     className: "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/30",
   },
+  // Online Orders are stored as ordinary DELIVERY orders tagged with an
+  // onlinePlatformId (the OrderType enum has no "ONLINE" member), so they
+  // share this badge — the platform name is shown as a second badge next to
+  // it, which is what distinguishes an aggregator order from own-fleet
+  // delivery at a glance.
+  DELIVERY: {
+    label: "🛵 Delivery",
+    className: "bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-500/30",
+  },
 };
 
 // Table-level category — the thing that decides sort order and the headline
@@ -98,6 +107,74 @@ function Timer({ since }) {
   );
 }
 
+function money(n) {
+  return `₹${Number(n || 0).toFixed(2)}`;
+}
+
+// Hover detail for a card: every line item with its quantity and cost, plus
+// the order total. Rendered inline (not in a portal) and positioned
+// absolutely over the card, so it needs pointer-events-none — otherwise
+// moving the cursor onto the tooltip would count as leaving the card and it
+// would flicker.
+//
+// `itemLines` is supplied in the same shape by both sources of cards: the
+// tables board flattens it server-side (tables.service.js) and OrdersPage's
+// orderToBoardItem flattens the raw /pos/orders response the same way.
+function OrderItemsTooltip({ order }) {
+  const lines = order.itemLines || [];
+  if (lines.length === 0) return null;
+
+  const totalQty = lines.reduce((sum, l) => sum + (l.quantity || 0), 0);
+
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-2 z-30 w-72 -translate-x-1/2 scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+      <div className="rounded-xl border border-[#E7EAE1] dark:border-[#2E3A2E] bg-white dark:bg-[#1D231D] p-3 shadow-xl shadow-black/10 dark:shadow-black/50">
+        <div className="flex items-baseline justify-between gap-2 border-b border-[#E7EAE1] dark:border-[#262B24] pb-2">
+          <span className="text-xs font-bold uppercase tracking-wide text-[#1F2937] dark:text-white">
+            Order Items
+          </span>
+          <span className="font-mono text-[11px] text-[#6B7280] dark:text-[#9CA8A0]">
+            {totalQty} item{totalQty === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        <ul className="max-h-64 space-y-1.5 overflow-y-auto py-2">
+          {lines.map((line) => (
+            <li key={line.id} className="flex items-start justify-between gap-3 text-xs">
+              <span className="min-w-0 text-[#1F2937] dark:text-[#E4E9E2]">
+                <span className="font-mono font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
+                  {line.quantity}×
+                </span>{" "}
+                {line.name}
+                <span className="ml-1 font-mono text-[10px] text-[#9CA3AF] dark:text-[#6B7280]">
+                  @ {money(line.unitPrice)}
+                </span>
+              </span>
+              <span className="shrink-0 font-mono font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                {money(line.totalPrice)}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="flex items-baseline justify-between border-t border-[#E7EAE1] dark:border-[#262B24] pt-2">
+          <span className="text-xs font-bold text-[#1F2937] dark:text-white">
+            Total
+          </span>
+          <span className="font-mono text-sm font-bold text-[#3FA34D] dark:text-[#43B75A]">
+            {money(order.grandTotal)}
+          </span>
+        </div>
+        {/* Line totals are pre-tax snapshots; the order total includes GST,
+            add-ons and any charges, so the two legitimately differ. */}
+        <p className="mt-1 text-[10px] text-[#9CA3AF] dark:text-[#6B7280]">
+          Total includes GST, add-ons and charges
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // `table` is either:
 //  - a real dine-in table: { id, name, section, capacity, order }
 //  - a normalized takeaway entry: { id, name, order } (no section/capacity —
@@ -117,6 +194,16 @@ export default function TableOrderCard({
 }) {
   const { order } = table;
   const isTakeaway = order?.orderType === "TAKEAWAY";
+  const isDelivery = order?.orderType === "DELIVERY";
+  // Aggregator order (Swiggy/Zomato/...) rather than the restaurant's own
+  // delivery. platformName is flattened on by OrdersPage's orderToBoardItem.
+  const platformName = order?.platformName || order?.onlinePlatform?.name || null;
+  const isOnline = isDelivery && Boolean(platformName);
+  // Who closes the order out without a billing step: takeaway (already paid
+  // up front at the counter) and aggregator orders (the platform settles
+  // separately, there's nothing to collect here). Own-fleet delivery still
+  // has a bill to raise, so it goes to Billing like dine-in does.
+  const closesWithoutBilling = isTakeaway || isOnline;
   const isFree = !order;
   // kitchenStatus comes straight from the order's live KitchenOrder rows —
   // the same source the Kitchen Display itself reads from. Falls back to
@@ -128,8 +215,10 @@ export default function TableOrderCard({
   const typeBadge = order?.orderType ? ORDER_TYPE_BADGE[order.orderType] : null;
 
   return (
-    <div
-      className={`flex flex-col rounded-2xl border bg-white dark:bg-[#1D231D] p-5 shadow-sm transition-shadow ${
+    <div className="group relative">
+      {!isFree && <OrderItemsTooltip order={order} />}
+      <div
+      className={`flex h-full flex-col rounded-2xl border bg-white dark:bg-[#1D231D] p-5 shadow-sm transition-shadow ${
         isFree
           ? "border-[#E7EAE1] dark:border-[#262B24]"
           : "border-blue-200 dark:border-blue-500/30 shadow-blue-50 dark:shadow-black/20 hover:shadow-md dark:hover:shadow-black/40"
@@ -141,7 +230,11 @@ export default function TableOrderCard({
           <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
             {isTakeaway
               ? "Takeaway order"
-              : `${table.section || "—"} ${table.capacity ? `· ${table.capacity} seats` : ""}`}
+              : isDelivery
+                ? platformName
+                  ? `${platformName} · online order`
+                  : "Delivery order"
+                : `${table.section || "—"} ${table.capacity ? `· ${table.capacity} seats` : ""}`}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -160,13 +253,20 @@ export default function TableOrderCard({
         </div>
       ) : (
         <>
-          {typeBadge && (
-            <span
-              className={`mt-3 inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${typeBadge.className}`}
-            >
-              {typeBadge.label}
-            </span>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {typeBadge && (
+              <span
+                className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${typeBadge.className}`}
+              >
+                {typeBadge.label}
+              </span>
+            )}
+            {platformName && (
+              <span className="inline-flex w-fit items-center rounded-full border border-violet-200 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:text-violet-400">
+                {platformName}
+              </span>
+            )}
+          </div>
           {pendingSync && (
             <span className="mt-2 inline-flex w-fit items-center rounded-full border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
               Sync pending
@@ -221,7 +321,7 @@ export default function TableOrderCard({
             </span>
           </div>
 
-          {isTakeaway ? (
+          {closesWithoutBilling ? (
             <>
               <button
                 onClick={() => onOrderDelivered(order.id)}
@@ -233,7 +333,11 @@ export default function TableOrderCard({
                 }
                 className="mt-3 w-full rounded-xl bg-[#3FA34D] py-2.5 text-sm font-bold text-white shadow-sm shadow-[#3FA34D]/20 dark:shadow-black/30 transition-colors hover:bg-[#358F42] disabled:cursor-not-allowed disabled:bg-[#D1D5DB] dark:disabled:bg-[#262B24] disabled:text-[#6B7280] dark:disabled:text-[#4B5563] disabled:shadow-none dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
               >
-                {completing ? "Marking Delivered…" : "Order Delivered"}
+                {completing
+                  ? "Marking Delivered…"
+                  : isTakeaway
+                    ? "Order Delivered"
+                    : "Mark Delivered"}
               </button>
               {!canComplete && (
                 <p className="mt-1.5 text-center text-xs text-[#9CA3AF] dark:text-[#6B7280]">
@@ -268,6 +372,7 @@ export default function TableOrderCard({
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
