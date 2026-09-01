@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import TableStrip from "./components/TableStrip";
 import MenuBrowser from "./components/MenuBrowser";
 import OrderTicket from "./components/OrderTicket";
+import KotPrintModal from "./components/KotPrintModal";
 import SuccessToast from "./components/SuccessToast";
 import CounterPicker from "./components/CounterPicker";
 import {
@@ -27,6 +28,11 @@ export default function PosOrderScreen() {
   const [selectedPlatformId, setSelectedPlatformId] = useState("");
 
   // Kitchen Branches — the physical kitchens this outlet has configured.
+  // Order whose kitchen ticket should be printed. Dine-in and online set
+  // this the instant the order reaches the kitchen; takeaway doesn't, since
+  // its ticket is printed from Billing after payment.
+  const [printKotOrderId, setPrintKotOrderId] = useState(null);
+
   const [kitchenBranches, setKitchenBranches] = useState([]);
   const [selectedKitchenBranchId, setSelectedKitchenBranchId] = useState("");
 
@@ -187,18 +193,19 @@ export default function PosOrderScreen() {
         // Takeaway is NOT offline-capable (see offlineQueue.js's file
         // header) — billing needs live payment-gateway state, so this
         // always goes straight to the network and hands off to Billing
-        // immediately, same as before.
+        // immediately.
         //
-        // FIX: was calling createOrder() alone here, which never sends
-        // the order to the kitchen — Takeaway orders sat at status NEW
-        // with no KitchenOrder ever created, so they never showed up on
-        // the Kitchen Display at all (unlike Dine In, which already went
-        // through the atomic create+send-to-kitchen call via
-        // placeDineInOrder below). Switching to
-        // placeOrderAndSendToKitchen gives it the same KOT — and the
-        // same Ready/Served flow — as Dine In, while still handing off
-        // to Billing immediately after.
-        const order = await placeOrderAndSendToKitchen({
+        // Deliberately createOrder, NOT placeOrderAndSendToKitchen:
+        // takeaway is paid up front, and the kitchen shouldn't start
+        // cooking food that hasn't been paid for and might be abandoned at
+        // the counter. The send-to-kitchen and the KOT print both happen in
+        // Billings.jsx the moment payment clears.
+        //
+        // (This deliberately reverses an earlier change that sent takeaway
+        // at placement time. That was made so takeaway would appear on the
+        // Kitchen Display at all — it still does, just from payment onward
+        // rather than from order entry.)
+        const order = await createOrder({
           orderType,
           counterId: getSelectedCounterId(),
           kitchenBranchId: selectedKitchenBranchId || null,
@@ -230,6 +237,8 @@ export default function PosOrderScreen() {
           kitchenBranchId: selectedKitchenBranchId || null,
           items,
         });
+        // Online orders go straight to the kitchen, so the ticket prints now.
+        setPrintKotOrderId(order.id);
         setLastOrder(order);
         setShowSuccessToast(true);
         setCart([]);
@@ -277,7 +286,13 @@ export default function PosOrderScreen() {
       setLastOrder(order);
       setShowSuccessToast(true);
       if (queuedOffline) {
-        setError(null); // this isn't an error state — just informational, shown via the toast message
+        // Placed offline: there's no server order id yet, so there are no
+        // KitchenOrder rows to fetch and print. The ticket prints from the
+        // Kitchen Display once the order syncs.
+        setError(null); // not an error state — informational, shown via the toast
+      } else {
+        // Dine-in went to the kitchen atomically with the order, so print now.
+        setPrintKotOrderId(order.id);
       }
       setCart([]);
       setSelectedTable(null);
@@ -325,6 +340,13 @@ export default function PosOrderScreen() {
         <div className="overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] p-4">
           <MenuBrowser onAddItem={addItem} />
         </div>
+
+        {printKotOrderId && (
+          <KotPrintModal
+            orderId={printKotOrderId}
+            onClose={() => setPrintKotOrderId(null)}
+          />
+        )}
 
         <OrderTicket
           orderType={orderType}
