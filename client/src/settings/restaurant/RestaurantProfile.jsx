@@ -2,7 +2,8 @@
 // src/settings/restaurant/RestaurantProfile.jsx
 // ==============================================
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { apiRequest } from "../../api/apiClient";
 import {
   FiSave,
   FiRefreshCw,
@@ -30,15 +31,129 @@ const RestaurantProfile = () => {
   // FORM STATE
   // ==========================================
 
-  const [formData, setFormData] = useState({
+  // Mirrors EDITABLE_PROFILE_FIELDS in server/src/settings/settings.service.js.
+  // `restaurantName` is the form's label for the outlet's `name` column; the
+  // mapping happens in toPayload/fromProfile below so the rest of the markup
+  // can keep using the friendlier key.
+  const EMPTY_FORM = {
     restaurantName: "",
     legalBusinessName: "",
     restaurantType: "Restaurant",
     tagline: "",
     description: "",
-    logo: null,
-    banner: null,
-  });
+    logoUrl: "",
+    bannerUrl: "",
+    gstNumber: "",
+    fssaiNumber: "",
+    panNumber: "",
+    registrationNumber: "",
+    address: "",
+    city: "",
+    state: "",
+    pincode: "",
+    country: "India",
+    mobile: "",
+    alternateMobile: "",
+    email: "",
+    website: "",
+    whatsapp: "",
+    openingTime: "",
+    closingTime: "",
+    timezone: "Asia/Kolkata",
+    defaultLanguage: "en",
+    currency: "INR",
+    facebookUrl: "",
+    instagramUrl: "",
+    googleBusinessUrl: "",
+    googleMapsUrl: "",
+  };
+
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [saved, setSaved] = useState(EMPTY_FORM); // last persisted state, for Reset
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  // The server speaks the schema's column names; the form uses its own for a
+  // few fields. One conversion each way, in one place.
+  function fromProfile(p) {
+    return {
+      ...EMPTY_FORM,
+      ...Object.fromEntries(
+        Object.entries(p || {})
+          .filter(([, v]) => v !== null && v !== undefined)
+          .map(([k, v]) => [k, v]),
+      ),
+      restaurantName: p?.name || "",
+      gstNumber: p?.gstin || "",
+      fssaiNumber: p?.fssai || "",
+      mobile: p?.phone || "",
+    };
+  }
+
+  function toPayload(f) {
+    const { restaurantName, gstNumber, fssaiNumber, mobile, ...rest } = f;
+    return {
+      ...rest,
+      name: restaurantName,
+      gstin: gstNumber,
+      fssai: fssaiNumber,
+      phone: mobile,
+    };
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { ok, data } = await apiRequest("/settings/restaurant-profile");
+      if (cancelled) return;
+      if (ok) {
+        const next = fromProfile(data);
+        setFormData(next);
+        setSaved(next);
+      } else {
+        setError(data?.error || data?.message || "Couldn't load the profile.");
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleSave() {
+    setError("");
+    setNotice("");
+    if (!formData.restaurantName.trim()) {
+      setError("Restaurant name is required.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setSaving(true);
+    const { ok, data } = await apiRequest("/settings/restaurant-profile", {
+      method: "PUT",
+      body: JSON.stringify(toPayload(formData)),
+    });
+    setSaving(false);
+    if (!ok) {
+      setError(data?.error || data?.message || "Couldn't save the profile.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const next = fromProfile(data);
+    setFormData(next);
+    setSaved(next);
+    setNotice("Restaurant profile saved.");
+  }
+
+  // Reverts to the last PERSISTED values, not to blank — a Reset that wiped
+  // the form would be a trap next to a Save button.
+  function handleReset() {
+    setFormData(saved);
+    setError("");
+    setNotice("");
+  }
 
   // ==========================================
   // INPUT CHANGE
@@ -57,15 +172,30 @@ const RestaurantProfile = () => {
   // IMAGE CHANGE
   // ==========================================
 
+  // Logo/banner preview only.
+  //
+  // URL.createObjectURL produces a blob: URL that lives in THIS tab and dies
+  // on reload, so it must never be persisted — a saved blob: URL would look
+  // fine until the page refreshed and then 404 forever. Saving these properly
+  // needs the file uploaded to R2 first (server/src/config/r2.js) and the
+  // returned public URL stored in logoUrl/bannerUrl, which isn't wired up
+  // yet. Until then the picker previews the image without claiming to save
+  // it, and logoUrl/bannerUrl are only settable directly.
+  const [imagePreview, setImagePreview] = useState({ logo: null, banner: null });
+
   const handleImage = (e) => {
     const { name, files } = e.target;
 
     if (!files.length) return;
 
-    setFormData((prev) => ({
+    setImagePreview((prev) => ({
       ...prev,
       [name]: URL.createObjectURL(files[0]),
     }));
+    setNotice("");
+    setError(
+      "Image previews aren't saved yet — file upload isn't wired up. Everything else on this page saves normally.",
+    );
   };
 
   return (
@@ -94,6 +224,9 @@ const RestaurantProfile = () => {
 
           <div className="flex gap-4">
             <button
+              type="button"
+              onClick={handleReset}
+              disabled={saving || loading}
               className="
                 h-12
                 px-6
@@ -104,6 +237,7 @@ const RestaurantProfile = () => {
                 flex
                 items-center
                 gap-2
+                disabled:opacity-50
               "
             >
               <FiRefreshCw />
@@ -111,6 +245,9 @@ const RestaurantProfile = () => {
             </button>
 
             <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || loading}
               className="
                 h-12
                 px-8
@@ -121,10 +258,11 @@ const RestaurantProfile = () => {
                 flex
                 items-center
                 gap-2
+                disabled:opacity-60
               "
             >
               <FiSave />
-              Save Changes
+              {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
         </div>
@@ -174,9 +312,9 @@ const RestaurantProfile = () => {
                   transition
                 "
               >
-                {formData.logo ? (
+                {(imagePreview.logo || formData.logoUrl) ? (
                   <img
-                    src={formData.logo}
+                    src={imagePreview.logo || formData.logoUrl}
                     alt="Logo"
                     className="h-full w-full object-contain rounded-2xl"
                   />
@@ -221,9 +359,9 @@ const RestaurantProfile = () => {
                   transition
                 "
               >
-                {formData.banner ? (
+                {(imagePreview.banner || formData.bannerUrl) ? (
                   <img
-                    src={formData.banner}
+                    src={imagePreview.banner || formData.bannerUrl}
                     alt="Banner"
                     className="h-full w-full object-cover rounded-2xl"
                   />
@@ -359,6 +497,8 @@ const RestaurantProfile = () => {
               <input
                 type="text"
                 name="gstNumber"
+              value={formData.gstNumber}
+              onChange={handleChange}
                 placeholder="29ABCDE1234F1Z5"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -374,6 +514,8 @@ const RestaurantProfile = () => {
               <input
                 type="text"
                 name="fssaiNumber"
+              value={formData.fssaiNumber}
+              onChange={handleChange}
                 placeholder="Enter FSSAI License"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -387,6 +529,8 @@ const RestaurantProfile = () => {
               <input
                 type="text"
                 name="panNumber"
+              value={formData.panNumber}
+              onChange={handleChange}
                 placeholder="ABCDE1234F"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -402,6 +546,8 @@ const RestaurantProfile = () => {
               <input
                 type="text"
                 name="registrationNumber"
+              value={formData.registrationNumber}
+              onChange={handleChange}
                 placeholder="Enter Registration Number"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -430,6 +576,8 @@ const RestaurantProfile = () => {
               <input
                 type="tel"
                 name="mobile"
+              value={formData.mobile}
+              onChange={handleChange}
                 placeholder="+91 9876543210"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -445,6 +593,8 @@ const RestaurantProfile = () => {
               <input
                 type="tel"
                 name="alternateMobile"
+              value={formData.alternateMobile}
+              onChange={handleChange}
                 placeholder="+91 9876543210"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -460,6 +610,8 @@ const RestaurantProfile = () => {
               <input
                 type="tel"
                 name="whatsapp"
+              value={formData.whatsapp}
+              onChange={handleChange}
                 placeholder="+91 9876543210"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -473,6 +625,8 @@ const RestaurantProfile = () => {
               <input
                 type="email"
                 name="email"
+              value={formData.email}
+              onChange={handleChange}
                 placeholder="info@restaurant.com"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -486,6 +640,8 @@ const RestaurantProfile = () => {
               <input
                 type="url"
                 name="website"
+              value={formData.website}
+              onChange={handleChange}
                 placeholder="https://www.restaurant.com"
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
@@ -513,6 +669,8 @@ const RestaurantProfile = () => {
               <textarea
                 rows={4}
                 name="address"
+              value={formData.address}
+              onChange={handleChange}
                 placeholder="Enter complete restaurant address"
                 className="w-full rounded-2xl border border-gray-300 p-4 resize-none focus:border-blue-500 outline-none"
               />
@@ -529,6 +687,8 @@ const RestaurantProfile = () => {
                 <input
                   type="text"
                   name="city"
+              value={formData.city}
+              onChange={handleChange}
                   placeholder="Bangalore"
                   className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
                 />
@@ -542,6 +702,8 @@ const RestaurantProfile = () => {
                 <input
                   type="text"
                   name="state"
+              value={formData.state}
+              onChange={handleChange}
                   placeholder="Karnataka"
                   className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
                 />
@@ -555,6 +717,8 @@ const RestaurantProfile = () => {
                 <input
                   type="text"
                   name="country"
+              value={formData.country}
+              onChange={handleChange}
                   defaultValue="India"
                   className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
                 />
@@ -568,6 +732,8 @@ const RestaurantProfile = () => {
                 <input
                   type="text"
                   name="pincode"
+              value={formData.pincode}
+              onChange={handleChange}
                   placeholder="560001"
                   className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
                 />
@@ -589,6 +755,8 @@ const RestaurantProfile = () => {
               <input
                 type="time"
                 name="openingTime"
+              value={formData.openingTime}
+              onChange={handleChange}
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
             </div>
@@ -599,6 +767,8 @@ const RestaurantProfile = () => {
               <input
                 type="time"
                 name="closingTime"
+              value={formData.closingTime}
+              onChange={handleChange}
                 className="w-full h-14 rounded-xl border border-gray-300 px-4 focus:border-blue-500 outline-none"
               />
             </div>
@@ -616,34 +786,47 @@ const RestaurantProfile = () => {
             <div>
               <label className="block mb-3 font-semibold">Currency</label>
 
-              <select className="w-full h-14 rounded-xl border border-gray-300 px-4">
-                <option>Indian Rupee (₹)</option>
-
-                <option>US Dollar ($)</option>
-
-                <option>UAE Dirham (AED)</option>
+              <select
+                name="currency"
+                value={formData.currency}
+                onChange={handleChange}
+                className="w-full h-14 rounded-xl border border-gray-300 px-4"
+              >
+                {/* Values are the stored codes, not the display labels — the
+                    options previously had no value at all, so even a bound
+                    select would have saved "Indian Rupee (₹)". */}
+                <option value="INR">Indian Rupee (₹)</option>
+                <option value="USD">US Dollar ($)</option>
+                <option value="AED">UAE Dirham (AED)</option>
               </select>
             </div>
 
             <div>
               <label className="block mb-3 font-semibold">Time Zone</label>
 
-              <select className="w-full h-14 rounded-xl border border-gray-300 px-4">
-                <option>Asia/Kolkata</option>
-
-                <option>UTC</option>
+              <select
+                name="timezone"
+                value={formData.timezone}
+                onChange={handleChange}
+                className="w-full h-14 rounded-xl border border-gray-300 px-4"
+              >
+                <option value="Asia/Kolkata">Asia/Kolkata</option>
+                <option value="UTC">UTC</option>
               </select>
             </div>
 
             <div>
               <label className="block mb-3 font-semibold">Language</label>
 
-              <select className="w-full h-14 rounded-xl border border-gray-300 px-4">
-                <option>English</option>
-
-                <option>Hindi</option>
-
-                <option>Kannada</option>
+              <select
+                name="defaultLanguage"
+                value={formData.defaultLanguage}
+                onChange={handleChange}
+                className="w-full h-14 rounded-xl border border-gray-300 px-4"
+              >
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="kn">Kannada</option>
               </select>
             </div>
           </div>
@@ -659,24 +842,36 @@ const RestaurantProfile = () => {
           <div className="grid md:grid-cols-2 gap-8">
             <input
               type="url"
+              name="facebookUrl"
+              value={formData.facebookUrl}
+              onChange={handleChange}
               placeholder="Facebook URL"
               className="h-14 rounded-xl border border-gray-300 px-4"
             />
 
             <input
               type="url"
+              name="instagramUrl"
+              value={formData.instagramUrl}
+              onChange={handleChange}
               placeholder="Instagram URL"
               className="h-14 rounded-xl border border-gray-300 px-4"
             />
 
             <input
               type="url"
+              name="googleBusinessUrl"
+              value={formData.googleBusinessUrl}
+              onChange={handleChange}
               placeholder="Google Business Profile"
               className="h-14 rounded-xl border border-gray-300 px-4"
             />
 
             <input
               type="url"
+              name="googleMapsUrl"
+              value={formData.googleMapsUrl}
+              onChange={handleChange}
               placeholder="Google Maps URL"
               className="h-14 rounded-xl border border-gray-300 px-4"
             />
@@ -687,8 +882,22 @@ const RestaurantProfile = () => {
             SAVE
         ====================================== */}
 
+        {error && (
+          <div className="mt-8 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+            {error}
+          </div>
+        )}
+        {notice && (
+          <div className="mt-8 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800">
+            {notice}
+          </div>
+        )}
+
         <div className="flex justify-end gap-4 mt-10 mb-10">
           <button
+            type="button"
+            onClick={handleReset}
+            disabled={saving || loading}
             className="
               h-14
               px-8
@@ -697,12 +906,16 @@ const RestaurantProfile = () => {
               border-gray-300
               hover:bg-gray-100
               font-semibold
+              disabled:opacity-50
             "
           >
             Reset
           </button>
 
           <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || loading}
             className="
               h-14
               px-10
@@ -714,10 +927,11 @@ const RestaurantProfile = () => {
               flex
               items-center
               gap-3
+              disabled:opacity-60
             "
           >
             <FiSave />
-            Save Restaurant Profile
+            {saving ? "Saving…" : "Save Restaurant Profile"}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@
 // appears in its own column on the right once payment completes, instead
 // of replacing the billing panel or taking over the whole page.
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 import { WifiOff } from "lucide-react";
 import InvoiceView from "./InvoiceView";
@@ -410,9 +411,19 @@ export default function Billings() {
       {/* ============ Active Orders (left) ============ */}
       <div className="flex w-72 min-h-[500px] shrink-0 flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
         <div className="shrink-0 border-b border-[#E7EAE1] dark:border-[#262B24] px-4 py-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-[#1F2937] dark:text-white">
-            Active Orders
-          </h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-[#1F2937] dark:text-white">
+              Active Orders
+            </h2>
+            {/* This list only ever shows orders still awaiting payment, so
+                there was no way to reach a bill once it was settled. */}
+            <Link
+              to="/billing/history"
+              className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] px-2.5 py-1 text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+            >
+              History
+            </Link>
+          </div>
           {isOffline && (
             <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
               <WifiOff className="h-3.5 w-3.5" />

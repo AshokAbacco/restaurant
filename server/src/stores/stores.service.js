@@ -47,6 +47,8 @@ export const updateOutlet = async (id, data, organizationId) => {
       address: data.address || null,
       phone: data.phone || null,
       gstin: data.gstin || null,
+      fssai: data.fssai || null,
+      tagline: data.tagline || null,
       // Without this, deleteOutlet's soft-delete (isActive: false) was a
       // one-way door: getAllOutlets returns inactive outlets too, so a
       // deactivated branch stayed visible in the Branches list forever with

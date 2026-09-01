@@ -604,9 +604,66 @@ model Outlet {
   address         String?
   phone           String?
   gstin           String?
+  // Printed on the invoice header. FSSAI licence number is legally required
+  // on restaurant bills in India; tagline is the line under the name
+  // ("Authentic Multi-Cuisine Fine Dining"). Both optional — the invoice
+  // simply omits the row when they're not set.
+  fssai           String?
+  tagline         String?
   timezone        String? @default("Asia/Kolkata")
   defaultLanguage String? @default("en")
   isActive        Boolean @default(true)
+
+  // ── Restaurant profile (Settings -> Restaurant Profile) ────────────────
+  // These back the profile form, which previously had nowhere to save to —
+  // it was a pure mockup with no handler and no matching columns. All
+  // nullable: an outlet created before this, or one that never fills the
+  // form in, is completely unaffected.
+  legalBusinessName String?
+  restaurantType    String? // Restaurant, Cafe, Bar, Cloud Kitchen...
+  description       String?
+  logoUrl           String?
+  bannerUrl         String?
+
+  // Statutory identifiers other than gstin/fssai above
+  panNumber          String?
+  registrationNumber String?
+
+  // Address broken out. `address` above stays the single-line form used on
+  // the invoice header and is kept in sync by the profile form.
+  city    String?
+  state   String?
+  pincode String?
+  country String? @default("India")
+
+  // "HH:mm" strings rather than DateTime — these are wall-clock opening
+  // hours, not instants, and storing them as DateTime would drag timezone
+  // conversion into something that should just print as typed.
+  openingTime String?
+  closingTime String?
+
+  email           String?
+  website         String?
+  whatsapp        String?
+  alternateMobile String?
+
+  currency String? @default("INR")
+
+  facebookUrl       String?
+  instagramUrl      String?
+  googleBusinessUrl String?
+  googleMapsUrl     String?
+
+  // ── Bill QR / barcode (Settings -> QR Settings) ───────────────────────
+  // upiId is the VPA the payment QR is built from ("royalspice@ybl"). The QR
+  // itself is never stored — it's a deterministic render of a `upi://pay`
+  // string built per-bill from this VPA plus that bill's amount and
+  // reference, so storing an image would only go stale.
+  upiId           String?
+  upiPayeeName    String? // shown in the payer's UPI app; defaults to the outlet name
+  showBillQr      Boolean @default(true)
+  showBillBarcode Boolean @default(true)
+  billFooterNote  String? // e.g. "Thank you! Free Wi-Fi: RoyalSpiceGuest"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1097,6 +1154,8 @@ model Employee {
   // which is the right default for owners, managers and single-kitchen sites.
   kitchenBranchId String?
   kitchenBranch   KitchenBranch? @relation(fields: [kitchenBranchId], references: [id])
+
+  invoicesBilled Invoice[] @relation("InvoicesByCashier")
 
   address            EmployeeAddress?
   userAccount        UserAccount?
@@ -2073,6 +2132,17 @@ model Invoice {
   gstNumber     String?
   sentVia       String? // print / email / whatsapp — comma-separated or JSON if multiple
   pdfUrl        String?
+
+  // Who actually took the payment and closed the bill. Comes from the
+  // authenticated session at billing time (completeBilling's performedById),
+  // never from the client, so it's a real audit trail rather than a label.
+  //
+  // Recorded on the INVOICE rather than the Order because it answers "who
+  // billed this", which is a different question from Order.waiterId ("who
+  // served this table") — the same order is routinely served by one person
+  // and billed by another.
+  cashierId String?
+  cashier   Employee? @relation("InvoicesByCashier", fields: [cashierId], references: [id])
 
   createdAt DateTime @default(now())
 

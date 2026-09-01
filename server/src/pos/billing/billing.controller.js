@@ -28,3 +28,22 @@ export async function completeBilling(req, res) {
     res.status(400).json({ message: "Failed to complete billing", error: err.message });
   }
 }
+
+export async function getBillHistory(req, res) {
+  try {
+    const history = await billingService.listBillHistory(
+      {
+        from: req.query.from,
+        to: req.query.to,
+        search: req.query.search,
+        limit: req.query.limit,
+      },
+      req.tenant.outletId,
+    );
+    res.json(history);
+  } catch (err) {
+    res
+      .status(400)
+      .json({ message: "Failed to fetch bill history", error: err.message });
+  }
+}

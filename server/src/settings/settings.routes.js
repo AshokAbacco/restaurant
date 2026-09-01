@@ -9,6 +9,9 @@ import * as settingsController from "./settings.controller.js";
 
 const router = Router();
 
+router.get("/restaurant-profile", settingsController.getRestaurantProfile);
+router.put("/restaurant-profile", settingsController.updateRestaurantProfile);
+
 router.get("/order-status-labels", settingsController.getOrderStatusLabels);
 router.put(
   "/order-status-labels/:systemStatus",

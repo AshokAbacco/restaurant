@@ -33,6 +33,12 @@ const POLL_INTERVAL_MS = 8000;
 // next (waiting for pickup), Served last (already done, lowest urgency).
 // NEW/ACCEPTED/PREPARING all count as "Pending" here since the simplified
 // workflow only exposes Pending -> Ready -> Served as visible stages.
+// Matches UNASSIGNED_KITCHEN in server/src/pos/kot/kot.service.js. Selects
+// tickets with NO kitchen — orders placed before Kitchen Branches existed, or
+// by a device that skipped the picker. Without this tab those tickets would
+// only be reachable from "All Kitchens" now that branch matching is strict.
+const UNASSIGNED_KITCHEN = "UNASSIGNED";
+
 const DISPLAY_RANK = { NEW: 0, ACCEPTED: 0, PREPARING: 0, READY: 1, SERVED: 2 };
 
 // True lifecycle order, used to pick a group's status. Distinct from
@@ -459,6 +465,20 @@ export default function KitchenDisplayScreen() {
               {k.name}
             </button>
           ))}
+          {/* Tickets with no kitchen assigned. Every order placed before
+              Kitchen Branches existed lands here, so this is where the
+              kitchen goes looking for work that wasn't routed. */}
+          <button
+            onClick={() => setActiveKitchenBranchId(UNASSIGNED_KITCHEN)}
+            title="Orders that were never routed to a specific kitchen"
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              activeKitchenBranchId === UNASSIGNED_KITCHEN
+                ? "bg-[#1F2937] text-white dark:bg-white dark:text-[#12160F]"
+                : "bg-white dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
+            }`}
+          >
+            Unassigned
+          </button>
         </div>
       )}
 
@@ -496,9 +516,20 @@ export default function KitchenDisplayScreen() {
             Loading tickets…
           </p>
         ) : visibleTickets.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-[#9CA3AF] dark:text-[#6B7280]">
-              No active tickets. All caught up.
+          <div className="flex h-full items-center justify-center px-6">
+            <p className="text-center text-[#9CA3AF] dark:text-[#6B7280]">
+              {activeKitchenBranchId === UNASSIGNED_KITCHEN
+                ? "No unrouted tickets — every active order has been sent to a specific kitchen."
+                : activeKitchenBranchId !== "ALL"
+                  ? // Naming the kitchen matters: otherwise an empty screen is
+                    // ambiguous between "this kitchen is caught up" and "the
+                    // filter is broken", which is exactly the confusion the
+                    // old non-strict matching caused.
+                    `No active tickets for ${
+                      kitchenBranches.find((k) => k.id === activeKitchenBranchId)
+                        ?.name || "this kitchen"
+                    }. Check All Kitchens or Unassigned for unrouted orders.`
+                  : "No active tickets. All caught up."}
             </p>
           </div>
         ) : (
