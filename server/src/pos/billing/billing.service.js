@@ -43,6 +43,31 @@ export async function getBillingSummary(orderId, outletId) {
       table: true,
       customer: true,
       waiter: { select: { fullName: true, employeeCode: true } },
+      // Restaurant header for the printed bill — same fields the invoice
+      // itself pulls, so the preview in the modal and the final invoice
+      // can't drift apart.
+      outlet: {
+        select: {
+          name: true,
+          address: true,
+          phone: true,
+          gstin: true,
+          fssai: true,
+          tagline: true,
+          // Bill QR / barcode settings — the invoice renders the codes from
+          // these, so they have to travel with the bill.
+          upiId: true,
+          upiPayeeName: true,
+          showBillQr: true,
+          showBillBarcode: true,
+          billFooterNote: true,
+        },
+      },
+      kitchenOrders: {
+        select: { kotNumber: true },
+        orderBy: { kotNumber: "asc" },
+      },
+      kitchenBranch: { select: { name: true } },
       items: {
         include: { menuItem: true, addOns: { include: { addOn: true } } },
       },
@@ -82,6 +107,13 @@ export async function getBillingSummary(orderId, outletId) {
       ? { name: order.customer.name, mobile: order.customer.mobile }
       : null,
     waiter: order.waiter ? order.waiter.fullName : null,
+    outlet: order.outlet || null,
+    // KOT numbers the kitchen actually worked from — one per kitchen section,
+    // so a multi-station order legitimately has several.
+    kotNumbers: (order.kitchenOrders || []).map((k) => k.kotNumber),
+    kitchenBranch: order.kitchenBranch?.name || null,
+    // "Covers" on a restaurant bill = number of diners, not number of items.
+    covers: order.numberOfGuests || null,
     items: order.items.map(toInvoiceLine),
     subtotal,
     cgst,
@@ -238,7 +270,14 @@ export async function completeBilling(
     outletId,
   );
 
-  await invoicesService.generateInvoice(orderId, {}, outletId);
+  // performedById is the authenticated employee completing the bill — the
+  // same value already used for the cash-drawer SALE above. Recording it on
+  // the invoice is what puts a real cashier name on the printed bill.
+  await invoicesService.generateInvoice(
+    orderId,
+    { cashierId: performedById },
+    outletId,
+  );
   const fullInvoice = await invoicesService.getInvoiceByOrder(orderId, outletId);
 
   return {
@@ -247,4 +286,96 @@ export async function completeBilling(
     invoice: fullInvoice,
     duePayment,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BILL HISTORY
+//
+// Every bill raised in a date range, with what was charged, what was
+// collected and what's still outstanding — the reprint/reconciliation list.
+//
+// Driven off Invoice rather than Order because an invoice is the definition
+// of "a bill was raised": an order that was cancelled, or is still open on a
+// table, has no invoice and correctly doesn't appear here.
+// ─────────────────────────────────────────────────────────────────────────
+export async function listBillHistory(
+  { from, to, search, limit = 200 } = {},
+  outletId,
+) {
+  // Default to today. `to` is treated as INCLUSIVE of the whole day — a
+  // cashier picking 31/08 to 31/08 means "everything today", not "up to
+  // midnight", which would return nothing.
+  const start = from ? new Date(from) : new Date(new Date().setHours(0, 0, 0, 0));
+  const end = to ? new Date(to) : new Date();
+  if (to) end.setHours(23, 59, 59, 999);
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      outletId,
+      createdAt: { gte: start, lte: end },
+      ...(search
+        ? {
+            OR: [
+              { invoiceNumber: { contains: search, mode: "insensitive" } },
+              { order: { orderNumber: { contains: search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      cashier: { select: { fullName: true } },
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          orderType: true,
+          status: true,
+          grandTotal: true,
+          table: { select: { name: true } },
+          payments: { select: { method: true, amount: true, status: true } },
+          kitchenOrders: {
+            select: { kotNumber: true },
+            orderBy: { kotNumber: "asc" },
+            take: 1, // the bill quotes one reference; see InvoiceView
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(Number(limit) || 200, 500),
+  });
+
+  return invoices.map((inv) => {
+    const grandTotal = Number(inv.order?.grandTotal || 0);
+    const paid = (inv.order?.payments || [])
+      .filter((p) => p.status === "PAID")
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+
+    return {
+      invoiceId: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      createdAt: inv.createdAt,
+      orderId: inv.order?.id || null,
+      orderNumber: inv.order?.orderNumber || null,
+      kotNumber: inv.order?.kitchenOrders?.[0]?.kotNumber || null,
+      orderType: inv.order?.orderType || null,
+      tableName: inv.order?.table?.name || null,
+      status: inv.order?.status || null,
+      cashier: inv.cashier?.fullName || null,
+      grandTotal,
+      paid: Math.round(paid * 100) / 100,
+      // Never negative: an overpayment shouldn't render as a negative balance
+      // in a column staff read as "still to collect".
+      balance: Math.max(Math.round((grandTotal - paid) * 100) / 100, 0),
+      // De-duplicated, so a split of two cash payments reads "Cash" not
+      // "Cash, Cash".
+      paymentMethods: [
+        ...new Set(
+          (inv.order?.payments || [])
+            .filter((p) => p.status === "PAID")
+            .map((p) => p.method),
+        ),
+      ],
+    };
+  });
 }

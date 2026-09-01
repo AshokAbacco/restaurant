@@ -229,10 +229,16 @@ export async function listKotsForOrder(orderId, outletId) {
 
 // Kitchen display screen — everything not finished, oldest first.
 // Pass kitchenSectionId to scope this to one station's screen (grill, dessert, etc.).
-// kitchenBranchId narrows the display to ONE physical kitchen. Tickets with a
-// null kitchenBranchId are always included: they're either pre-feature tickets
-// or from a single-kitchen outlet, and hiding them would make live orders
-// silently disappear from every screen.
+// kitchenBranchId narrows the display to ONE physical kitchen — STRICTLY.
+//
+// This used to also include tickets with a null kitchenBranchId on every
+// kitchen tab, so nothing placed before the feature existed could get lost.
+// In practice that made the tabs look broken: every legacy ticket showed up
+// under Ground Floor AND First Floor, so switching tabs appeared to change
+// nothing. A kitchen tab now shows only that kitchen's work.
+//
+// Unrouted tickets aren't lost — they're reachable through the dedicated
+// "UNASSIGNED" filter, which the Kitchen Display renders as its own tab.
 // Returns the physical kitchen an employee is pinned to, or null if they can
 // see every kitchen. Only KITCHEN/CHEF staff are ever pinned in practice, but
 // the lookup is role-agnostic: whoever has an Employee.kitchenBranchId set is
@@ -246,6 +252,22 @@ export async function getEmployeeKitchenBranchId(employeeId, outletId) {
   return employee?.kitchenBranchId || null;
 }
 
+// Sentinel for the "Unassigned" tab — tickets with no kitchen at all (placed
+// before Kitchen Branches existed, or by a device that skipped the picker).
+// Can't use null for this, since null already means "no filter, show all".
+export const UNASSIGNED_KITCHEN = "UNASSIGNED";
+
+// kitchenBranchId narrows the display to ONE physical kitchen.
+//
+// FIX: this originally matched `kitchenBranchId = X OR kitchenBranchId IS
+// NULL`, so unrouted tickets couldn't silently vanish. In practice that made
+// the kitchen tabs look broken: every ticket placed before this feature has a
+// null branch, so all of them appeared under every kitchen and switching tabs
+// seemed to do nothing.
+//
+// Matching is strict now. Unrouted tickets aren't lost — they still show on
+// "All Kitchens", and they get their own "Unassigned" tab via the sentinel
+// above so a kitchen can pick up work that was never routed.
 export async function getActiveKitchenDisplay(
   kitchenSectionId,
   outletId,
@@ -256,9 +278,11 @@ export async function getActiveKitchenDisplay(
       outletId,
       status: { notIn: ["COMPLETED", "CANCELLED"] },
       ...(kitchenSectionId ? { kitchenSectionId } : {}),
-      ...(kitchenBranchId
-        ? { OR: [{ kitchenBranchId }, { kitchenBranchId: null }] }
-        : {}),
+      ...(kitchenBranchId === UNASSIGNED_KITCHEN
+        ? { kitchenBranchId: null }
+        : kitchenBranchId
+          ? { kitchenBranchId }
+          : {}),
     },
     include: {
       order: {

@@ -1,11 +1,14 @@
 // src/billing/InvoiceView.jsx
 //
-// Renders a printable invoice once billing has been completed successfully.
+// Thermal-receipt style bill: monospace, narrow, dashed rules, right-aligned
+// amounts — laid out to print correctly on an 80mm roll as well as A4.
+//
 // "Download PDF" reuses the browser's native print dialog (choose "Save as
 // PDF" as the destination) so no extra PDF-generation dependency is needed.
-// "Share" uses the Web Share API where available and falls back to copying
-// a plain-text summary to the clipboard.
+// "Share" uses the Web Share API where available and falls back to copying a
+// plain-text summary to the clipboard.
 import { useState } from "react";
+import BillCodes from "./BillCodes";
 
 const PAYMENT_METHOD_LABEL = {
   CASH: "Cash",
@@ -20,30 +23,115 @@ function lineAddOnTotal(item) {
   return (item.addOns || []).reduce((sum, a) => sum + Number(a.totalPrice), 0);
 }
 
-function formatDateTime(value) {
-  const d = new Date(value);
-  return d.toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
+const money = (n) => `₹${Number(n || 0).toFixed(2)}`;
+
+function formatDate(value) {
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 }
 
+function formatTime(value) {
+  return new Date(value).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// Derives the rate to LABEL a tax/charge row, e.g. "CGST (2.5%)". The stored
+// figures are absolute amounts, not rates — the rate is only ever shown, never
+// used to recompute anything, so a missing/zero subtotal just drops the label
+// rather than printing a wrong percentage.
+function ratePart(amount, base) {
+  if (!base || !amount) return "";
+  const pct = (Number(amount) / Number(base)) * 100;
+  if (!Number.isFinite(pct) || pct <= 0) return "";
+  // Trim 2.50 -> 2.5, 5.00 -> 5
+  return ` (${pct.toFixed(2).replace(/\.?0+$/, "")}%)`;
+}
+
+// A dashed rule matching the receipt's separator lines.
+const Rule = ({ solid = false }) => (
+  <div
+    className={`my-1.5 border-t ${
+      solid
+        ? "border-[#1F2937] dark:border-[#E4E9E2]"
+        : "border-dashed border-[#9CA3AF] dark:border-[#4B5563]"
+    }`}
+  />
+);
+
+const Row = ({ label, value, bold = false, muted = false }) => (
+  <div
+    className={`flex justify-between gap-3 ${
+      bold ? "font-bold" : ""
+    } ${muted ? "text-[#6B7280] dark:text-[#9CA8A0]" : ""}`}
+  >
+    <span>{label}</span>
+    <span className="whitespace-nowrap tabular-nums">{value}</span>
+  </div>
+);
+
 export default function InvoiceView({ invoice, summary, payments, onDone }) {
   const [copied, setCopied] = useState(false);
+
   const order = invoice.order;
   const items = order.items || [];
+
+  // The outlet is what carries the restaurant's own identity. Prefer the
+  // invoice's copy (it's the record of what was actually billed); fall back to
+  // the summary so the modal preview looks identical before the invoice
+  // exists.
+  const outlet = invoice.outlet || summary?.outlet || {};
+
   const subtotal = Number(order.subtotal);
   const gstAmount = Number(order.gstAmount);
   const cgst = summary?.cgst ?? gstAmount / 2;
   const sgst = summary?.sgst ?? gstAmount / 2;
-  const discountAmount = Number(order.discountAmount);
+  const serviceCharge = Number(
+    order.serviceChargeAmount ?? summary?.serviceChargeAmount ?? 0,
+  );
+  const discountAmount = Number(order.discountAmount || 0);
   const grandTotal = Number(order.grandTotal);
 
-  const paymentSummary = (payments || order.payments || [])
-    .map(
-      (p) =>
-        `${PAYMENT_METHOD_LABEL[p.method] || p.method} ₹${Number(p.amount).toFixed(2)}`,
-    )
+  // Items: 5 (Qty: 10) — distinct lines vs total units, as on the reference
+  // bill. These are different numbers and both matter to a cashier checking
+  // a bill against a tray.
+  const lineCount = items.length;
+  const totalQty = items.reduce((sum, i) => sum + Number(i.quantity || 0), 0);
+
+  // An order genuinely produces one KitchenOrder PER kitchen section, so a
+  // dish-plus-drink order really does have two or three ticket numbers. The
+  // bill shows only the first (lowest, since they're fetched ascending) —
+  // that's the reference staff quote when pulling up an order, and printing
+  // a comma-separated list of three made the line hard to read.
+  //
+  // The full set is still on the order if it's ever needed for a dispute.
+  const kotNumbers = order.kitchenOrders?.length
+    ? order.kitchenOrders.map((k) => k.kotNumber)
+    : summary?.kotNumbers || [];
+  const primaryKot = kotNumbers[0] || null;
+
+  const steward = order.waiter?.fullName || summary?.waiter || null;
+  // Who closed the bill. Recorded on the invoice at billing time from the
+  // authenticated session (Invoice.cashierId), so it's the real person, not
+  // whoever happens to be looking at the screen now. Distinct from the
+  // steward above — the same order is routinely served by one person and
+  // billed by another.
+  // Resolved server-side from the outlet's CASHIER-role account — see
+  // resolveCashierName in invoices.service.js. `cashier` is the raw employee
+  // who closed the bill, kept only as a fallback for an older payload.
+  const cashierName =
+    invoice.cashierName || invoice.cashier?.fullName || summary?.cashier || null;
+  const covers = order.numberOfGuests ?? summary?.covers ?? null;
+  const tableName = order.table?.name || null;
+  const tableSection = order.table?.section || null;
+
+  const paymentList = payments || order.payments || [];
+  const paymentSummary = paymentList
+    .map((p) => `${PAYMENT_METHOD_LABEL[p.method] || p.method} ${money(p.amount)}`)
     .join(", ");
 
   function handlePrint() {
@@ -52,10 +140,11 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
 
   async function handleShare() {
     const text = [
-      `Invoice ${invoice.invoiceNumber}`,
-      order.table?.name ? `Table: ${order.table.name}` : null,
+      outlet.name,
+      `Bill ${invoice.invoiceNumber}`,
+      tableName ? `Table: ${tableName}` : null,
       order.customer?.name ? `Customer: ${order.customer.name}` : null,
-      `Grand Total: ₹${grandTotal.toFixed(2)}`,
+      `Net Payable: ${money(grandTotal)}`,
       `Payment: ${paymentSummary || "Paid"}`,
     ]
       .filter(Boolean)
@@ -63,10 +152,7 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
 
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `Invoice ${invoice.invoiceNumber}`,
-          text,
-        });
+        await navigator.share({ title: `Bill ${invoice.invoiceNumber}`, text });
       } catch {
         // user cancelled the share sheet — nothing to do
       }
@@ -78,133 +164,215 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="invoice-print-area flex-1 overflow-y-auto px-6 py-5">
-        <div className="mb-5 flex items-start justify-between">
-          <div>
-            <h3 className="text-xl font-bold text-[#1F2937] dark:text-white">
-              Invoice
+    // min-h-0 + flex-1 matter when this is nested inside another flex column
+    // (the reprint modal in BillHistory.jsx). Without them this root keeps
+    // flex's default min-height:auto, refuses to shrink below the receipt's
+    // full height, and spills straight out of its container — the receipt
+    // overflowed the modal, the barcode and QR were clipped, and the footer
+    // buttons ended up off-screen with nothing scrollable to reach them.
+    // Harmless when rendered standalone, where there's no flex parent to
+    // stretch against.
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      {/* overflow-y-auto is also what zeroes this child's automatic minimum
+          size, which is what actually lets it scroll rather than grow. */}
+      <div className="min-h-0 flex-1 overflow-y-auto bg-[#F3F5EE] dark:bg-[#12160F] px-4 py-5">
+        {/* Fixed narrow column so the on-screen bill matches the proportions
+            of the paper it prints on. */}
+        <div className="invoice-print-area mx-auto w-full max-w-[380px] bg-white dark:bg-[#171C17] p-5 font-mono text-[11px] leading-relaxed text-[#1F2937] dark:text-[#E4E9E2] shadow-sm">
+          {/* ============ HEADER ============ */}
+          <div className="text-center">
+            <h3 className="text-[15px] font-bold uppercase tracking-wide">
+              {outlet.name || "Restaurant"}
             </h3>
-            <p className="font-mono text-sm font-semibold text-[#3FA34D] dark:text-[#43B75A]">
-              {invoice.invoiceNumber}
-            </p>
+            {outlet.tagline && (
+              <p className="mt-0.5 text-[10px]">{outlet.tagline}</p>
+            )}
+            {outlet.address && (
+              <p className="mt-0.5 text-[10px]">{outlet.address}</p>
+            )}
+            {outlet.phone && (
+              <p className="mt-0.5 text-[10px]">Ph: {outlet.phone}</p>
+            )}
+            {(outlet.gstin || outlet.fssai) && (
+              <p className="mt-0.5 text-[10px] font-semibold">
+                {outlet.gstin ? `GSTIN: ${outlet.gstin}` : ""}
+                {outlet.gstin && outlet.fssai ? " | " : ""}
+                {outlet.fssai ? `FSSAI: ${outlet.fssai}` : ""}
+              </p>
+            )}
           </div>
-          <div className="text-right text-xs text-[#6B7280] dark:text-[#9CA8A0]">
-            <p>{formatDateTime(invoice.createdAt || Date.now())}</p>
-            <p className="mt-0.5 font-medium text-[#3FA34D] dark:text-[#43B75A]">
-              PAID
-            </p>
-          </div>
-        </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-white/5 p-3 text-sm">
-          <div>
-            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">Table</p>
-            <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-              {order.table?.name || "—"}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
-              Customer
-            </p>
-            <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-              {order.customer?.name || "Walk-in"}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
-              Order No.
-            </p>
-            <p className="font-mono text-xs font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-              {order.orderNumber}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
-              Order Type
-            </p>
-            <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-              {order.orderType?.replace("_", " ")}
-            </p>
-          </div>
-        </div>
+          <Rule solid />
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[#E7EAE1] dark:border-[#262B24] text-left text-xs uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
-              <th className="py-1.5">Item</th>
-              <th className="py-1.5 text-center">Qty</th>
-              <th className="py-1.5 text-right">Price</th>
-              <th className="py-1.5 text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
+          {/* ============ BILL META ============ */}
+          {/* Meta rows.
+              Built as a flat ORDERED list and flowed into two columns rather
+              than hand-placed pairs. That's what stops blank cells appearing:
+              any entry that doesn't apply (no table on a delivery, no steward,
+              no cashier on an older bill) is dropped from the list, and
+              everything after it shifts up to fill the space. Even indices sit
+              left, odd indices right. */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 font-semibold">
+            {[
+              `Bill: ${invoice.invoiceNumber}`,
+              tableName
+                ? `Table ${tableName}${tableSection ? ` (${tableSection})` : ""}`
+                : order.orderType?.replace("_", " "),
+              cashierName ? `Cashier: ${cashierName}` : null,
+              `Time: ${formatTime(invoice.createdAt || Date.now())}`,
+              `Order: ${order.orderNumber}`,
+              `Date: ${formatDate(invoice.createdAt || Date.now())}`,
+              steward ? `Steward: ${steward}` : null,
+              covers ? `Covers: ${covers} Pax` : null,
+              order.customer?.name ? `Customer: ${order.customer.name}` : null,
+            ]
+              .filter(Boolean)
+              .map((entry, i) => (
+                <span key={entry} className={i % 2 ? "text-right" : ""}>
+                  {entry}
+                </span>
+              ))}
+
+            {/* KOT numbers run full width — a multi-station order can carry
+                several and they'd wrap badly in half a line. */}
+            {primaryKot && (
+              <span className="col-span-2">KOT: {primaryKot}</span>
+            )}
+          </div>
+
+          <Rule solid />
+
+          {/* ============ ITEMS ============ */}
+          <div className="flex justify-between font-bold uppercase">
+            <span className="flex-1">Item</span>
+            <span className="w-10 text-center">Qty</span>
+            <span className="w-20 text-right">Amount</span>
+          </div>
+
+          <Rule />
+
+          <div className="space-y-1">
             {items.map((item) => {
               const addOnTotal = lineAddOnTotal(item);
               return (
-                <tr
-                  key={item.id}
-                  className="border-b border-[#E7EAE1] dark:border-[#262B24]"
-                >
-                  <td className="py-1.5 pr-2">
-                    <p className="font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                <div key={item.id}>
+                  <div className="flex justify-between gap-1">
+                    <span className="flex-1 font-semibold">
                       {item.menuItem?.name || item.name}
-                    </p>
-                    {(item.addOns || []).map((a, idx) => (
-                      <p
-                        key={idx}
-                        className="text-xs text-[#9CA3AF] dark:text-[#6B7280]"
-                      >
-                        + {a.addOn?.name || a.name} × {a.quantity}
-                      </p>
-                    ))}
-                  </td>
-                  <td className="py-1.5 text-center font-mono text-[#6B7280] dark:text-[#9CA8A0]">
-                    {item.quantity}
-                  </td>
-                  <td className="py-1.5 text-right font-mono text-[#6B7280] dark:text-[#9CA8A0]">
-                    ₹{Number(item.unitPrice).toFixed(2)}
-                  </td>
-                  <td className="py-1.5 text-right font-mono font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-                    ₹{(Number(item.totalPrice) + addOnTotal).toFixed(2)}
-                  </td>
-                </tr>
+                    </span>
+                    <span className="w-10 text-center tabular-nums">
+                      {item.quantity}
+                    </span>
+                    <span className="w-20 text-right font-semibold tabular-nums">
+                      {money(Number(item.totalPrice) + addOnTotal)}
+                    </span>
+                  </div>
+                  {(item.addOns || []).map((a, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between gap-1 text-[10px] text-[#6B7280] dark:text-[#9CA8A0]"
+                    >
+                      <span className="flex-1 pl-2">
+                        + {a.addOn?.name || a.name}
+                      </span>
+                      <span className="w-10 text-center tabular-nums">
+                        {a.quantity}
+                      </span>
+                      <span className="w-20 text-right tabular-nums">
+                        {money(a.totalPrice)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               );
             })}
-          </tbody>
-        </table>
+          </div>
 
-        <div className="mt-4 space-y-1 border-t border-dashed border-[#D5DAD0] dark:border-[#2E342C] pt-3 font-mono text-sm text-[#6B7280] dark:text-[#9CA8A0]">
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span>₹{subtotal.toFixed(2)}</span>
+          <Rule solid />
+
+          {/* ============ TOTALS ============ */}
+          <div className="space-y-0.5">
+            <Row
+              label={`Items: ${lineCount} (Qty: ${totalQty})`}
+              value={`Subtotal: ${money(subtotal)}`}
+            />
+
+            {serviceCharge > 0 && (
+              <Row
+                label={`Service Charge${ratePart(serviceCharge, subtotal)}:`}
+                value={`+ ${money(serviceCharge)}`}
+              />
+            )}
+
+            {/* Single combined row, matching the reference bill. CGST and SGST
+                are always equal halves of the same GST amount here, so
+                splitting them across two lines just adds noise. */}
+            {gstAmount > 0 && (
+              <Row
+                label={`CGST${ratePart(cgst, subtotal)} + SGST${ratePart(sgst, subtotal)}:`}
+                value={`+ ${money(gstAmount)}`}
+              />
+            )}
+
+            {discountAmount > 0 && (
+              <Row
+                label="Discount:"
+                value={`− ${money(discountAmount)}`}
+              />
+            )}
           </div>
-          <div className="flex justify-between">
-            <span>CGST</span>
-            <span>₹{cgst.toFixed(2)}</span>
+
+          <Rule solid />
+
+          <div className="flex justify-between text-[14px] font-bold uppercase">
+            <span>Net Payable</span>
+            <span className="tabular-nums">{money(grandTotal)}</span>
           </div>
-          <div className="flex justify-between">
-            <span>SGST</span>
-            <span>₹{sgst.toFixed(2)}</span>
-          </div>
-          {discountAmount > 0 && (
-            <div className="flex justify-between text-[#3FA34D] dark:text-[#43B75A]">
-              <span>Discount</span>
-              <span>−₹{discountAmount.toFixed(2)}</span>
-            </div>
+
+          <Rule solid />
+
+          {/* ============ PAYMENT ============ */}
+          {paymentList.length > 0 && (
+            <>
+              <div className="space-y-0.5">
+                {paymentList.map((p, idx) => (
+                  <Row
+                    key={p.id || idx}
+                    label={PAYMENT_METHOD_LABEL[p.method] || p.method}
+                    value={money(p.amount)}
+                  />
+                ))}
+              </div>
+              <Rule />
+            </>
           )}
-          <div className="flex justify-between border-t border-[#E7EAE1] dark:border-[#262B24] pt-1.5 text-base font-bold text-[#1F2937] dark:text-white">
-            <span>Grand Total</span>
-            <span>₹{grandTotal.toFixed(2)}</span>
-          </div>
-        </div>
 
-        <div className="mt-3 rounded-lg bg-[#EAF6EC] dark:bg-[#43B75A]/10 px-3 py-2 text-xs font-medium text-[#2F7D3A] dark:text-[#43B75A]">
-          Payment received: {paymentSummary || "—"}
+          <p className="text-center text-[10px] font-semibold uppercase">
+            Paid
+          </p>
+          <p className="mt-2 text-center text-[10px]">
+            Thank you for dining with us!
+          </p>
+
+          {/* Barcode (the bill reference, for staff lookup) and the UPI
+              payment QR. Both are generated from this bill's own data, so
+              the QR always carries the correct amount — see BillCodes.jsx. */}
+          <BillCodes
+            className="mt-3"
+            outlet={outlet}
+            reference={invoice.invoiceNumber}
+            tableName={tableName}
+            amount={grandTotal}
+          />
+          {order.kitchenBranch?.name && (
+            <p className="mt-1 text-center text-[9px] text-[#9CA3AF] dark:text-[#6B7280]">
+              Prepared at {order.kitchenBranch.name}
+            </p>
+          )}
         </div>
       </div>
 
+      {/* ============ ACTIONS (never printed) ============ */}
       <div className="flex items-center justify-between gap-2 border-t border-[#E7EAE1] dark:border-[#262B24] px-6 py-4 print:hidden">
         <div className="flex gap-2">
           <button
@@ -243,15 +411,22 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
             top: 0;
             left: 0;
             width: 100%;
+            max-width: none;
+            padding: 0;
+            box-shadow: none;
           }
-          /* Paper is always white — force legible ink regardless of
-             whether the app is in light or dark mode on screen. */
+          /* Paper is always white — force legible ink regardless of whether
+             the app is in light or dark mode on screen. */
           .invoice-print-area, .invoice-print-area * {
             background: #fff !important;
-            color: #111 !important;
-            border-color: #ddd !important;
+            color: #000 !important;
+            border-color: #000 !important;
           }
         }
+        /* 80mm thermal roll. Without an explicit page size the browser
+           defaults to A4 and the receipt prints as a narrow strip in the
+           corner of a mostly-empty sheet. */
+        @page { size: 80mm auto; margin: 4mm; }
       `}</style>
     </div>
   );

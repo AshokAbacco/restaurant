@@ -245,6 +245,21 @@ export const getAddOns = () => request(`/pos/add-ons?isEnabled=true`);
 
 // Read-only bill preview for the Billing & Payment modal: items, subtotal,
 // CGST/SGST, discount, grand total, and anything already paid so far.
+// Every bill raised in a date range — the reconciliation / reprint list.
+export const getBillHistory = (params = {}) => {
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== "" && v != null),
+  ).toString();
+  return request(`/pos/billing/history${qs ? `?${qs}` : ""}`);
+};
+
+// Fetches a previously generated invoice so it can be reprinted. Reuses the
+// existing invoices route rather than duplicating the payload on the history
+// endpoint — the list stays light, and the full bill is only pulled when
+// someone actually clicks Print.
+export const getInvoiceForOrder = (orderId) =>
+  request(`/pos/invoices/orders/${orderId}`);
+
 export const getBillingSummary = (orderId) =>
   request(`/pos/billing/orders/${orderId}/summary`);
 

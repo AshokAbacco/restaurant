@@ -42,6 +42,8 @@ const EMPTY_FORM = {
   address: "",
   phone: "",
   gstin: "",
+  fssai: "",
+  tagline: "",
 };
 
 // GSTIN is 15 chars: 2 state digits, 10-char PAN, entity digit, 'Z', checksum.
@@ -96,6 +98,8 @@ const BranchesSettings = () => {
       address: branch.address || "",
       phone: branch.phone || "",
       gstin: branch.gstin || "",
+      fssai: branch.fssai || "",
+      tagline: branch.tagline || "",
     });
     setFormError("");
     setNotice("");
@@ -139,6 +143,8 @@ const BranchesSettings = () => {
           address: form.address.trim() || null,
           phone: form.phone.trim() || null,
           gstin: gstin || null,
+          fssai: form.fssai.trim() || null,
+          tagline: form.tagline.trim() || null,
         }),
       },
     );
@@ -179,6 +185,8 @@ const BranchesSettings = () => {
         address: branch.address,
         phone: branch.phone,
         gstin: branch.gstin,
+        fssai: branch.fssai,
+        tagline: branch.tagline,
         isActive: true,
       }),
     });
@@ -756,6 +764,39 @@ const BranchForm = ({
         />
         <p className="mt-1 text-xs text-gray-500">
           Optional. Appears on this branch's invoices.
+        </p>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          FSSAI licence no.
+        </label>
+        <input
+          value={form.fssai}
+          onChange={(e) => setField("fssai", e.target.value)}
+          placeholder="e.g. 11223344005566"
+          maxLength={20}
+          className="h-10 w-full rounded-lg border bg-white px-3 font-mono text-sm"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Printed alongside the GSTIN on the bill header. Legally required on
+          restaurant invoices in India.
+        </p>
+      </div>
+
+      <div className="sm:col-span-2">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Tagline
+        </label>
+        <input
+          value={form.tagline}
+          onChange={(e) => setField("tagline", e.target.value)}
+          placeholder="e.g. Authentic Multi-Cuisine Fine Dining"
+          maxLength={120}
+          className="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Optional line printed under the restaurant name on the bill.
         </p>
       </div>
     </div>

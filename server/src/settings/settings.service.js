@@ -125,3 +125,105 @@ export async function resetOrderStatusLabel(outletId, systemStatus) {
   await prisma.orderStatusLabel.delete({ where: { id: existing.id } });
   return { reset: true, alreadyDefault: false };
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// RESTAURANT PROFILE (Settings -> Restaurant Profile)
+//
+// Reads/writes the CURRENT outlet, resolved from the access token — the
+// client never sends an outlet id, so a user can't edit another branch's
+// profile by guessing one. To edit a different branch, switch to it with
+// the header outlet switcher.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Everything the profile form owns. Anything not on this list is ignored,
+// so a caller can't flip isActive, move the outlet to another organization,
+// or otherwise reach past the form by adding fields to the request body.
+const EDITABLE_PROFILE_FIELDS = [
+  "name",
+  "legalBusinessName",
+  "restaurantType",
+  "tagline",
+  "description",
+  "logoUrl",
+  "bannerUrl",
+  "gstin",
+  "fssai",
+  "panNumber",
+  "registrationNumber",
+  "address",
+  "city",
+  "state",
+  "pincode",
+  "country",
+  "phone",
+  "alternateMobile",
+  "email",
+  "website",
+  "whatsapp",
+  "openingTime",
+  "closingTime",
+  "timezone",
+  "defaultLanguage",
+  "currency",
+  "facebookUrl",
+  "instagramUrl",
+  "googleBusinessUrl",
+  "googleMapsUrl",
+  // Bill QR / barcode
+  "upiId",
+  "upiPayeeName",
+  "showBillQr",
+  "showBillBarcode",
+  "billFooterNote",
+];
+
+const PROFILE_SELECT = Object.fromEntries(
+  ["id", ...EDITABLE_PROFILE_FIELDS].map((f) => [f, true]),
+);
+
+export async function getRestaurantProfile(outletId) {
+  return prisma.outlet.findUnique({
+    where: { id: outletId },
+    select: PROFILE_SELECT,
+  });
+}
+
+// Non-nullable Boolean columns. Kept separate because the string handling
+// below would turn an empty value into null and blow up the update.
+const BOOLEAN_PROFILE_FIELDS = new Set(["showBillQr", "showBillBarcode"]);
+
+export async function updateRestaurantProfile(outletId, payload = {}) {
+  const data = {};
+  for (const field of EDITABLE_PROFILE_FIELDS) {
+    if (payload[field] === undefined) continue;
+
+    if (BOOLEAN_PROFILE_FIELDS.has(field)) {
+      // Accepts a real boolean or the string form a checkbox/form post may
+      // send, and ignores anything else rather than writing null.
+      const raw = payload[field];
+      if (typeof raw === "boolean") data[field] = raw;
+      else if (raw === "true" || raw === "false") data[field] = raw === "true";
+      continue;
+    }
+
+    const value = typeof payload[field] === "string" ? payload[field].trim() : payload[field];
+    // Empty string clears the field rather than storing "". `name` is the
+    // one exception — an outlet must always have a name, so a blank one is
+    // skipped instead of nulling a required column.
+    if (field === "name") {
+      if (value) data.name = value;
+      continue;
+    }
+    data[field] = value === "" ? null : value;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return getRestaurantProfile(outletId);
+  }
+
+  return prisma.outlet.update({
+    where: { id: outletId },
+    data,
+    select: PROFILE_SELECT,
+  });
+}
