@@ -40,6 +40,13 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
   const location = useLocation();
   const menuRef = useRef(null);
+
+  // The logged-in account's outlet/restaurant name (set by the backend on
+  // login / GET /auth/me — see server/src/auth/auth.service.js's
+  // publicUser()). Falls back to the generic product name until a
+  // restaurant name is actually available (e.g. brief moment before the
+  // session finishes restoring, or an account with no outlet yet).
+  const restaurantName = user?.outlet?.name?.trim() || "Restaurant ERP";
   // =====================================================
   // MOBILE DRAWER: lock body scroll + close on Escape
   // =====================================================
@@ -79,6 +86,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
   // =====================================================
   // OWNER MENU
+  // (Manager shares this exact menu — see the role switch below.)
   // =====================================================
 
   const ownerMenu = [
@@ -104,11 +112,11 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       path: "/kitchen",
       icon: <FiCoffee />,
     },
-    //   {
-    //   name: "Kitchen Notes",
-    //   path: "/kitchen/notes",
-    //   icon: <FiFileText />,
-    // },
+      {
+      name: "Kitchen Notes",
+      path: "/kitchen/notes",
+      icon: <FiFileText />,
+    },
 
     {
       name: "Orders",
@@ -116,11 +124,11 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       icon: <FiClipboard />,
     },
 
-    // {
-    //   name: "Tables",
-    //   path: "/tables",
-    //   icon: <FiGrid />,
-    // },
+    {
+      name: "Tables",
+      path: "/tables",
+      icon: <FiGrid />,
+    },
     {
       name: "Tables Reservations",
       path: "/table-reservations",
@@ -181,6 +189,12 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       icon: <FiTrendingUp />,
     },
 
+    {
+      name: "Settings",
+      path: "/settings",
+      icon: <FiSettings />,
+    },
+
     // Opens the self-ordering kiosk screen in a new tab/window. It's a
     // fullscreen customer-facing app (attract screen -> order -> payment
     // -> success loop) with no admin chrome, so it deliberately does NOT
@@ -192,83 +206,6 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       external: true,
     },
 
-    // {
-    //   name: "Settings",
-    //   path: "/settings",
-    //   icon: <FiSettings />,
-    // },
-  ];
-
-  // =====================================================
-  // MANAGER MENU
-  // =====================================================
-
-  const managerMenu = [
-    {
-      name: "Dashboard",
-      path: "/dashboard",
-      icon: <FiHome />,
-    },
-
-    {
-      name: "POS",
-      path: "/pos",
-      icon: <FiShoppingCart />,
-    },
-
-    {
-      name: "Orders",
-      path: "/pos/orders",
-      icon: <FiClipboard />,
-    },
-
-    // {
-    //   name: "Tables",
-    //   path: "/tables",
-    //   icon: <FiGrid />,
-    // },
-
-    {
-      name: "Menu",
-      path: "/menu",
-      icon: <FiCoffee />,
-    },
-
-    {
-      name: "Inventory",
-      path: "/inventory",
-      icon: <FiBox />,
-    },
-
-    {
-      name: "Customers",
-      path: "/customers",
-      icon: <FiUsers />,
-    },
-
-    {
-      name: "Billing",
-      path: "/billing",
-      icon: <FiFileText />,
-    },
-
-    {
-      name: "Kitchen",
-      path: "/kitchen",
-      icon: <FiCoffee />,
-    },
-
-    {
-      name: "Expenses",
-      path: "/expenses",
-      icon: <FiDollarSign />,
-    },
-
-    {
-      name: "Reports",
-      path: "/reports",
-      icon: <FiBarChart2 />,
-    },
   ];
 
   // =====================================================
@@ -289,9 +226,27 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
     },
 
     {
+      name: "Tables",
+      path: "/tables",
+      icon: <TableProperties />,
+    },
+
+    {
+      name: "Kitchen Orders",
+      path: "/kitchen",
+      icon: <FiCoffee />,
+    },
+
+    {
       name: "Orders",
       path: "/pos/orders",
       icon: <FiClipboard />,
+    },
+
+    {
+      name: "Tables Reservations",
+      path: "/table-reservations",
+      icon: <MdOutlineTableRestaurant />,
     },
 
     {
@@ -301,13 +256,7 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
     },
 
     {
-      name: "Customers",
-      path: "/customers",
-      icon: <FiUsers />,
-    },
-
-    {
-      name: "Billing",
+      name: "Billing & Payments",
       path: "/billing",
       icon: <FiFileText />,
     },
@@ -335,9 +284,14 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       icon: <FiShoppingCart />,
     },
     {
-      name: "My Tables",
+      name: "Tables",
       path: "/tables",
       icon: <TableProperties />,
+    },
+    {
+      name: "Kitchen Orders",
+      path: "/kitchen",
+      icon: <FiCoffee />,
     },
     {
       name: "Orders",
@@ -345,19 +299,14 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       icon: <FiClipboard />,
     },
     {
+      name: "Tables Reservations",
+      path: "/table-reservations",
+      icon: <MdOutlineTableRestaurant />,
+    },
+    {
       name: "Menu",
       path: "/menu",
       icon: <FiCoffee />,
-    },
-    {
-      name: "Billing",
-      path: "/billing",
-      icon: <FiFileText />,
-    },
-    {
-      name: "Payments",
-      path: "/payments",
-      icon: <FiCreditCard />,
     },
   ];
 
@@ -367,22 +316,40 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
 
   const kitchenMenu = [
     {
+      name: "Dashboard",
+      path: "/dashboard",
+      icon: <FiHome />,
+    },
+    {
+      name: "POS",
+      path: "/pos",
+      icon: <FiShoppingCart />,
+    },
+    {
       name: "Kitchen Orders",
       path: "/kitchen",
       icon: <FiCoffee />,
     },
-
-    // {
-    //   name: "Kitchen Notes",
-    //   path: "/kitchen/notes",
-    //   icon: <FiFileText />,
-    // },
-
+    {
+      name: "Orders",
+      path: "/pos/orders",
+      icon: <FiClipboard />,
+    },
     {
       name: "Menu",
       path: "/menu",
       icon: <FiGrid />,
     },
+    {
+      name: "Inventory",
+      path: "/inventory",
+      icon: <FiBox />,
+    },
+    // {
+    //   name: "Expenses",
+    //   path: "/expenses",
+    //   icon: <FiDollarSign />,
+    // },
   ];
   // =====================================================
   // MENU BY ROLE
@@ -393,8 +360,9 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       case "OWNER":
         return ownerMenu;
 
+      // Manager gets the exact same access as Owner.
       case "MANAGER":
-        return managerMenu;
+        return ownerMenu;
 
       case "CASHIER":
         return cashierMenu;
@@ -433,8 +401,8 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       >
         {!collapsed && (
           <div>
-            <h1 className="text-2xl font-bold text-[#3FA34D] dark:text-[#43B75A]">
-              Restaurant ERP
+            <h1 className="text-1xl font-bold text-[#3FA34D] dark:text-[#43B75A] truncate">
+              {restaurantName}
             </h1>
 
             <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280] mt-1">

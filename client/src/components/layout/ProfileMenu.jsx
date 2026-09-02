@@ -5,6 +5,7 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import { Link } from "react-router-dom";
+import { createPortal } from "react-dom";
 
 import {
   FiChevronDown,
@@ -13,6 +14,7 @@ import {
   FiLock,
   FiHelpCircle,
   FiLogOut,
+  FiX,
 } from "react-icons/fi";
 
 import { useAuth } from "../../auth/AuthContext";
@@ -21,6 +23,10 @@ const ProfileMenu = () => {
   const { user, logout } = useAuth();
 
   const [open, setOpen] = useState(false);
+
+  // Confirmation modal shown before actually logging out — see
+  // handleLogoutClick/confirmLogout below.
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const menuRef = useRef(null);
 
@@ -44,12 +50,25 @@ const ProfileMenu = () => {
 
   // ==========================================
   // LOGOUT
+  // Clicking "Logout" in the dropdown no longer logs out immediately — it
+  // closes the dropdown and opens a confirm modal instead. The actual
+  // logout only happens if the user confirms in that modal.
   // ==========================================
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
+    setOpen(false);
+
+    setConfirmOpen(true);
+  };
+
+  const confirmLogout = () => {
     logout();
 
-    setOpen(false);
+    setConfirmOpen(false);
+  };
+
+  const cancelLogout = () => {
+    setConfirmOpen(false);
   };
 
   return (
@@ -141,7 +160,7 @@ const ProfileMenu = () => {
               </div>
             </Link>
 
-            <Link
+            {/* <Link
               to="/settings"
               onClick={() => setOpen(false)}
               className="flex items-center gap-4 px-5 py-4 hover:bg-[#F3F5EE] dark:hover:bg-[#1E241E] transition-colors"
@@ -157,7 +176,7 @@ const ProfileMenu = () => {
                   Manage application settings
                 </p>
               </div>
-            </Link>
+            </Link> */}
 
             <Link
               to="/help"
@@ -179,7 +198,7 @@ const ProfileMenu = () => {
             {/* ================= LOGOUT ================= */}
 
             <button
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               className="w-full flex items-center gap-4 px-5 py-4 text-[#EF5350] hover:bg-[#EF5350]/10 transition-colors"
             >
               <div className="w-10 h-10 rounded-xl bg-[#EF5350]/10 flex items-center justify-center">
@@ -219,6 +238,70 @@ const ProfileMenu = () => {
           </div>
         </div>
       )}
+
+      {/* ================= LOGOUT CONFIRM MODAL ================= */}
+
+      {confirmOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F2937]/40 dark:bg-black/60 p-4"
+            onClick={cancelLogout}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm overflow-hidden rounded-2xl bg-white dark:bg-[#171C17] shadow-xl"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
+                <h2 className="text-lg font-bold text-[#1F2937] dark:text-white">
+                  Log out?
+                </h2>
+
+                <button
+                  type="button"
+                  onClick={cancelLogout}
+                  className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/10 hover:text-[#6B7280] dark:hover:text-[#9CA8A0]"
+                >
+                  <FiX className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-5 py-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 shrink-0 rounded-xl bg-[#EF5350]/10 flex items-center justify-center text-[#EF5350]">
+                    <FiLogOut />
+                  </div>
+
+                  <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                    Are you sure you want to log out of your account? You'll
+                    need to sign in again to continue.
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-2 border-t border-[#E7EAE1] dark:border-[#262B24] px-5 py-4">
+                <button
+                  type="button"
+                  onClick={cancelLogout}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={confirmLogout}
+                  className="rounded-lg bg-[#EF5350] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#E23F3A]"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };

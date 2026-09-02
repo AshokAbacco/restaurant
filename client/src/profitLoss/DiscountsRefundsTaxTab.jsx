@@ -60,8 +60,8 @@ const DiscountsRefundsTaxTab = () => {
       ) : (
         <div className="space-y-6">
           {/* Discounts */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">
+          <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5">
+            <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4">
               Discount Impact
             </h2>
             {discounts && (
@@ -87,14 +87,17 @@ const DiscountsRefundsTaxTab = () => {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {discounts.byType.map((d) => (
-                  <div key={d.type} className="rounded-xl bg-gray-50 p-3">
-                    <div className="text-xs text-gray-500 mb-1">
+                  <div
+                    key={d.type}
+                    className="rounded-xl bg-gray-50 dark:bg-white/5 p-3"
+                  >
+                    <div className="text-xs text-gray-500 dark:text-[#9CA8A0] mb-1">
                       {d.type.replace("_", " ")}
                     </div>
-                    <div className="text-base font-semibold text-gray-800">
+                    <div className="text-base font-semibold text-gray-800 dark:text-white">
                       {currency(d.amount)}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-gray-400 dark:text-[#6B7280]">
                       {d.count} applied
                     </div>
                   </div>
@@ -104,8 +107,8 @@ const DiscountsRefundsTaxTab = () => {
           </div>
 
           {/* Refunds */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">
+          <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5">
+            <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4">
               Refund Analysis
             </h2>
             {refunds && (
@@ -123,7 +126,7 @@ const DiscountsRefundsTaxTab = () => {
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-gray-500 border-b border-gray-100">
+                  <tr className="text-left text-gray-500 dark:text-[#9CA8A0] border-b border-gray-100 dark:border-[#262B24]">
                     <th className="py-2 pr-4 font-medium">Reason</th>
                     <th className="py-2 pr-4 font-medium">Count</th>
                     <th className="py-2 pr-4 font-medium">Amount</th>
@@ -133,11 +136,15 @@ const DiscountsRefundsTaxTab = () => {
                   {refunds.byReason.map((r) => (
                     <tr
                       key={r.reason}
-                      className="border-b border-gray-50 last:border-0"
+                      className="border-b border-gray-50 dark:border-[#262B24] last:border-0"
                     >
-                      <td className="py-2.5 pr-4 text-gray-700">{r.reason}</td>
-                      <td className="py-2.5 pr-4 text-gray-700">{r.count}</td>
-                      <td className="py-2.5 pr-4 text-gray-700">
+                      <td className="py-2.5 pr-4 text-gray-700 dark:text-[#E4E9E2]">
+                        {r.reason}
+                      </td>
+                      <td className="py-2.5 pr-4 text-gray-700 dark:text-[#E4E9E2]">
+                        {r.count}
+                      </td>
+                      <td className="py-2.5 pr-4 text-gray-700 dark:text-[#E4E9E2]">
                         {currency(r.amount)}
                       </td>
                     </tr>
@@ -146,13 +153,15 @@ const DiscountsRefundsTaxTab = () => {
               </table>
             )}
             {refunds?.note && (
-              <p className="text-xs text-gray-400 mt-3">{refunds.note}</p>
+              <p className="text-xs text-gray-400 dark:text-[#6B7280] mt-3">
+                {refunds.note}
+              </p>
             )}
           </div>
 
           {/* Tax */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">
+          <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5">
+            <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4">
               Tax Analysis
             </h2>
             {tax && (

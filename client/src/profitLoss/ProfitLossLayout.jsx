@@ -1,21 +1,6 @@
 // ==============================================
 // client/src/profitLoss/ProfitLossLayout.jsx
 // ==============================================
-// Tab shell for the P&L module.
-//
-// IMPORTANT: tabs are plain local state, NOT nested react-router <Route>s.
-// The previous version nested <Route>/<Outlet>/<NavLink> two layout-levels
-// deep (ProtectedRoute -> ProfitLossLayout -> tab), which is a known source
-// of blank pages: relative NavLink targets inside pathless layout routes
-// don't resolve consistently across react-router-dom versions, and if the
-// URL doesn't match on the first render it falls through to App.jsx's
-// catch-all `<Route path="*" element={<Navigate to="/dashboard" />} />` —
-// which is exactly the "blank flash then layout switches" symptom. Switching
-// to state-based tabs removes that failure mode entirely: there's no route
-// transition at all when you click a tab, so there's nothing to mis-match.
-//
-// Manager only sees the Overview tab (matches the backend's SUMMARY_ACCESS
-// routes); Owner/Admin see everything (matches FULL_ACCESS routes).
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../auth/AuthContext";
@@ -84,9 +69,9 @@ const ProfitLossLayout = () => {
   const ActiveComponent = activeTab?.Component ?? OverviewTab;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b border-gray-200 bg-white px-6 lg:px-8 pt-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#12160F]">
+      <div className="border-b border-gray-200 dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 lg:px-8 pt-6">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
           Profit &amp; Loss
         </h1>
 
@@ -98,8 +83,8 @@ const ProfitLossLayout = () => {
               onClick={() => setActiveKey(tab.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab?.key === tab.key
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                  : "border-transparent text-gray-500 dark:text-[#9CA8A0] hover:text-gray-700 dark:hover:text-[#E4E9E2]"
               }`}
             >
               {tab.label}
@@ -108,7 +93,7 @@ const ProfitLossLayout = () => {
         </nav>
 
         {!isFullAccess && (
-          <p className="pb-3 text-xs text-gray-400">
+          <p className="pb-3 text-xs text-gray-400 dark:text-[#6B7280]">
             You're viewing summary-level financials. Detailed cost, tax, and
             export tools are restricted to Owner/Admin accounts.
           </p>

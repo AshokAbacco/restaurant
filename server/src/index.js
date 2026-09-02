@@ -22,6 +22,7 @@ import kioskRoutes from "./kiosk/kiosk.routes.js";
 import ReportsRoutes from "./reports/reports.routes.js";
 import profitLossRoutes from "./profitLoss/profitLoss.routes.js";
 import dashboardRoutes from "./dashboard/dashboard.routes.js";
+import printerProfilesRoutes from "./printer-profiles/printerProfiles.routes.js";
 
 const app = express();
 console.log("🚀 USING UPDATED INDEX.JS - KIOSK WITHOUT STAFF AUTH");
@@ -54,7 +55,7 @@ app.use(
   "/api/inventory",
   requireAuth,
   requireOutletContext,
-  requireRole("OWNER", "ADMIN", "MANAGER", "STORE_KEEPER"),
+  requireRole("OWNER", "ADMIN", "MANAGER", "STORE_KEEPER", "KITCHEN"),
   inventoryRoutes,
 );
 app.use(
@@ -156,6 +157,15 @@ app.use(
   requireAuth,
   requireOutletContext,
   dashboardRoutes,
+);
+
+// Printer profiles — mount at /pos/ path to match frontend
+app.use(
+  "/api/pos/printer-profiles",
+  requireAuth,
+  requireOutletContext,
+  requireRole("OWNER", "ADMIN", "MANAGER", "CASHIER", "WAITER", "CHEF", "KITCHEN"),
+  printerProfilesRoutes,
 );
 
 // ==============================================

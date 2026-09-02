@@ -38,6 +38,7 @@ import CountersSettings from "./counters/CountersSettings";
 // Printer
 import PrinterSettings from "./printer/PrinterSettings";
 
+
 // Notifications
 import NotificationSettings from "./notifications/NotificationSettings";
 
@@ -93,6 +94,14 @@ const SettingsRoutes = () => {
 
       {/* Printer */}
       <Route path="printer" element={<PrinterSettings />} />
+
+      {/* The separate Printer Profiles pages were folded into the single
+          Printer Settings page above. Redirected rather than deleted so any
+          bookmark or in-app link still lands somewhere useful. */}
+      <Route
+        path="printer-profiles/*"
+        element={<Navigate to="/settings/printer" replace />}
+      />
 
       {/* Notifications */}
       <Route path="notifications" element={<NotificationSettings />} />

@@ -1,608 +1,746 @@
 // ==============================================
 // src/settings/printer/PrinterSettings.jsx
 // ==============================================
+// One compact page instead of seven stacked panels.
+//
+//   1. Add / Edit Printer — hardware model + paper size, and nothing else
+//      competing for attention. Picking a model fills the spec.
+//   2. Print Settings — every toggle in one scannable list, not six cards.
+//   3. All Connected Printers — the saved list, with Edit / Delete.
+//
+// Edit loads a row straight back into section 1, so there's one form on the
+// page and no separate add/edit screens to keep in sync.
+//
+// The settings and the paper spec both save onto the SAME PrinterProfile row,
+// because they genuinely differ per device: a kitchen printer auto-prints
+// KOTs and shows no prices, a counter printer auto-prints receipts and kicks
+// a cash drawer. A single global block of print preferences can't express
+// that.
 
-import React, { useState } from "react";
-import { FiPrinter, FiSave, FiRefreshCw } from "react-icons/fi";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FiPrinter,
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiSave,
+  FiX,
+  FiCheck,
+  FiAlertCircle,
+  FiStar,
+  FiMonitor,
+} from "react-icons/fi";
+
+import PageHeader from "../../components/layout/PageHeader";
+import PaperPreview from "../printer-profiles/PaperPreview";
+import {
+  listPrinterProfiles,
+  createPrinterProfile,
+  updatePrinterProfile,
+  makePrinterProfileDefault,
+  deactivatePrinterProfile,
+  getSelectedProfileId,
+  setSelectedProfile,
+  refreshActiveProfile,
+} from "../../print/printerConfig";
+import { PRINTER_CATALOGUE, findCatalogueModel } from "../../print/printerProfiles";
+import { printOnce } from "../../print/printing";
+
+// Paper size presets. The bracketed figure is the printable width — the part
+// the head can actually reach — which is what the layout is built against.
+const PAPER_SIZES = [
+  { label: "80mm (72mm)", paperWidthMm: 80, printableWidthMm: 72, printableDots: 576, columns: 48, baseFontPx: 10 },
+  { label: "70mm (64mm)", paperWidthMm: 70, printableWidthMm: 64, printableDots: 512, columns: 42, baseFontPx: 10 },
+  { label: "58mm (48mm)", paperWidthMm: 58, printableWidthMm: 48, printableDots: 384, columns: 32, baseFontPx: 9 },
+];
+
+const CONNECTIONS = ["SYSTEM", "NETWORK", "USB", "BLUETOOTH"];
+
+// Grouped so the list reads as three short runs rather than twelve loose
+// rows. Order matters more than grouping here — the ones staff change most
+// are first.
+const SETTINGS_GROUPS = [
+  {
+    group: "Automatic printing",
+    items: [
+      ["autoPrintKot", "Auto print kitchen ticket", "Send the KOT to this printer as soon as an order is placed."],
+      ["autoPrintReceipt", "Auto print receipt", "Print the receipt immediately after payment."],
+      ["autoPrintInvoice", "Auto print invoice", "Print the invoice when an order is completed."],
+      ["allowReprint", "Allow reprint on demand", "Let staff reprint a previous bill from Bill History."],
+    ],
+  },
+  {
+    group: "Receipt content",
+    items: [
+      ["printLogo", "Print restaurant logo", "Include the outlet logo at the top of the receipt."],
+      ["printGstDetails", "Print GST details", "Show GSTIN and the tax breakdown."],
+      ["printQrCode", "Print QR code", "Include the UPI / feedback QR on the receipt."],
+      ["printBarcode", "Print barcode", "Include the invoice barcode for tracking."],
+    ],
+  },
+  {
+    group: "Kitchen ticket",
+    items: [
+      ["printItemNotes", "Print item notes", 'Include customer notes such as "less spicy".'],
+      ["printTableNumber", "Print table number", "Show the table on the kitchen ticket."],
+      ["printOrderTime", "Print order time", "Show when the order was placed."],
+      ["openCashDrawer", "Open cash drawer after payment", "Trigger the drawer on a cash payment."],
+    ],
+  },
+];
+
+const EMPTY = {
+  name: "",
+  model: "",
+  paperWidthMm: 80,
+  printableWidthMm: 72,
+  printableDots: 576,
+  columns: 48,
+  speedMmPerSec: 300,
+  baseFontPx: 10,
+  extraMarginMm: 0,
+  connectionType: "SYSTEM",
+  ipAddress: "",
+  copies: 1,
+  deviceLabel: "",
+  isDefault: false,
+  autoPrintKot: true,
+  autoPrintReceipt: true,
+  autoPrintInvoice: false,
+  allowReprint: true,
+  printLogo: true,
+  printGstDetails: true,
+  printQrCode: true,
+  printBarcode: false,
+  printItemNotes: true,
+  printTableNumber: true,
+  printOrderTime: true,
+  openCashDrawer: false,
+};
+
+const inputClass =
+  "w-full px-3 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-sm text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:border-[#3FA34D] dark:focus:border-[#43B75A] outline-none transition-colors";
+
+const labelClass =
+  "block mb-1.5 text-xs font-semibold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0]";
+
+const Card = ({ title, right, children }) => (
+  <section className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm">
+    <header className="flex items-center justify-between gap-3 flex-wrap px-5 py-3.5 border-b border-[#E7EAE1] dark:border-[#262B24]">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-[#1F2937] dark:text-[#E4E9E2]">
+        {title}
+      </h2>
+      {right}
+    </header>
+    <div className="p-5">{children}</div>
+  </section>
+);
 
 const PrinterSettings = () => {
-  const [settings, setSettings] = useState({
-    enablePrinting: true,
-    defaultPrinter: "POS Receipt Printer",
-    paperSize: "80 mm",
-    printerType: "Network",
-  });
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [confirmId, setConfirmId] = useState(null);
+  const [form, setForm] = useState(EMPTY);
+  const [deviceProfileId, setDeviceProfileId] = useState(getSelectedProfileId());
+  const formRef = useRef(null);
+  const testRef = useRef(null);
 
-  // ==========================================
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setProfiles(await listPrinterProfiles());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleChange = (e) => {
-    const { name, value, checked, type } = e.target;
+  useEffect(() => {
+    load();
+  }, [load]);
 
-    setSettings((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
+  const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  function applyModel(id) {
+    const preset = findCatalogueModel(id);
+    if (!preset) return set("model", "");
+    setForm((f) => ({
+      ...f,
+      name: f.name.trim() || preset.label,
+      model: preset.model,
+      paperWidthMm: preset.paperWidthMm,
+      printableWidthMm: preset.printableWidthMm,
+      printableDots: preset.printableDots,
+      columns: preset.columns,
+      speedMmPerSec: preset.speedMmPerSec,
+      baseFontPx: preset.baseFontPx,
     }));
-  };
+  }
 
-  // ==========================================
+  function applyPaperSize(size) {
+    setForm((f) => ({ ...f, ...size, label: undefined }));
+  }
 
-  const handleSave = () => {
-    console.log(settings);
+  function startEdit(profile) {
+    // Only the keys the form owns — spreading the row would drag in id,
+    // outletId and timestamps and post them straight back.
+    const next = { ...EMPTY };
+    for (const key of Object.keys(EMPTY)) {
+      if (profile[key] !== null && profile[key] !== undefined) next[key] = profile[key];
+    }
+    setForm(next);
+    setEditingId(profile.id);
+    setError("");
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
-    // API Later
-  };
+  function cancelEdit() {
+    setForm(EMPTY);
+    setEditingId(null);
+    setError("");
+  }
+
+  const widthError =
+    Number(form.printableWidthMm) > Number(form.paperWidthMm)
+      ? `Printable width can't exceed the ${form.paperWidthMm}mm roll.`
+      : "";
+
+  async function handleSave() {
+    setError("");
+    if (!form.name.trim()) return setError("Give this printer a name.");
+    if (widthError) return setError(widthError);
+
+    const payload = { ...form };
+    payload.name = form.name.trim();
+    payload.model = form.model.trim() || null;
+    payload.deviceLabel = form.deviceLabel.trim() || null;
+    payload.ipAddress = form.ipAddress.trim() || null;
+    // The server rejects clearing a default rather than un-setting it.
+    if (editingId && !form.isDefault) delete payload.isDefault;
+
+    setSaving(true);
+    try {
+      const saved = editingId
+        ? await updatePrinterProfile(editingId, payload)
+        : await createPrinterProfile(payload);
+      setNotice(`"${saved.name}" saved.`);
+      cancelEdit();
+      await load();
+      await refreshActiveProfile();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(profile) {
+    setError("");
+    try {
+      await deactivatePrinterProfile(profile.id);
+      if (deviceProfileId === profile.id) {
+        await setSelectedProfile(null);
+        setDeviceProfileId(null);
+      }
+      if (editingId === profile.id) cancelEdit();
+      setNotice(`"${profile.name}" removed.`);
+      await load();
+      await refreshActiveProfile();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setConfirmId(null);
+    }
+  }
+
+  async function handleUseHere(profile) {
+    await setSelectedProfile(profile);
+    setDeviceProfileId(profile.id);
+    setNotice(`This device now prints on "${profile.name}".`);
+  }
+
+  async function handleMakeDefault(profile) {
+    try {
+      await makePrinterProfileDefault(profile.id);
+      await load();
+      await refreshActiveProfile();
+      setNotice(`"${profile.name}" is now the outlet default.`);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const activePaper = useMemo(
+    () =>
+      PAPER_SIZES.find(
+        (s) =>
+          s.paperWidthMm === Number(form.paperWidthMm) &&
+          s.printableWidthMm === Number(form.printableWidthMm),
+      ),
+    [form.paperWidthMm, form.printableWidthMm],
+  );
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      {/* ======================================
-          HEADER
-      ====================================== */}
+    <div className="p-6 space-y-6">
+      <PageHeader
+        title="Printer Settings"
+        subtitle="Pick the printer model and paper size, then choose what each printer prints. Kitchen tickets and bills lay themselves out against these numbers."
+        icon={<FiPrinter />}
+        showRefresh
+        onRefresh={load}
+        loading={loading}
+      />
 
-      <div className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-8 py-8 flex items-center justify-between">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center">
-              <FiPrinter size={30} />
+      {notice && (
+        <div className="rounded-xl bg-[#EAF6EC] dark:bg-[#43B75A]/10 border border-[#3FA34D]/20 dark:border-[#43B75A]/30 text-[#3FA34D] dark:text-[#43B75A] px-4 py-3 flex items-center gap-3 text-sm">
+          <FiCheck className="shrink-0" />
+          {notice}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-[#EF5350] dark:text-red-400 px-4 py-3 flex items-center gap-3 text-sm">
+          <FiAlertCircle className="shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* ============ 1. ADD / EDIT PRINTER ============ */}
+
+      <div ref={formRef}>
+        <Card
+          title={editingId ? "Edit Printer" : "Add Printer"}
+          right={
+            editingId && (
+              <button
+                onClick={cancelEdit}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#1F2937] dark:hover:text-white"
+              >
+                <FiX size={14} />
+                Cancel edit
+              </button>
+            )
+          }
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div>
+              <label className={labelClass}>Printer Hardware Model</label>
+              <select
+                value={
+                  PRINTER_CATALOGUE.flatMap((g) => g.models).find(
+                    (m) => m.model === form.model,
+                  )?.id || ""
+                }
+                onChange={(e) => applyModel(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Custom / not listed</option>
+                {PRINTER_CATALOGUE.map((group) => (
+                  <optgroup key={group.group} label={group.group}>
+                    {group.models.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
             </div>
 
             <div>
-              <h1 className="text-4xl font-bold">Printer Settings</h1>
-
-              <p className="mt-2 text-gray-500">
-                Configure receipt, kitchen and invoice printers.
+              <label className={labelClass}>Printable Width Override &amp; Paper Size</label>
+              <div className="flex flex-wrap gap-2">
+                {PAPER_SIZES.map((size) => {
+                  const active = activePaper?.label === size.label;
+                  return (
+                    <button
+                      key={size.label}
+                      type="button"
+                      onClick={() => applyPaperSize(size)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                        active
+                          ? "border-[#3FA34D] dark:border-[#43B75A] bg-[#EAF6EC] dark:bg-[#43B75A]/10 text-[#3FA34D] dark:text-[#43B75A]"
+                          : "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+                      }`}
+                    >
+                      {size.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 font-mono text-xs text-[#3FA34D] dark:text-[#43B75A]">
+                {form.printableWidthMm}mm ({form.printableDots} Dots) · Columns:{" "}
+                {form.columns} Chars (Font A)
+                {form.speedMmPerSec ? ` · Speed: ${form.speedMmPerSec}mm/s` : ""}
               </p>
+              {widthError && (
+                <p className="mt-1.5 text-xs font-medium text-[#EF5350] dark:text-red-400">
+                  {widthError}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className={labelClass}>Printer Name *</label>
+              <input
+                value={form.name}
+                onChange={(e) => set("name", e.target.value)}
+                placeholder="e.g. Front Counter Printer"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Connection</label>
+                <select
+                  value={form.connectionType}
+                  onChange={(e) => set("connectionType", e.target.value)}
+                  className={inputClass}
+                >
+                  {CONNECTIONS.map((c) => (
+                    <option key={c} value={c}>
+                      {c.charAt(0) + c.slice(1).toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>
+                  {form.connectionType === "NETWORK" ? "IP Address" : "Device Label"}
+                </label>
+                {form.connectionType === "NETWORK" ? (
+                  <input
+                    value={form.ipAddress}
+                    onChange={(e) => set("ipAddress", e.target.value)}
+                    placeholder="192.168.1.50"
+                    className={inputClass}
+                  />
+                ) : (
+                  <input
+                    value={form.deviceLabel}
+                    onChange={(e) => set("deviceLabel", e.target.value)}
+                    placeholder="Billing counter PC"
+                    className={inputClass}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <button
-              className="
-                h-12
-                px-6
-                rounded-xl
-                border
-                hover:bg-gray-100
-                flex
-                items-center
-                gap-2
-              "
-            >
-              <FiRefreshCw />
-              Reset
-            </button>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-[#E7EAE1] dark:border-[#262B24]">
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-[#4B5563] dark:text-[#9CA8A0] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.isDefault}
+                  onChange={(e) => set("isDefault", e.target.checked)}
+                  className="w-4 h-4 accent-[#3FA34D] dark:accent-[#43B75A]"
+                />
+                Set as outlet default
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[#4B5563] dark:text-[#9CA8A0]">
+                Copies
+                <select
+                  value={form.copies}
+                  onChange={(e) => set("copies", Number(e.target.value))}
+                  className="px-2 py-1.5 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] text-sm dark:[color-scheme:dark] outline-none"
+                >
+                  {[1, 2, 3].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
-            <button
-              onClick={handleSave}
-              className="
-                h-12
-                px-8
-                rounded-xl
-                bg-blue-600
-                hover:bg-blue-700
-                text-white
-                flex
-                items-center
-                gap-2
-              "
-            >
-              <FiSave />
-              Save
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => printOnce(testRef, { profile: form })}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-sm font-semibold text-[#4B5563] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+              >
+                <FiPrinter size={14} />
+                Test Print
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || Boolean(widthError)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {editingId ? <FiSave size={14} /> : <FiPlus size={14} />}
+                {saving ? "Saving…" : editingId ? "Save Changes" : "Add Printer"}
+              </button>
+            </div>
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* ======================================
-          CONTENT
-      ====================================== */}
+      {/* ============ 2. PRINT SETTINGS (LIST) ============ */}
 
-      <div className="max-w-6xl mx-auto p-8">
-        {/* ======================================
-            GENERAL
-        ====================================== */}
-
-        <div className="bg-white rounded-2xl border p-8">
-          <h2 className="text-2xl font-bold mb-8">General Printer Settings</h2>
-
-          <div className="space-y-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Enable Printing</h3>
-
-                <p className="text-sm text-gray-500">
-                  Enable printing throughout the restaurant.
-                </p>
-              </div>
-
-              <input
-                type="checkbox"
-                name="enablePrinting"
-                checked={settings.enablePrinting}
-                onChange={handleChange}
-                className="w-5 h-5"
-              />
-            </label>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block mb-2 font-medium">
-                  Default Printer
+      <Card
+        title="Print Settings"
+        right={
+          <span className="text-xs text-[#6B7280] dark:text-[#9CA8A0]">
+            Applies to {editingId ? `"${form.name || "this printer"}"` : "the printer being added"}
+          </span>
+        }
+      >
+        <div className="divide-y divide-[#E7EAE1] dark:divide-[#262B24] -my-2">
+          {SETTINGS_GROUPS.map((group) => (
+            <div key={group.group} className="py-2">
+              <p className="px-1 py-2 text-[11px] font-bold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
+                {group.group}
+              </p>
+              {group.items.map(([key, label, hint]) => (
+                <label
+                  key={key}
+                  className="flex items-center justify-between gap-4 px-1 py-2 rounded-lg hover:bg-[#F3F5EE] dark:hover:bg-white/5 cursor-pointer"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                      {label}
+                    </span>
+                    <span className="block text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                      {hint}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form[key])}
+                    onChange={(e) => set(key, e.target.checked)}
+                    className="w-4 h-4 shrink-0 accent-[#3FA34D] dark:accent-[#43B75A]"
+                  />
                 </label>
-
-                <select
-                  name="defaultPrinter"
-                  value={settings.defaultPrinter}
-                  onChange={handleChange}
-                  className="w-full h-12 border rounded-lg px-4"
-                >
-                  <option>POS Receipt Printer</option>
-
-                  <option>Kitchen Printer</option>
-
-                  <option>Invoice Printer</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-2 font-medium">
-                  Printer Connection
-                </label>
-
-                <select
-                  name="printerType"
-                  value={settings.printerType}
-                  onChange={handleChange}
-                  className="w-full h-12 border rounded-lg px-4"
-                >
-                  <option>USB</option>
-
-                  <option>Network</option>
-
-                  <option>Bluetooth</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-2 font-medium">Paper Size</label>
-
-                <select
-                  name="paperSize"
-                  value={settings.paperSize}
-                  onChange={handleChange}
-                  className="w-full h-12 border rounded-lg px-4"
-                >
-                  <option>58 mm</option>
-
-                  <option>80 mm</option>
-
-                  <option>A4</option>
-                </select>
-              </div>
+              ))}
             </div>
-          </div>
+          ))}
         </div>
-        {/* ======================================
-            PRINTER CONFIGURATION
-        ====================================== */}
-
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Printer Configuration</h2>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* POS Printer */}
-
-            <div className="border rounded-2xl p-6">
-              <h3 className="text-lg font-bold mb-4">POS Receipt Printer</h3>
-
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Printer Name"
-                  className="w-full h-11 border rounded-lg px-4"
-                />
-
-                <input
-                  type="text"
-                  placeholder="IP Address"
-                  className="w-full h-11 border rounded-lg px-4"
-                />
-
-                <button
-                  className="
-                    w-full
-                    h-11
-                    rounded-lg
-                    bg-green-600
-                    hover:bg-green-700
-                    text-white
-                  "
-                >
-                  Test Print
-                </button>
-              </div>
-            </div>
-
-            {/* Kitchen Printer */}
-
-            <div className="border rounded-2xl p-6">
-              <h3 className="text-lg font-bold mb-4">Kitchen Printer</h3>
-
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Printer Name"
-                  className="w-full h-11 border rounded-lg px-4"
-                />
-
-                <input
-                  type="text"
-                  placeholder="IP Address"
-                  className="w-full h-11 border rounded-lg px-4"
-                />
-
-                <button
-                  className="
-                    w-full
-                    h-11
-                    rounded-lg
-                    bg-green-600
-                    hover:bg-green-700
-                    text-white
-                  "
-                >
-                  Test Print
-                </button>
-              </div>
-            </div>
-
-            {/* Invoice Printer */}
-
-            <div className="border rounded-2xl p-6">
-              <h3 className="text-lg font-bold mb-4">Invoice Printer</h3>
-
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Printer Name"
-                  className="w-full h-11 border rounded-lg px-4"
-                />
-
-                <input
-                  type="text"
-                  placeholder="IP Address"
-                  className="w-full h-11 border rounded-lg px-4"
-                />
-
-                <button
-                  className="
-                    w-full
-                    h-11
-                    rounded-lg
-                    bg-green-600
-                    hover:bg-green-700
-                    text-white
-                  "
-                >
-                  Test Print
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ======================================
-            AUTO PRINT SETTINGS
-        ====================================== */}
-
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Auto Print Settings</h2>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Auto Print Receipt</h3>
-
-                <p className="text-sm text-gray-500">
-                  Print receipt immediately after payment.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Auto Print Kitchen Ticket</h3>
-
-                <p className="text-sm text-gray-500">
-                  Print KOT automatically for every order.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Auto Print Invoice</h3>
-
-                <p className="text-sm text-gray-500">
-                  Print invoice after order completion.
-                </p>
-              </div>
-
-              <input type="checkbox" className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Reprint on Demand</h3>
-
-                <p className="text-sm text-gray-500">
-                  Allow staff to reprint previous bills.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-          </div>
-        </div>
-
-        {/* ======================================
-            RECEIPT OPTIONS
-        ====================================== */}
-
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Receipt Options</h2>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <label className="block mb-2 font-medium">Number of Copies</label>
-
-              <select className="w-full h-12 border rounded-lg px-4">
-                <option>1 Copy</option>
-
-                <option>2 Copies</option>
-
-                <option>3 Copies</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-2 font-medium">Receipt Width</label>
-
-              <select className="w-full h-12 border rounded-lg px-4">
-                <option>58 mm</option>
-
-                <option>80 mm</option>
-              </select>
-            </div>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print Restaurant Logo</h3>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print GST Details</h3>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-          </div>
-        </div>
-        {/* ======================================
-            KITCHEN ORDER TICKET (KOT)
-        ====================================== */}
-
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">
-            Kitchen Order Ticket (KOT)
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Auto Print KOT</h3>
-
-                <p className="text-sm text-gray-500">
-                  Automatically print kitchen tickets.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print Item Notes</h3>
-
-                <p className="text-sm text-gray-500">
-                  Include customer notes in kitchen ticket.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print Table Number</h3>
-
-                <p className="text-sm text-gray-500">
-                  Display table number on kitchen ticket.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print Order Time</h3>
-
-                <p className="text-sm text-gray-500">
-                  Include order time on kitchen ticket.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-          </div>
-        </div>
-
-        {/* ======================================
-            CASH DRAWER & BARCODE
-        ====================================== */}
-
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Cash Drawer & Barcode</h2>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">
-                  Open Cash Drawer After Payment
-                </h3>
-
-                <p className="text-sm text-gray-500">
-                  Automatically trigger cash drawer.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print QR Code</h3>
-
-                <p className="text-sm text-gray-500">
-                  Print QR code on receipt.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print Barcode</h3>
-
-                <p className="text-sm text-gray-500">
-                  Print barcode for invoice tracking.
-                </p>
-              </div>
-
-              <input type="checkbox" className="w-5 h-5" />
-            </label>
-          </div>
-        </div>
-
-        {/* ======================================
-            CONNECTED PRINTERS
-        ====================================== */}
-
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold">Connected Printers</h2>
-
-            <button
-              className="
-                h-11
-                px-5
-                rounded-lg
-                bg-green-600
-                hover:bg-green-700
-                text-white
-              "
-            >
-              Scan Printers
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
+        <p className="mt-4 pt-4 border-t border-[#E7EAE1] dark:border-[#262B24] text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+          These save with the printer above — use <strong>Add Printer</strong> or{" "}
+          <strong>Save Changes</strong> to apply them.
+        </p>
+      </Card>
+
+      {/* ============ 3. ALL CONNECTED PRINTERS ============ */}
+
+      <Card
+        title="All Connected Printers"
+        right={
+          <span className="text-xs text-[#6B7280] dark:text-[#9CA8A0]">
+            {profiles.length} configured
+          </span>
+        }
+      >
+        <div className="overflow-x-auto -m-5">
+          <table className="w-full text-left">
+            <thead className="bg-[#F3F5EE] dark:bg-[#1D231C] border-b border-[#E7EAE1] dark:border-[#262B24]">
+              <tr>
+                {["Printer", "Model", "Paper", "Connection", "Status", ""].map((h, i) => (
+                  <th
+                    key={h || i}
+                    className={`px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0] ${
+                      i === 5 ? "text-right" : ""
+                    }`}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
+              {loading ? (
                 <tr>
-                  <th className="px-5 py-4 text-left">Printer</th>
-
-                  <th className="px-5 py-4 text-left">Type</th>
-
-                  <th className="px-5 py-4 text-left">Connection</th>
-
-                  <th className="px-5 py-4 text-left">Status</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                <tr className="border-t">
-                  <td className="px-5 py-4">Epson TM-T82</td>
-
-                  <td className="px-5 py-4">Receipt Printer</td>
-
-                  <td className="px-5 py-4">Network</td>
-
-                  <td className="px-5 py-4 text-green-600 font-semibold">
-                    Connected
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                    Loading printers…
                   </td>
                 </tr>
-
-                <tr className="border-t">
-                  <td className="px-5 py-4">Epson Kitchen</td>
-
-                  <td className="px-5 py-4">Kitchen Printer</td>
-
-                  <td className="px-5 py-4">USB</td>
-
-                  <td className="px-5 py-4 text-green-600 font-semibold">
-                    Connected
+              ) : profiles.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                    No printers added yet — receipts print on standard 80mm
+                    geometry until you add one.
                   </td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
+              ) : (
+                profiles.map((p) => (
+                  <tr
+                    key={p.id}
+                    className={`hover:bg-[#F3F5EE] dark:hover:bg-white/5 transition-colors ${
+                      p.isActive ? "" : "opacity-50"
+                    }`}
+                  >
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                          {p.name}
+                        </span>
+                        {p.isDefault && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#EAF6EC] dark:bg-[#43B75A]/10 text-[#3FA34D] dark:text-[#43B75A]">
+                            <FiStar size={9} />
+                            Default
+                          </span>
+                        )}
+                        {p.id === deviceProfileId && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300">
+                            <FiMonitor size={9} />
+                            This device
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                      {p.model || "Custom"}
+                    </td>
+                    <td className="px-5 py-3 font-mono text-sm text-[#1F2937] dark:text-[#E4E9E2] whitespace-nowrap">
+                      {p.paperWidthMm}mm ({p.printableWidthMm}mm)
+                      <span className="block text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                        {p.columns} col
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                      {(p.connectionType || "SYSTEM").charAt(0) +
+                        (p.connectionType || "SYSTEM").slice(1).toLowerCase()}
+                      {p.ipAddress && (
+                        <span className="block font-mono text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                          {p.ipAddress}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          p.isActive
+                            ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+                            : "bg-[#F3F5EE] text-[#4B5563] dark:bg-white/5 dark:text-[#9CA8A0]"
+                        }`}
+                      >
+                        {p.isActive ? "Connected" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      {confirmId === p.id ? (
+                        <div className="flex items-center justify-end gap-3 whitespace-nowrap">
+                          <span className="text-xs text-[#EF5350] dark:text-red-400 font-medium">
+                            Remove?
+                          </span>
+                          <button
+                            onClick={() => setConfirmId(null)}
+                            className="text-xs font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#1F2937] dark:hover:text-white"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleDelete(p)}
+                            className="text-xs font-semibold text-[#EF5350] dark:text-red-400 hover:text-red-700"
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1">
+                          {p.isActive && p.id !== deviceProfileId && (
+                            <button
+                              onClick={() => handleUseHere(p)}
+                              title="Use this printer on this device"
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#3FA34D] dark:text-[#43B75A] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10"
+                            >
+                              Use here
+                            </button>
+                          )}
+                          {p.isActive && !p.isDefault && (
+                            <button
+                              onClick={() => handleMakeDefault(p)}
+                              title="Make outlet default"
+                              className="p-2 rounded-lg text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10 hover:text-[#3FA34D] dark:hover:text-[#43B75A]"
+                            >
+                              <FiStar size={15} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => startEdit(p)}
+                            title="Edit"
+                            className="p-2 rounded-lg text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10 hover:text-[#3FA34D] dark:hover:text-[#43B75A]"
+                          >
+                            <FiEdit2 size={15} />
+                          </button>
+                          {/* No Delete on the default — the server refuses it,
+                              so the button could only ever produce an error. */}
+                          {p.isActive && !p.isDefault && (
+                            <button
+                              onClick={() => setConfirmId(p.id)}
+                              title="Delete"
+                              className="p-2 rounded-lg text-[#9CA3AF] dark:text-[#6B7280] hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-[#EF5350] dark:hover:text-red-400"
+                            >
+                              <FiTrash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
+      </Card>
 
-        {/* ======================================
-            FOOTER
-        ====================================== */}
+      {/* Collapsed by default — the preview is reassurance, not a step. */}
+      <details className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm">
+        <summary className="px-5 py-3.5 cursor-pointer text-sm font-bold uppercase tracking-wide text-[#1F2937] dark:text-[#E4E9E2]">
+          Paper preview
+        </summary>
+        <div className="px-5 pb-5">
+          <PaperPreview profile={form} compact />
+        </div>
+      </details>
 
-        <div className="flex justify-end gap-4 mt-8 pb-10">
-          <button
-            className="
-              h-12
-              px-6
-              rounded-xl
-              border
-              border-gray-300
-              hover:bg-gray-100
-            "
-          >
-            Reset Settings
-          </button>
-
-          <button
-            onClick={handleSave}
-            className="
-              h-12
-              px-8
-              rounded-xl
-              bg-blue-600
-              hover:bg-blue-700
-              text-white
-              flex
-              items-center
-              gap-2
-            "
-          >
-            <FiSave />
-            Save Printer Settings
-          </button>
+      {/* Test slip. Never shown on screen — printOnce() clones it into the
+          print root and the print stylesheet hides everything else. */}
+      <div className="hidden">
+        <div
+          ref={testRef}
+          className="receipt-sheet mx-auto w-full bg-white p-4 font-mono leading-snug text-black"
+          style={{ fontSize: `${form.baseFontPx}px` }}
+        >
+          <div className="text-center font-bold uppercase" style={{ fontSize: "1.3em" }}>
+            Printer Test
+          </div>
+          <div className="text-center">{form.name || "Unsaved printer"}</div>
+          <div className="my-1.5 border-t border-black" />
+          <div className="flex justify-between">
+            <span>Model:</span>
+            <span className="font-bold">{form.model || "Custom"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Paper:</span>
+            <span className="font-bold">{form.paperWidthMm}mm</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Printable:</span>
+            <span className="font-bold">{form.printableWidthMm}mm</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Columns:</span>
+            <span className="font-bold">{form.columns}</span>
+          </div>
+          <div className="my-1.5 border-t border-black" />
+          {/* A ruler exactly `columns` characters wide. If it wraps the font
+              is too large for this paper; if it stops short there's width
+              going unused. */}
+          <div className="whitespace-pre" style={{ overflow: "hidden" }}>
+            {Array.from({ length: Number(form.columns) || 48 }, (_, i) =>
+              (i + 1) % 10 === 0 ? String(((i + 1) / 10) % 10) : "-",
+            ).join("")}
+          </div>
+          <div className="mt-1">{`${form.columns} columns wide`}</div>
+          <div className="my-1.5 border-t border-black" />
+          <div className="text-center">Alignment check complete</div>
         </div>
       </div>
     </div>

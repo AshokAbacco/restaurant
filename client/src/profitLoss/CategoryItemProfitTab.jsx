@@ -16,7 +16,7 @@ const Table = ({ columns, rows, rowKey }) => (
   <div className="overflow-x-auto">
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-left text-gray-500 border-b border-gray-100">
+        <tr className="text-left text-gray-500 dark:text-[#9CA8A0] border-b border-gray-100 dark:border-[#262B24]">
           {columns.map((c) => (
             <th key={c.key} className="py-2 pr-4 font-medium">
               {c.label}
@@ -28,10 +28,13 @@ const Table = ({ columns, rows, rowKey }) => (
         {rows.map((row) => (
           <tr
             key={row[rowKey]}
-            className="border-b border-gray-50 last:border-0"
+            className="border-b border-gray-50 dark:border-[#262B24] last:border-0"
           >
             {columns.map((c) => (
-              <td key={c.key} className="py-2.5 pr-4 text-gray-700">
+              <td
+                key={c.key}
+                className="py-2.5 pr-4 text-gray-700 dark:text-[#E4E9E2]"
+              >
                 {c.render ? c.render(row) : row[c.key]}
               </td>
             ))}
@@ -84,8 +87,8 @@ const CategoryItemProfitTab = () => {
         <Loader />
       ) : (
         <>
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">
+          <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5 mb-6">
+            <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4">
               Category-wise Profit
             </h2>
             {categories.length === 0 ? (
@@ -121,8 +124,8 @@ const CategoryItemProfitTab = () => {
             )}
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">
+          <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5">
+            <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4">
               Item-wise Profit
             </h2>
             {items.length === 0 ? (

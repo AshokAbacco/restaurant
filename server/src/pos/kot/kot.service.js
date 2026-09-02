@@ -216,8 +216,37 @@ export async function listKotsForOrder(orderId, outletId) {
     where: { orderId, outletId },
     include: {
       kitchenSection: true,
+      kitchenBranch: { select: { id: true, name: true } },
+      // Restaurant name for the printed ticket header. Name only — the KOT
+      // must never carry GSTIN, address or anything billing-related.
+      outlet: { select: { name: true } },
+      // The printed KOT needs the order header (number, type, table) and
+      // nothing about money — see KotTicket.jsx. Selected explicitly rather
+      // than `order: true` so pricing columns can't leak onto a kitchen slip
+      // by someone later adding a field to the Order model.
+      order: {
+        select: {
+          orderNumber: true,
+          orderType: true,
+          notes: true,
+          numberOfGuests: true,
+          table: { select: { name: true } },
+          onlinePlatform: { select: { name: true } },
+        },
+      },
       chef: { select: { fullName: true, employeeCode: true } },
-      items: { include: { orderItem: { include: { menuItem: true } } } },
+      items: {
+        include: {
+          orderItem: {
+            select: {
+              id: true,
+              quantity: true,
+              notes: true,
+              menuItem: { select: { name: true } },
+            },
+          },
+        },
+      },
       notes: {
         include: { chef: { select: { fullName: true } } },
         orderBy: { createdAt: "asc" },
