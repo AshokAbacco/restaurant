@@ -112,11 +112,11 @@ const Sidebar = ({ mobileOpen, onClose, collapsed, onToggleCollapse }) => {
       path: "/kitchen",
       icon: <FiCoffee />,
     },
-      {
-      name: "Kitchen Notes",
-      path: "/kitchen/notes",
-      icon: <FiFileText />,
-    },
+    //   {
+    //   name: "Kitchen Notes",
+    //   path: "/kitchen/notes",
+    //   icon: <FiFileText />,
+    // },
 
     {
       name: "Orders",
