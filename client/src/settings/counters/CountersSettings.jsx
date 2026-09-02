@@ -111,22 +111,22 @@ const CountersSettings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <p className="text-gray-500">Loading counters…</p>
+      <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410] flex items-center justify-center">
+        <p className="text-gray-500 dark:text-[#9CA8A0]">Loading counters…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="bg-white border-b">
+    <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
+      <div className="bg-white dark:bg-[#171C17] border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div className="max-w-4xl mx-auto px-8 py-8 flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-600 dark:bg-indigo-500 text-white flex items-center justify-center">
             <FiMapPin size={30} />
           </div>
           <div>
-            <h1 className="text-4xl font-bold">Billing Counters</h1>
-            <p className="mt-2 text-gray-500">
+            <h1 className="text-4xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">Billing Counters</h1>
+            <p className="mt-2 text-gray-500 dark:text-[#9CA8A0]">
               Every physical POS terminal in this outlet — "Counter 1",
               "Captain", etc. Staff pick one on their device; renaming or
               removing a counter here is an Owner/Admin action.
@@ -137,20 +137,20 @@ const CountersSettings = () => {
 
       <div className="max-w-4xl mx-auto p-8">
         {error && (
-          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 text-red-700 px-5 py-4">
+          <div className="mb-6 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 px-5 py-4">
             {error}
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border p-8">
+        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-gray-700">
+            <h2 className="font-semibold text-gray-700 dark:text-[#E4E9E2]">
               {counters.length} counter{counters.length === 1 ? "" : "s"}
             </h2>
             {editingId === null && (
               <button
                 onClick={startCreate}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="flex items-center gap-2 rounded-lg bg-blue-600 dark:bg-[#60A5FA] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 dark:hover:bg-[#3B82F6]"
               >
                 <FiPlus /> Add Counter
               </button>
@@ -158,30 +158,30 @@ const CountersSettings = () => {
           </div>
 
           {editingId === "new" && (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 p-4">
               <input
                 autoFocus
                 value={nameDraft}
                 onChange={(e) => setNameDraft(e.target.value)}
                 placeholder="e.g. Counter 1"
-                className="flex-1 h-10 rounded-lg border px-3 text-sm"
+                className="flex-1 h-10 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] px-3 text-sm bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2]"
                 onKeyDown={(e) => e.key === "Enter" && handleSave()}
               />
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="rounded-lg bg-blue-600 px-4 h-10 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                className="rounded-lg bg-blue-600 dark:bg-[#60A5FA] px-4 h-10 text-sm font-semibold text-white hover:bg-blue-700 dark:hover:bg-[#3B82F6] disabled:opacity-60"
               >
                 {saving ? "Saving…" : "Add"}
               </button>
-              <button onClick={cancelEdit} className="rounded-lg border px-4 h-10 text-sm">
+              <button onClick={cancelEdit} className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] px-4 h-10 text-sm">
                 Cancel
               </button>
             </div>
           )}
 
           {counters.length === 0 && editingId !== "new" ? (
-            <p className="text-center text-gray-400 py-10">
+            <p className="text-center text-gray-400 dark:text-[#6B7280] py-10">
               No counters yet — add one so staff can select it on the POS screen.
             </p>
           ) : (
@@ -189,7 +189,7 @@ const CountersSettings = () => {
               {counters.map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between rounded-xl border p-4"
+                  className="flex items-center justify-between rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-4"
                 >
                   {editingId === c.id ? (
                     <div className="flex flex-1 items-center gap-2">
@@ -197,17 +197,17 @@ const CountersSettings = () => {
                         autoFocus
                         value={nameDraft}
                         onChange={(e) => setNameDraft(e.target.value)}
-                        className="flex-1 h-10 rounded-lg border px-3 text-sm"
+                        className="flex-1 h-10 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] px-3 text-sm bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2]"
                         onKeyDown={(e) => e.key === "Enter" && handleSave()}
                       />
                       <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:opacity-60"
+                        className="rounded-lg bg-blue-600 dark:bg-[#60A5FA] p-2 text-white hover:bg-blue-700 dark:hover:bg-[#3B82F6] disabled:opacity-60"
                       >
                         <FiCheck />
                       </button>
-                      <button onClick={cancelEdit} className="rounded-lg border p-2">
+                      <button onClick={cancelEdit} className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] p-2">
                         <FiX />
                       </button>
                     </div>
@@ -216,27 +216,29 @@ const CountersSettings = () => {
                       <div className="flex items-center gap-3">
                         <span
                           className={`h-2.5 w-2.5 rounded-full ${
-                            c.isActive ? "bg-emerald-500" : "bg-gray-300"
+                            c.isActive
+                              ? "bg-emerald-500 dark:bg-emerald-400"
+                              : "bg-gray-300 dark:bg-[#262B24]"
                           }`}
                         />
-                        <span className="font-medium">{c.name}</span>
+                        <span className="font-medium text-[#1F2937] dark:text-[#E4E9E2]">{c.name}</span>
                         {!c.isActive && (
-                          <span className="text-xs text-gray-400">(inactive)</span>
+                          <span className="text-xs text-gray-400 dark:text-[#6B7280]">(inactive)</span>
                         )}
                       </div>
 
                       {confirmDeleteId === c.id ? (
                         <div className="flex items-center gap-2 text-sm">
-                          <span className="text-gray-500">Remove this counter?</span>
+                          <span className="text-gray-500 dark:text-[#9CA8A0]">Remove this counter?</span>
                           <button
                             onClick={() => handleDelete(c.id)}
-                            className="font-semibold text-red-600 hover:text-red-700"
+                            className="font-semibold text-red-600 dark:text-red-400 hover:text-red-700"
                           >
                             Confirm
                           </button>
                           <button
                             onClick={() => setConfirmDeleteId(null)}
-                            className="text-gray-500 hover:text-gray-700"
+                            className="text-gray-500 dark:text-[#9CA8A0] hover:text-gray-700"
                           >
                             Cancel
                           </button>
@@ -245,19 +247,19 @@ const CountersSettings = () => {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleToggleActive(c)}
-                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-100"
+                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-[#9CA8A0] hover:bg-gray-100 dark:hover:bg-[#1D231C]"
                           >
                             {c.isActive ? "Deactivate" : "Activate"}
                           </button>
                           <button
                             onClick={() => startEdit(c)}
-                            className="rounded-lg p-2 text-gray-400 hover:bg-blue-50 hover:text-blue-600"
+                            className="rounded-lg p-2 text-gray-400 dark:text-[#6B7280] hover:bg-blue-50 hover:text-blue-600"
                           >
                             <FiEdit2 size={14} />
                           </button>
                           <button
                             onClick={() => setConfirmDeleteId(c.id)}
-                            className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                            className="rounded-lg p-2 text-gray-400 dark:text-[#6B7280] hover:bg-red-50 hover:text-red-600"
                           >
                             <FiTrash2 size={14} />
                           </button>

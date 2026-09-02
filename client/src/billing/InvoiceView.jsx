@@ -376,7 +376,7 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
           )}
 
           <p className="text-center text-[10px] font-semibold uppercase">
-            Paid
+            Pay
           </p>
           <p className="mt-2 text-center text-[10px]">
             Thank you for dining with us!

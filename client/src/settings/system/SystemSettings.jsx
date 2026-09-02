@@ -1,9 +1,48 @@
 // ==============================================
 // src/settings/system/SystemSettings.jsx
+// Updated with dark/light mode support, matching SettingsDashboard
 // ==============================================
 
 import React, { useState } from "react";
 import { FiSettings, FiSave, FiRefreshCw } from "react-icons/fi";
+
+const inputClass =
+  "w-full h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg px-4 bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] dark:[color-scheme:dark] focus:outline-none focus:border-[#2563EB] dark:focus:border-[#60A5FA] transition-colors";
+
+const Card = ({ title, children, className = "", titleClass = "" }) => (
+  <div
+    className={`bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8 mt-8 ${className}`}
+  >
+    <h2 className={`text-2xl font-bold mb-8 text-[#1F2937] dark:text-[#E4E9E2] ${titleClass}`}>
+      {title}
+    </h2>
+    {children}
+  </div>
+);
+
+const ToggleRow = ({ title, description, checked, onChange, name, defaultChecked }) => (
+  <label className="flex items-center justify-between border border-[#E7EAE1] dark:border-[#262B24] rounded-xl p-5">
+    <div>
+      <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">{title}</h3>
+      <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">{description}</p>
+    </div>
+    <input
+      type="checkbox"
+      name={name}
+      checked={checked}
+      defaultChecked={defaultChecked}
+      onChange={onChange}
+      className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
+    />
+  </label>
+);
+
+const StatBox = ({ label, value, valueClass = "text-green-600 dark:text-green-400" }) => (
+  <div className="rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-6">
+    <h3 className="text-[#6B7280] dark:text-[#9CA8A0]">{label}</h3>
+    <p className={`mt-3 font-bold ${valueClass}`}>{value}</p>
+  </div>
+);
 
 const SystemSettings = () => {
   const [settings, setSettings] = useState({
@@ -35,36 +74,38 @@ const SystemSettings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
       {/* ======================================
           HEADER
       ====================================== */}
 
-      <div className="bg-white border-b">
+      <div className="bg-white dark:bg-[#171C17] border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div className="max-w-6xl mx-auto px-8 py-8 flex items-center justify-between">
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-slate-700 text-white flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-[#475569] dark:bg-[#94A3B8] text-white flex items-center justify-center">
               <FiSettings size={30} />
             </div>
 
             <div>
-              <h1 className="text-4xl font-bold">System Settings</h1>
+              <h1 className="text-4xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
+                System Settings
+              </h1>
 
-              <p className="mt-2 text-gray-500">
+              <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0]">
                 Configure global system preferences and security.
               </p>
             </div>
           </div>
 
           <div className="flex gap-4">
-            <button className="h-12 px-6 rounded-xl border hover:bg-gray-100 flex items-center gap-2">
+            <button className="h-12 px-6 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#1F2937] dark:text-[#E4E9E2] hover:bg-[#F3F5EE] dark:hover:bg-white/5 flex items-center gap-2 transition-colors">
               <FiRefreshCw />
               Reset
             </button>
 
             <button
               onClick={handleSave}
-              className="h-12 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+              className="h-12 px-8 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white flex items-center gap-2 shadow-lg transition-all"
             >
               <FiSave />
               Save
@@ -82,18 +123,22 @@ const SystemSettings = () => {
             GENERAL
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8">
-          <h2 className="text-2xl font-bold mb-8">General Settings</h2>
+        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
+          <h2 className="text-2xl font-bold mb-8 text-[#1F2937] dark:text-[#E4E9E2]">
+            General Settings
+          </h2>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block mb-2 font-medium">Time Zone</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Time Zone
+              </label>
 
               <select
                 name="timezone"
                 value={settings.timezone}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               >
                 <option>Asia/Kolkata</option>
 
@@ -106,13 +151,15 @@ const SystemSettings = () => {
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Date Format</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Date Format
+              </label>
 
               <select
                 name="dateFormat"
                 value={settings.dateFormat}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               >
                 <option>DD/MM/YYYY</option>
 
@@ -123,13 +170,15 @@ const SystemSettings = () => {
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Currency</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Currency
+              </label>
 
               <select
                 name="currency"
                 value={settings.currency}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               >
                 <option>INR (₹)</option>
 
@@ -140,13 +189,15 @@ const SystemSettings = () => {
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Language</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Language
+              </label>
 
               <select
                 name="language"
                 value={settings.language}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               >
                 <option>English</option>
 
@@ -162,12 +213,10 @@ const SystemSettings = () => {
             SECURITY
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Security</h2>
-
+        <Card title="Security">
           <div className="space-y-6">
             <div>
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Session Timeout (Minutes)
               </label>
 
@@ -176,69 +225,45 @@ const SystemSettings = () => {
                 name="sessionTimeout"
                 value={settings.sessionTimeout}
                 onChange={handleChange}
-                className="w-full md:w-60 h-12 border rounded-lg px-4"
+                className={`md:w-60 ${inputClass}`}
               />
             </div>
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Maintenance Mode</h3>
-
-                <p className="text-sm text-gray-500">
-                  Prevent users from accessing the system during maintenance.
-                </p>
-              </div>
-
-              <input
-                type="checkbox"
-                name="maintenanceMode"
-                checked={settings.maintenanceMode}
-                onChange={handleChange}
-                className="w-5 h-5"
-              />
-            </label>
+            <ToggleRow
+              title="Maintenance Mode"
+              description="Prevent users from accessing the system during maintenance."
+              name="maintenanceMode"
+              checked={settings.maintenanceMode}
+              onChange={handleChange}
+            />
           </div>
-        </div>
+        </Card>
+
         {/* ======================================
             LOGIN & SECURITY
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Login & Security</h2>
-
+        <Card title="Login & Security">
           <div className="grid md:grid-cols-2 gap-6">
             {/* Strong Password */}
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Strong Password Policy</h3>
-
-                <p className="text-sm text-gray-500">
-                  Require uppercase, lowercase, numbers and symbols.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Strong Password Policy"
+              description="Require uppercase, lowercase, numbers and symbols."
+              defaultChecked
+            />
 
             {/* Two Factor */}
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Two-Factor Authentication</h3>
-
-                <p className="text-sm text-gray-500">
-                  Enable OTP verification for administrators.
-                </p>
-              </div>
-
-              <input type="checkbox" className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Two-Factor Authentication"
+              description="Enable OTP verification for administrators."
+            />
 
             {/* Login Attempts */}
 
             <div>
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Maximum Login Attempts
               </label>
 
@@ -247,14 +272,14 @@ const SystemSettings = () => {
                 defaultValue="5"
                 min="1"
                 max="20"
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             {/* Lockout */}
 
             <div>
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Account Lock Duration (Minutes)
               </label>
 
@@ -262,87 +287,77 @@ const SystemSettings = () => {
                 type="number"
                 defaultValue="30"
                 min="1"
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             SYSTEM STATUS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">System Status</h2>
-
+        <Card title="System Status">
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">Database</h3>
-
-              <p className="mt-3 text-green-600 font-bold">Connected</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">API Server</h3>
-
-              <p className="mt-3 text-green-600 font-bold">Online</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">Storage</h3>
-
-              <p className="mt-3 text-green-600 font-bold">Healthy</p>
-            </div>
+            <StatBox label="Database" value="Connected" />
+            <StatBox label="API Server" value="Online" />
+            <StatBox label="Storage" value="Healthy" />
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             EMAIL & API
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Integrations</h2>
-
+        <Card title="Integrations">
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="rounded-xl border p-6">
-              <h3 className="font-semibold">Email Service</h3>
+            <div className="rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-6">
+              <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                Email Service
+              </h3>
 
-              <p className="text-sm text-gray-500 mt-2">SMTP Server Status</p>
+              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-2">
+                SMTP Server Status
+              </p>
 
-              <span className="inline-block mt-4 px-4 py-2 rounded-full bg-green-100 text-green-700">
+              <span className="inline-block mt-4 px-4 py-2 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-300">
                 Connected
               </span>
             </div>
 
-            <div className="rounded-xl border p-6">
-              <h3 className="font-semibold">Payment Gateway</h3>
+            <div className="rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-6">
+              <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                Payment Gateway
+              </h3>
 
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-2">
                 Gateway Connection Status
               </p>
 
-              <span className="inline-block mt-4 px-4 py-2 rounded-full bg-green-100 text-green-700">
+              <span className="inline-block mt-4 px-4 py-2 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-300">
                 Connected
               </span>
             </div>
           </div>
-        </div>
+        </Card>
+
         {/* ======================================
             SYSTEM TOOLS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">System Tools</h2>
-
+        <Card title="System Tools">
           <div className="flex flex-wrap gap-4">
             <button
               className="
                 h-12
                 px-6
                 rounded-xl
-                bg-blue-600
-                hover:bg-blue-700
+                bg-[#2563EB]
+                dark:bg-[#60A5FA]
+                hover:bg-[#1D4ED8]
+                dark:hover:bg-[#3B82F6]
                 text-white
+                transition-colors
               "
             >
               Clear Cache
@@ -353,9 +368,12 @@ const SystemSettings = () => {
                 h-12
                 px-6
                 rounded-xl
-                bg-green-600
-                hover:bg-green-700
+                bg-[#3FA34D]
+                dark:bg-[#43B75A]
+                hover:bg-[#358F42]
+                dark:hover:bg-[#3AA34E]
                 text-white
+                transition-colors
               "
             >
               Restart Services
@@ -367,64 +385,48 @@ const SystemSettings = () => {
                 px-6
                 rounded-xl
                 bg-orange-600
+                dark:bg-orange-500
                 hover:bg-orange-700
+                dark:hover:bg-orange-400
                 text-white
+                transition-colors
               "
             >
               Logout All Users
             </button>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             SYSTEM INFORMATION
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">System Information</h2>
-
+        <Card title="System Information">
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">Application Version</h3>
-
-              <p className="text-xl font-bold mt-3">v1.0.0</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">Node.js Version</h3>
-
-              <p className="text-xl font-bold mt-3">v22.x</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">Database</h3>
-
-              <p className="text-xl font-bold mt-3">PostgreSQL</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">Server Uptime</h3>
-
-              <p className="text-xl font-bold mt-3">12 Days</p>
-            </div>
+            <StatBox label="Application Version" value="v1.0.0" valueClass="text-xl text-[#1F2937] dark:text-[#E4E9E2]" />
+            <StatBox label="Node.js Version" value="v22.x" valueClass="text-xl text-[#1F2937] dark:text-[#E4E9E2]" />
+            <StatBox label="Database" value="PostgreSQL" valueClass="text-xl text-[#1F2937] dark:text-[#E4E9E2]" />
+            <StatBox label="Server Uptime" value="12 Days" valueClass="text-xl text-[#1F2937] dark:text-[#E4E9E2]" />
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             DANGER ZONE
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border border-red-200 p-8 mt-8">
-          <h2 className="text-2xl font-bold text-red-600 mb-8">Danger Zone</h2>
+        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-red-200 dark:border-red-500/30 p-8 mt-8">
+          <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-8">
+            Danger Zone
+          </h2>
 
           <div className="space-y-6">
-            <div className="flex items-center justify-between border border-red-200 rounded-xl p-5">
+            <div className="flex items-center justify-between border border-red-200 dark:border-red-500/30 rounded-xl p-5">
               <div>
-                <h3 className="font-semibold text-red-600">
+                <h3 className="font-semibold text-red-600 dark:text-red-400">
                   Enable Maintenance Mode
                 </h3>
 
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-1">
                   Only administrators will be able to access the application.
                 </p>
               </div>
@@ -435,21 +437,24 @@ const SystemSettings = () => {
                   py-2
                   rounded-lg
                   bg-red-600
+                  dark:bg-red-500
                   hover:bg-red-700
+                  dark:hover:bg-red-400
                   text-white
+                  transition-colors
                 "
               >
                 Enable
               </button>
             </div>
 
-            <div className="flex items-center justify-between border border-red-200 rounded-xl p-5">
+            <div className="flex items-center justify-between border border-red-200 dark:border-red-500/30 rounded-xl p-5">
               <div>
-                <h3 className="font-semibold text-red-600">
+                <h3 className="font-semibold text-red-600 dark:text-red-400">
                   Reset System Settings
                 </h3>
 
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-1">
                   Restore all system settings to their default values.
                 </p>
               </div>
@@ -461,8 +466,12 @@ const SystemSettings = () => {
                   rounded-lg
                   border
                   border-red-500
+                  dark:border-red-400
                   text-red-600
+                  dark:text-red-400
                   hover:bg-red-50
+                  dark:hover:bg-red-500/10
+                  transition-colors
                 "
               >
                 Reset
@@ -482,8 +491,13 @@ const SystemSettings = () => {
               px-6
               rounded-xl
               border
-              border-gray-300
-              hover:bg-gray-100
+              border-[#E7EAE1]
+              dark:border-[#262B24]
+              text-[#1F2937]
+              dark:text-[#E4E9E2]
+              hover:bg-[#F3F5EE]
+              dark:hover:bg-white/5
+              transition-colors
             "
           >
             Reset Settings
@@ -495,12 +509,16 @@ const SystemSettings = () => {
               h-12
               px-8
               rounded-xl
-              bg-blue-600
-              hover:bg-blue-700
+              bg-[#3FA34D]
+              dark:bg-[#43B75A]
+              hover:bg-[#358F42]
+              dark:hover:bg-[#3AA34E]
               text-white
               flex
               items-center
               gap-2
+              shadow-lg
+              transition-all
             "
           >
             <FiSave />

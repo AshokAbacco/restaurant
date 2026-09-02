@@ -1,5 +1,6 @@
 // ==============================================
 // src/settings/qr/QRSettings.jsx
+// Updated with dark/light mode support, matching SettingsDashboard
 // ==============================================
 
 import React, { useEffect, useState } from "react";
@@ -7,6 +8,51 @@ import { apiRequest } from "../../api/apiClient";
 import BillCodes, { buildUpiLink } from "../../billing/BillCodes";
 import { FiSave, FiRefreshCw, FiDownload } from "react-icons/fi";
 import { FaQrcode } from "react-icons/fa";
+
+const inputClass =
+  "w-full h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg px-4 bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] dark:[color-scheme:dark] focus:outline-none focus:border-[#2563EB] dark:focus:border-[#60A5FA] transition-colors";
+
+const billInputClass =
+  "w-full h-14 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] px-4 focus:outline-none focus:border-[#2563EB] dark:focus:border-[#60A5FA] transition-colors";
+
+const Card = ({ title, right, subtitle, children }) => (
+  <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8 mt-8">
+    <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <h2 className="text-2xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">{title}</h2>
+      {right}
+    </div>
+    {subtitle && (
+      <p className="mb-8 text-[#6B7280] dark:text-[#9CA8A0]">{subtitle}</p>
+    )}
+    {!subtitle && <div className="mb-8" />}
+    {children}
+  </div>
+);
+
+const ToggleRow = ({ title, description, checked, onChange, name, defaultChecked }) => (
+  <label className="flex items-center justify-between border border-[#E7EAE1] dark:border-[#262B24] rounded-xl p-5">
+    <div>
+      <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">{title}</h3>
+      <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">{description}</p>
+    </div>
+    <input
+      type="checkbox"
+      name={name}
+      checked={checked}
+      defaultChecked={defaultChecked}
+      onChange={onChange}
+      className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
+    />
+  </label>
+);
+
+const StatBox = ({ label, value }) => (
+  <div className="rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-6">
+    <h3 className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">{label}</h3>
+    <p className="text-3xl font-bold mt-3 text-[#1F2937] dark:text-[#E4E9E2]">{value}</p>
+  </div>
+);
+
 const QRSettings = () => {
   const [settings, setSettings] = useState({
     qrOrdering: true,
@@ -122,22 +168,24 @@ const QRSettings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
       {/* ======================================
           HEADER
       ====================================== */}
 
-      <div className="bg-white border-b">
+      <div className="bg-white dark:bg-[#171C17] border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div className="max-w-6xl mx-auto px-8 py-8 flex items-center justify-between">
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-green-600 text-white flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-[#0891B2] dark:bg-[#06B6D4] text-white flex items-center justify-center">
               <FaQrcode size={30} />
             </div>
 
             <div>
-              <h1 className="text-4xl font-bold">QR Ordering Settings</h1>
+              <h1 className="text-4xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
+                QR Ordering Settings
+              </h1>
 
-              <p className="mt-2 text-gray-500">
+              <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0]">
                 Configure QR menu ordering for your restaurant.
               </p>
             </div>
@@ -150,10 +198,16 @@ const QRSettings = () => {
                 px-6
                 rounded-xl
                 border
-                hover:bg-gray-100
+                border-[#E7EAE1]
+                dark:border-[#262B24]
+                text-[#1F2937]
+                dark:text-[#E4E9E2]
+                hover:bg-[#F3F5EE]
+                dark:hover:bg-white/5
                 flex
                 items-center
                 gap-2
+                transition-colors
               "
             >
               <FiRefreshCw />
@@ -166,12 +220,16 @@ const QRSettings = () => {
                 h-12
                 px-8
                 rounded-xl
-                bg-blue-600
-                hover:bg-blue-700
+                bg-[#3FA34D]
+                dark:bg-[#43B75A]
+                hover:bg-[#358F42]
+                dark:hover:bg-[#3AA34E]
                 text-white
                 flex
                 items-center
                 gap-2
+                shadow-lg
+                transition-all
               "
             >
               <FiSave />
@@ -190,37 +248,31 @@ const QRSettings = () => {
             GENERAL SETTINGS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8">
-          <h2 className="text-2xl font-bold mb-8">General Settings</h2>
+        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
+          <h2 className="text-2xl font-bold mb-8 text-[#1F2937] dark:text-[#E4E9E2]">
+            General Settings
+          </h2>
 
           <div className="space-y-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Enable QR Ordering</h3>
-
-                <p className="text-sm text-gray-500">
-                  Allow customers to scan QR codes and order.
-                </p>
-              </div>
-
-              <input
-                type="checkbox"
-                name="qrOrdering"
-                checked={settings.qrOrdering}
-                onChange={handleChange}
-                className="w-5 h-5"
-              />
-            </label>
+            <ToggleRow
+              title="Enable QR Ordering"
+              description="Allow customers to scan QR codes and order."
+              name="qrOrdering"
+              checked={settings.qrOrdering}
+              onChange={handleChange}
+            />
 
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block mb-2 font-medium">QR Type</label>
+                <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                  QR Type
+                </label>
 
                 <select
                   name="qrType"
                   value={settings.qrType}
                   onChange={handleChange}
-                  className="w-full h-12 border rounded-lg px-4"
+                  className={inputClass}
                 >
                   <option>Table QR</option>
 
@@ -231,14 +283,16 @@ const QRSettings = () => {
               </div>
 
               <div>
-                <label className="block mb-2 font-medium">Menu URL</label>
+                <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                  Menu URL
+                </label>
 
                 <input
                   type="text"
                   name="domain"
                   value={settings.domain}
                   onChange={handleChange}
-                  className="w-full h-12 border rounded-lg px-4"
+                  className={inputClass}
                 />
               </div>
             </div>
@@ -249,160 +303,139 @@ const QRSettings = () => {
             TABLE QR SETTINGS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Table QR Configuration</h2>
-
+        <Card title="Table QR Configuration">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block mb-2 font-medium">Table Prefix</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Table Prefix
+              </label>
 
               <input
                 name="tablePrefix"
                 value={settings.tablePrefix}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Total Tables</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Total Tables
+              </label>
 
               <input
                 type="number"
                 name="totalTables"
                 value={settings.totalTables}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
           </div>
-        </div>
+        </Card>
+
         {/* ======================================
             QR DESIGN
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">QR Design</h2>
-
+        <Card title="QR Design">
           <div className="grid md:grid-cols-2 gap-6">
             {/* QR Color */}
 
             <div>
-              <label className="block mb-2 font-medium">QR Color</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                QR Color
+              </label>
 
               <input
                 type="color"
                 defaultValue="#000000"
-                className="w-20 h-12 border rounded-lg"
+                className="w-20 h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg bg-white dark:bg-[#1D231C]"
               />
             </div>
 
             {/* Background */}
 
             <div>
-              <label className="block mb-2 font-medium">Background Color</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Background Color
+              </label>
 
               <input
                 type="color"
                 defaultValue="#FFFFFF"
-                className="w-20 h-12 border rounded-lg"
+                className="w-20 h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg bg-white dark:bg-[#1D231C]"
               />
             </div>
 
             {/* Logo */}
 
             <div className="md:col-span-2">
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Restaurant Logo (Center of QR)
               </label>
 
               <input
                 type="file"
                 accept="image/*"
-                className="w-full border rounded-lg p-3"
+                className="w-full border border-[#E7EAE1] dark:border-[#262B24] rounded-lg p-3 bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#F3F5EE] dark:file:bg-white/5 file:text-[#1F2937] dark:file:text-[#E4E9E2] transition-colors"
               />
 
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-2">
                 Optional logo displayed in the center of generated QR codes.
               </p>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             CUSTOMER ORDER OPTIONS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Customer Order Options</h2>
-
+        <Card title="Customer Order Options">
           <div className="grid md:grid-cols-2 gap-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Customer Name Required</h3>
+            <ToggleRow
+              title="Customer Name Required"
+              description="Ask customer name before placing order."
+              defaultChecked
+            />
 
-                <p className="text-sm text-gray-500">
-                  Ask customer name before placing order.
-                </p>
-              </div>
+            <ToggleRow
+              title="Mobile Number Required"
+              description="Ask customer mobile number."
+            />
 
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Allow Special Instructions"
+              description="Customers can add cooking instructions."
+              defaultChecked
+            />
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Mobile Number Required</h3>
-
-                <p className="text-sm text-gray-500">
-                  Ask customer mobile number.
-                </p>
-              </div>
-
-              <input type="checkbox" className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Allow Special Instructions</h3>
-
-                <p className="text-sm text-gray-500">
-                  Customers can add cooking instructions.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Allow Online Payment</h3>
-
-                <p className="text-sm text-gray-500">
-                  Enable payment directly from QR ordering.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Allow Online Payment"
+              description="Enable payment directly from QR ordering."
+              defaultChecked
+            />
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             QR ACTIONS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">QR Code Actions</h2>
-
+        <Card title="QR Code Actions">
           <div className="flex flex-wrap gap-4">
             <button
               className="
                 h-12
                 px-6
                 rounded-xl
-                bg-blue-600
-                hover:bg-blue-700
+                bg-[#2563EB]
+                dark:bg-[#60A5FA]
+                hover:bg-[#1D4ED8]
+                dark:hover:bg-[#3B82F6]
                 text-white
+                transition-colors
               "
             >
               Generate QR Codes
@@ -413,12 +446,15 @@ const QRSettings = () => {
                 h-12
                 px-6
                 rounded-xl
-                bg-green-600
-                hover:bg-green-700
+                bg-[#3FA34D]
+                dark:bg-[#43B75A]
+                hover:bg-[#358F42]
+                dark:hover:bg-[#3AA34E]
                 text-white
                 flex
                 items-center
                 gap-2
+                transition-colors
               "
             >
               <FiDownload />
@@ -431,92 +467,79 @@ const QRSettings = () => {
                 px-6
                 rounded-xl
                 border
-                hover:bg-gray-100
+                border-[#E7EAE1]
+                dark:border-[#262B24]
+                text-[#1F2937]
+                dark:text-[#E4E9E2]
+                hover:bg-[#F3F5EE]
+                dark:hover:bg-white/5
+                transition-colors
               "
             >
               Print QR Codes
             </button>
           </div>
-        </div>
+        </Card>
+
         {/* ======================================
             QR STATISTICS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold">QR Statistics</h2>
-
-            <span className="text-sm text-gray-500">Live Overview</span>
-          </div>
-
+        <Card
+          title="QR Statistics"
+          right={
+            <span className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+              Live Overview
+            </span>
+          }
+        >
           <div className="grid md:grid-cols-4 gap-6">
-            <div className="rounded-xl border p-6">
-              <h3 className="text-sm text-gray-500">Total QR Codes</h3>
-
-              <p className="text-3xl font-bold mt-3">{settings.totalTables}</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-sm text-gray-500">Total Scans</h3>
-
-              <p className="text-3xl font-bold mt-3">2,458</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-sm text-gray-500">Orders via QR</h3>
-
-              <p className="text-3xl font-bold mt-3">812</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-sm text-gray-500">Active Tables</h3>
-
-              <p className="text-3xl font-bold mt-3">18</p>
-            </div>
+            <StatBox label="Total QR Codes" value={settings.totalTables} />
+            <StatBox label="Total Scans" value="2,458" />
+            <StatBox label="Orders via QR" value="812" />
+            <StatBox label="Active Tables" value="18" />
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             BILL QR & BARCODE
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-2">Bill QR &amp; Barcode</h2>
-          <p className="mb-8 text-gray-600">
-            Printed at the foot of every invoice. The barcode carries the bill
-            number for staff lookup; the QR is a UPI payment link that opens
-            with the exact bill amount already filled in.
-          </p>
-
+        <Card
+          title="Bill QR & Barcode"
+          subtitle="Printed at the foot of every invoice. The barcode carries the bill number for staff lookup; the QR is a UPI payment link that opens with the exact bill amount already filled in."
+        >
           {billError && (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+            <div className="mb-6 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-300">
               {billError}
             </div>
           )}
           {billNotice && (
-            <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800">
+            <div className="mb-6 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-5 py-4 text-sm font-medium text-emerald-800 dark:text-emerald-300">
               {billNotice}
             </div>
           )}
 
           <div className="grid md:grid-cols-2 gap-8">
             <div>
-              <label className="block mb-3 font-semibold">UPI ID (VPA)</label>
+              <label className="block mb-3 font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                UPI ID (VPA)
+              </label>
               <input
                 name="upiId"
                 value={bill.upiId}
                 onChange={handleBillChange}
                 placeholder="e.g. royalspice@ybl"
-                className="w-full h-14 rounded-xl border border-gray-300 px-4 font-mono"
+                className={`font-mono ${billInputClass}`}
               />
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                 Leave blank to print no payment QR. Nothing else is needed —
                 the QR is built from this.
               </p>
             </div>
 
             <div>
-              <label className="block mb-3 font-semibold">
+              <label className="block mb-3 font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                 Payee name shown in the UPI app
               </label>
               <input
@@ -524,15 +547,15 @@ const QRSettings = () => {
                 value={bill.upiPayeeName}
                 onChange={handleBillChange}
                 placeholder={bill.name || "Restaurant name"}
-                className="w-full h-14 rounded-xl border border-gray-300 px-4"
+                className={billInputClass}
               />
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                 Defaults to the restaurant name when left blank.
               </p>
             </div>
 
             <div className="md:col-span-2">
-              <label className="block mb-3 font-semibold">
+              <label className="block mb-3 font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                 Footer note (optional)
               </label>
               <input
@@ -540,28 +563,28 @@ const QRSettings = () => {
                 value={bill.billFooterNote}
                 onChange={handleBillChange}
                 placeholder="e.g. Thank you! Free Wi-Fi: RoyalSpiceGuest"
-                className="w-full h-14 rounded-xl border border-gray-300 px-4"
+                className={billInputClass}
               />
             </div>
 
-            <label className="flex items-center gap-3 font-semibold">
+            <label className="flex items-center gap-3 font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
               <input
                 type="checkbox"
                 name="showBillBarcode"
                 checked={bill.showBillBarcode}
                 onChange={handleBillChange}
-                className="w-5 h-5"
+                className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
               />
               Print barcode on bills
             </label>
 
-            <label className="flex items-center gap-3 font-semibold">
+            <label className="flex items-center gap-3 font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
               <input
                 type="checkbox"
                 name="showBillQr"
                 checked={bill.showBillQr}
                 onChange={handleBillChange}
-                className="w-5 h-5"
+                className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
               />
               Print UPI payment QR on bills
             </label>
@@ -569,9 +592,11 @@ const QRSettings = () => {
 
           {/* Live preview — the SAME component the invoice uses, fed sample
               values, so this can't drift from what actually prints. */}
-          <div className="mt-8 border-t pt-8">
-            <h3 className="mb-4 font-semibold">Preview on a sample bill</h3>
-            <div className="inline-block rounded-xl border bg-white p-5 font-mono text-[11px]">
+          <div className="mt-8 border-t border-[#E7EAE1] dark:border-[#262B24] pt-8">
+            <h3 className="mb-4 font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+              Preview on a sample bill
+            </h3>
+            <div className="inline-block rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-white p-5 font-mono text-[11px] text-black">
               <BillCodes
                 outlet={{
                   ...bill,
@@ -588,7 +613,7 @@ const QRSettings = () => {
               )}
             </div>
             {bill.upiId && (
-              <p className="mt-3 break-all text-xs text-gray-500">
+              <p className="mt-3 break-all text-xs text-[#6B7280] dark:text-[#9CA8A0]">
                 QR encodes:{" "}
                 <span className="font-mono">
                   {buildUpiLink({
@@ -611,7 +636,7 @@ const QRSettings = () => {
                 setBillNotice("");
               }}
               disabled={savingBill || loadingBill}
-              className="h-12 px-6 rounded-xl border border-gray-300 hover:bg-gray-100 font-semibold disabled:opacity-50"
+              className="h-12 px-6 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#1F2937] dark:text-[#E4E9E2] hover:bg-[#F3F5EE] dark:hover:bg-white/5 font-semibold disabled:opacity-50 transition-colors"
             >
               Reset
             </button>
@@ -619,50 +644,52 @@ const QRSettings = () => {
               type="button"
               onClick={handleSaveBill}
               disabled={savingBill || loadingBill}
-              className="h-12 px-8 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold flex items-center gap-2 disabled:opacity-60"
+              className="h-12 px-8 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white font-semibold flex items-center gap-2 disabled:opacity-60 shadow-lg transition-all"
             >
               <FiSave />
               {savingBill ? "Saving…" : "Save Bill Codes"}
             </button>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             QR PREVIEW
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">QR Preview</h2>
-
+        <Card title="QR Preview">
           <div className="flex flex-col md:flex-row items-center gap-10">
-            <div className="w-52 h-52 rounded-2xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
-              <FaQrcode size={120} className="text-gray-400" />
+            <div className="w-52 h-52 rounded-2xl border-2 border-dashed border-[#E7EAE1] dark:border-[#262B24] flex items-center justify-center bg-[#F9FAFB] dark:bg-[#12160F]">
+              <FaQrcode size={120} className="text-[#9CA3AF] dark:text-[#6B7280]" />
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-xl font-bold">Preview Information</h3>
+              <h3 className="text-xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
+                Preview Information
+              </h3>
 
-              <p className="text-gray-600">
+              <p className="text-[#6B7280] dark:text-[#9CA8A0]">
                 Type :
-                <span className="font-semibold ml-2">{settings.qrType}</span>
+                <span className="font-semibold ml-2 text-[#1F2937] dark:text-[#E4E9E2]">
+                  {settings.qrType}
+                </span>
               </p>
 
-              <p className="text-gray-600">
+              <p className="text-[#6B7280] dark:text-[#9CA8A0]">
                 URL :
-                <span className="font-semibold ml-2 break-all">
+                <span className="font-semibold ml-2 break-all text-[#1F2937] dark:text-[#E4E9E2]">
                   {settings.domain}
                 </span>
               </p>
 
-              <p className="text-gray-600">
+              <p className="text-[#6B7280] dark:text-[#9CA8A0]">
                 Table Prefix :
-                <span className="font-semibold ml-2">
+                <span className="font-semibold ml-2 text-[#1F2937] dark:text-[#E4E9E2]">
                   {settings.tablePrefix}
                 </span>
               </p>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             FOOTER
@@ -675,8 +702,13 @@ const QRSettings = () => {
               px-6
               rounded-xl
               border
-              border-gray-300
-              hover:bg-gray-100
+              border-[#E7EAE1]
+              dark:border-[#262B24]
+              text-[#1F2937]
+              dark:text-[#E4E9E2]
+              hover:bg-[#F3F5EE]
+              dark:hover:bg-white/5
+              transition-colors
             "
           >
             Reset Settings
@@ -688,12 +720,16 @@ const QRSettings = () => {
               h-12
               px-8
               rounded-xl
-              bg-blue-600
-              hover:bg-blue-700
+              bg-[#3FA34D]
+              dark:bg-[#43B75A]
+              hover:bg-[#358F42]
+              dark:hover:bg-[#3AA34E]
               text-white
               flex
               items-center
               gap-2
+              shadow-lg
+              transition-all
             "
           >
             <FiSave />

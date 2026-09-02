@@ -1,9 +1,48 @@
 // ==============================================
 // src/settings/tax/TaxBilling.jsx
+// Updated with dark/light mode support, matching SettingsDashboard
 // ==============================================
 
 import React, { useState } from "react";
 import { FiPercent, FiSave, FiRefreshCw } from "react-icons/fi";
+
+const inputClass =
+  "w-full h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg px-4 bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] dark:[color-scheme:dark] focus:outline-none focus:border-[#2563EB] dark:focus:border-[#60A5FA] transition-colors";
+
+const Card = ({ title, children }) => (
+  <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8 mt-8">
+    <h2 className="text-2xl font-bold mb-8 text-[#1F2937] dark:text-[#E4E9E2]">
+      {title}
+    </h2>
+    {children}
+  </div>
+);
+
+const ToggleRow = ({ title, description, checked, onChange, name, defaultChecked }) => (
+  <label className="flex items-center justify-between border border-[#E7EAE1] dark:border-[#262B24] rounded-xl p-5">
+    <div>
+      <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">{title}</h3>
+      <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">{description}</p>
+    </div>
+    <input
+      type="checkbox"
+      name={name}
+      checked={checked}
+      defaultChecked={defaultChecked}
+      onChange={onChange}
+      className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
+    />
+  </label>
+);
+
+const StatBox = ({ label, value, valueClass = "" }) => (
+  <div className="rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-6">
+    <h3 className="text-[#6B7280] dark:text-[#9CA8A0]">{label}</h3>
+    <p className={`text-3xl font-bold mt-3 text-[#1F2937] dark:text-[#E4E9E2] ${valueClass}`}>
+      {value}
+    </p>
+  </div>
+);
 
 const TaxBilling = () => {
   const [settings, setSettings] = useState({
@@ -35,36 +74,38 @@ const TaxBilling = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
       {/* ======================================
           HEADER
       ====================================== */}
 
-      <div className="bg-white border-b">
+      <div className="bg-white dark:bg-[#171C17] border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div className="max-w-6xl mx-auto px-8 py-8 flex items-center justify-between">
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-orange-600 text-white flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-[#DC2626] dark:bg-[#EF4444] text-white flex items-center justify-center">
               <FiPercent size={30} />
             </div>
 
             <div>
-              <h1 className="text-4xl font-bold">Tax & Billing</h1>
+              <h1 className="text-4xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
+                Tax & Billing
+              </h1>
 
-              <p className="mt-2 text-gray-500">
+              <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0]">
                 Configure GST, taxes, invoices and billing preferences.
               </p>
             </div>
           </div>
 
           <div className="flex gap-4">
-            <button className="h-12 px-6 rounded-xl border hover:bg-gray-100 flex items-center gap-2">
+            <button className="h-12 px-6 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#1F2937] dark:text-[#E4E9E2] hover:bg-[#F3F5EE] dark:hover:bg-white/5 flex items-center gap-2 transition-colors">
               <FiRefreshCw />
               Reset
             </button>
 
             <button
               onClick={handleSave}
-              className="h-12 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+              className="h-12 px-8 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white flex items-center gap-2 shadow-lg transition-all"
             >
               <FiSave />
               Save
@@ -82,30 +123,24 @@ const TaxBilling = () => {
             GST SETTINGS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8">
-          <h2 className="text-2xl font-bold mb-8">GST Settings</h2>
+        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
+          <h2 className="text-2xl font-bold mb-8 text-[#1F2937] dark:text-[#E4E9E2]">
+            GST Settings
+          </h2>
 
           <div className="space-y-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Enable GST</h3>
-
-                <p className="text-sm text-gray-500">
-                  Apply GST to invoices and receipts.
-                </p>
-              </div>
-
-              <input
-                type="checkbox"
-                name="gstEnabled"
-                checked={settings.gstEnabled}
-                onChange={handleChange}
-                className="w-5 h-5"
-              />
-            </label>
+            <ToggleRow
+              title="Enable GST"
+              description="Apply GST to invoices and receipts."
+              name="gstEnabled"
+              checked={settings.gstEnabled}
+              onChange={handleChange}
+            />
 
             <div>
-              <label className="block mb-2 font-medium">GST Number</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                GST Number
+              </label>
 
               <input
                 type="text"
@@ -113,7 +148,7 @@ const TaxBilling = () => {
                 value={settings.gstNumber}
                 onChange={handleChange}
                 placeholder="Enter GST Number"
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
           </div>
@@ -123,54 +158,60 @@ const TaxBilling = () => {
             TAX RATES
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Tax Rates</h2>
-
+        <Card title="Tax Rates">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block mb-2 font-medium">CGST (%)</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                CGST (%)
+              </label>
 
               <input
                 type="number"
                 name="cgst"
                 value={settings.cgst}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">SGST (%)</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                SGST (%)
+              </label>
 
               <input
                 type="number"
                 name="sgst"
                 value={settings.sgst}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">IGST (%)</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                IGST (%)
+              </label>
 
               <input
                 type="number"
                 name="igst"
                 value={settings.igst}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Tax Calculation</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Tax Calculation
+              </label>
 
               <select
                 name="taxType"
                 value={settings.taxType}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               >
                 <option>Inclusive</option>
 
@@ -178,29 +219,22 @@ const TaxBilling = () => {
               </select>
             </div>
           </div>
-        </div>
+        </Card>
+
         {/* ======================================
             SERVICE CHARGE
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Service Charge</h2>
-
+        <Card title="Service Charge">
           <div className="grid md:grid-cols-2 gap-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Enable Service Charge</h3>
-
-                <p className="text-sm text-gray-500">
-                  Apply service charge to customer bills.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Enable Service Charge"
+              description="Apply service charge to customer bills."
+              defaultChecked
+            />
 
             <div>
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Service Charge (%)
               </label>
 
@@ -209,14 +243,16 @@ const TaxBilling = () => {
                 defaultValue="5"
                 min="0"
                 max="100"
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Apply On</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Apply On
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>All Orders</option>
 
                 <option>Dine-In Only</option>
@@ -225,30 +261,22 @@ const TaxBilling = () => {
               </select>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             DISCOUNT SETTINGS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Discount Settings</h2>
-
+        <Card title="Discount Settings">
           <div className="grid md:grid-cols-2 gap-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Enable Discounts</h3>
-
-                <p className="text-sm text-gray-500">
-                  Allow staff to apply discounts.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Enable Discounts"
+              description="Allow staff to apply discounts."
+              defaultChecked
+            />
 
             <div>
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Maximum Discount (%)
               </label>
 
@@ -257,68 +285,65 @@ const TaxBilling = () => {
                 defaultValue="20"
                 min="0"
                 max="100"
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Manager Approval Required</h3>
-
-                <p className="text-sm text-gray-500">
-                  Require manager approval for discounts.
-                </p>
-              </div>
-
-              <input type="checkbox" className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Manager Approval Required"
+              description="Require manager approval for discounts."
+            />
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             BILLING SETTINGS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Billing Settings</h2>
-
+        <Card title="Billing Settings">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block mb-2 font-medium">Invoice Prefix</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Invoice Prefix
+              </label>
 
               <input
                 type="text"
                 defaultValue="INV"
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Receipt Prefix</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Receipt Prefix
+              </label>
 
               <input
                 type="text"
                 defaultValue="REC"
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Starting Invoice Number
               </label>
 
               <input
                 type="number"
                 defaultValue="1001"
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Decimal Places</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Decimal Places
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>0</option>
 
                 <option>2</option>
@@ -327,94 +352,71 @@ const TaxBilling = () => {
               </select>
             </div>
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Round Off Final Bill</h3>
+            <ToggleRow
+              title="Round Off Final Bill"
+              description="Automatically round invoice totals."
+              defaultChecked
+            />
 
-                <p className="text-sm text-gray-500">
-                  Automatically round invoice totals.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Show GST Breakdown</h3>
-
-                <p className="text-sm text-gray-500">
-                  Display CGST / SGST / IGST separately.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Show GST Breakdown"
+              description="Display CGST / SGST / IGST separately."
+              defaultChecked
+            />
           </div>
-        </div>
+        </Card>
+
         {/* ======================================
             RECEIPT SETTINGS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Receipt Settings</h2>
-
+        <Card title="Receipt Settings">
           <div className="grid md:grid-cols-2 gap-6">
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print Restaurant Logo</h3>
+            <ToggleRow
+              title="Print Restaurant Logo"
+              description="Display your restaurant logo on printed bills."
+              defaultChecked
+            />
 
-                <p className="text-sm text-gray-500">
-                  Display your restaurant logo on printed bills.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
-
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Print QR Code</h3>
-
-                <p className="text-sm text-gray-500">
-                  Show payment or feedback QR code.
-                </p>
-              </div>
-
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </label>
+            <ToggleRow
+              title="Print QR Code"
+              description="Show payment or feedback QR code."
+              defaultChecked
+            />
 
             <div className="md:col-span-2">
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Invoice Footer Message
               </label>
 
               <textarea
                 rows={4}
-                className="w-full border rounded-lg p-4 resize-none"
+                className="w-full border border-[#E7EAE1] dark:border-[#262B24] rounded-lg p-4 resize-none bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] focus:outline-none focus:border-[#2563EB] dark:focus:border-[#60A5FA] transition-colors"
                 placeholder="Thank you for visiting. Please visit us again."
               />
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             BILL PREVIEW
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Bill Preview</h2>
-
-          <div className="rounded-xl border bg-gray-50 p-8 max-w-md">
+        <Card title="Bill Preview">
+          <div className="rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-[#F9FAFB] dark:bg-[#12160F] p-8 max-w-md">
             <div className="text-center">
-              <h3 className="text-xl font-bold">Restaurant Name</h3>
+              <h3 className="text-xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
+                Restaurant Name
+              </h3>
 
-              <p className="text-sm text-gray-500">GSTIN : 29ABCDE1234F1Z5</p>
+              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                GSTIN : 29ABCDE1234F1Z5
+              </p>
             </div>
 
-            <hr className="my-5" />
+            <hr className="my-5 border-[#E7EAE1] dark:border-[#262B24]" />
 
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-sm text-[#1F2937] dark:text-[#E4E9E2]">
               <div className="flex justify-between">
                 <span>Veg Burger</span>
 
@@ -434,9 +436,9 @@ const TaxBilling = () => {
               </div>
             </div>
 
-            <hr className="my-5" />
+            <hr className="my-5 border-[#E7EAE1] dark:border-[#262B24]" />
 
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-sm text-[#1F2937] dark:text-[#E4E9E2]">
               <div className="flex justify-between">
                 <span>Subtotal</span>
 
@@ -456,41 +458,20 @@ const TaxBilling = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             TAX SUMMARY
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Tax Summary</h2>
-
+        <Card title="Tax Summary">
           <div className="grid md:grid-cols-4 gap-6">
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">CGST</h3>
-
-              <p className="text-3xl font-bold mt-3">{settings.cgst}%</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">SGST</h3>
-
-              <p className="text-3xl font-bold mt-3">{settings.sgst}%</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">IGST</h3>
-
-              <p className="text-3xl font-bold mt-3">{settings.igst}%</p>
-            </div>
-
-            <div className="rounded-xl border p-6">
-              <h3 className="text-gray-500">Tax Type</h3>
-
-              <p className="text-xl font-bold mt-4">{settings.taxType}</p>
-            </div>
+            <StatBox label="CGST" value={`${settings.cgst}%`} />
+            <StatBox label="SGST" value={`${settings.sgst}%`} />
+            <StatBox label="IGST" value={`${settings.igst}%`} />
+            <StatBox label="Tax Type" value={settings.taxType} valueClass="text-xl mt-4" />
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             FOOTER
@@ -503,8 +484,13 @@ const TaxBilling = () => {
               px-6
               rounded-xl
               border
-              border-gray-300
-              hover:bg-gray-100
+              border-[#E7EAE1]
+              dark:border-[#262B24]
+              text-[#1F2937]
+              dark:text-[#E4E9E2]
+              hover:bg-[#F3F5EE]
+              dark:hover:bg-white/5
+              transition-colors
             "
           >
             Reset Settings
@@ -516,12 +502,16 @@ const TaxBilling = () => {
               h-12
               px-8
               rounded-xl
-              bg-blue-600
-              hover:bg-blue-700
+              bg-[#3FA34D]
+              dark:bg-[#43B75A]
+              hover:bg-[#358F42]
+              dark:hover:bg-[#3AA34E]
               text-white
               flex
               items-center
               gap-2
+              shadow-lg
+              transition-all
             "
           >
             <FiSave />

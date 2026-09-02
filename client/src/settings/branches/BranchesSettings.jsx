@@ -214,8 +214,8 @@ const BranchesSettings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <p className="text-gray-500">Loading branches…</p>
+      <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410] flex items-center justify-center">
+        <p className="text-[#6B7280] dark:text-[#9CA8A0]">Loading branches…</p>
       </div>
     );
   }
@@ -223,15 +223,15 @@ const BranchesSettings = () => {
   const isFormOpen = editingId !== null;
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="bg-white border-b">
+    <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
+      <div className="bg-white dark:bg-[#171C17] border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div className="max-w-4xl mx-auto px-8 py-8 flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-600 text-white flex items-center justify-center">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-600 dark:bg-emerald-500 text-white flex items-center justify-center">
             <FiMapPin size={30} />
           </div>
           <div>
-            <h1 className="text-4xl font-bold">Branches</h1>
-            <p className="mt-2 text-gray-500">
+            <h1 className="text-4xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">Branches</h1>
+            <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0]">
               Every outlet in this restaurant. These are what staff choose
               between when they log in, and what the header switcher moves
               between. Menu, tables, stock and staff are all kept separate per
@@ -243,35 +243,35 @@ const BranchesSettings = () => {
 
       <div className="max-w-4xl mx-auto p-8">
         {error && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-5 py-4 text-red-700 dark:text-red-400">
             <FiAlertCircle className="mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {notice && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-800">
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-5 py-4 text-emerald-800 dark:text-emerald-300">
             <FiCheck className="mt-0.5 shrink-0" />
             <span>{notice}</span>
           </div>
         )}
 
         {!isOwner && (
-          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-800">
+          <div className="mb-6 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-5 py-4 text-amber-800 dark:text-amber-300">
             You can view and edit branch details, but only the account Owner
             can add or remove a branch.
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border p-8">
+        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-gray-700">
+            <h2 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
               {branches.length} branch{branches.length === 1 ? "" : "es"}
             </h2>
             {isOwner && !isFormOpen && (
               <button
                 onClick={startCreate}
-                className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                className="flex items-center gap-2 rounded-lg bg-emerald-600 dark:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 dark:hover:bg-emerald-600"
               >
                 <FiPlus /> Add Branch
               </button>
@@ -291,7 +291,7 @@ const BranchesSettings = () => {
           )}
 
           {branches.length === 0 && editingId !== "new" ? (
-            <p className="text-center text-gray-400 py-10">
+            <p className="text-center text-[#9CA3AF] dark:text-[#6B7280] py-10">
               No branches yet.
             </p>
           ) : (
@@ -311,49 +311,49 @@ const BranchesSettings = () => {
                 ) : (
                   <div
                     key={branch.id}
-                    className="flex items-start justify-between gap-4 rounded-xl border p-4"
+                    className="flex items-start justify-between gap-4 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-4"
                   >
                     <div className="flex min-w-0 items-start gap-3">
-                      <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                      <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                         <FiHome />
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-gray-800">
+                          <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
                             {branch.name}
                           </p>
                           {branch.id === currentOutletId && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                            <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                               You're here
                             </span>
                           )}
                           {branch.isActive === false && (
-                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                            <span className="rounded-full bg-gray-100 dark:bg-[#262B24] px-2 py-0.5 text-xs font-semibold text-gray-500 dark:text-[#9CA8A0]">
                               Inactive
                             </span>
                           )}
                         </div>
                         {branch.address && (
-                          <p className="mt-1 flex items-start gap-1.5 text-sm text-gray-500">
+                          <p className="mt-1 flex items-start gap-1.5 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                             <FiMapPin className="mt-0.5 shrink-0" size={13} />
                             {branch.address}
                           </p>
                         )}
                         <div className="mt-1 flex flex-wrap gap-4">
                           {branch.phone && (
-                            <p className="flex items-center gap-1.5 text-sm text-gray-500">
+                            <p className="flex items-center gap-1.5 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                               <FiPhone size={13} /> {branch.phone}
                             </p>
                           )}
                           {branch.gstin ? (
-                            <p className="flex items-center gap-1.5 font-mono text-sm text-gray-500">
+                            <p className="flex items-center gap-1.5 font-mono text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                               <FiFileText size={13} /> {branch.gstin}
                             </p>
                           ) : (
                             // Flagged rather than left blank: invoices are
                             // generated per outlet, so a branch with no GSTIN
                             // will print bills without one.
-                            <p className="flex items-center gap-1.5 text-sm text-amber-600">
+                            <p className="flex items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400">
                               <FiAlertCircle size={13} /> No GSTIN set
                             </p>
                           )}
@@ -366,13 +366,13 @@ const BranchesSettings = () => {
                         <>
                           <button
                             onClick={() => handleDelete(branch.id)}
-                            className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                            className="rounded-lg bg-red-600 dark:bg-red-500 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 dark:hover:bg-red-600"
                           >
                             Confirm
                           </button>
                           <button
                             onClick={() => setConfirmDeleteId(null)}
-                            className="rounded-lg border px-3 py-2 text-sm"
+                            className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] text-[#1F2937] dark:text-[#E4E9E2] px-3 py-2 text-sm hover:bg-[#F3F5EE] dark:hover:bg-[#1D231C]"
                           >
                             Cancel
                           </button>
@@ -383,7 +383,7 @@ const BranchesSettings = () => {
                             onClick={() => startEdit(branch)}
                             disabled={isFormOpen}
                             title="Edit branch"
-                            className="rounded-lg border p-2 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                            className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] p-2 text-gray-600 dark:text-[#9CA8A0] hover:bg-gray-50 dark:hover:bg-[#1D231C] disabled:opacity-40"
                           >
                             <FiEdit2 size={15} />
                           </button>
@@ -392,7 +392,7 @@ const BranchesSettings = () => {
                               onClick={() => handleRestore(branch)}
                               disabled={isFormOpen}
                               title="Restore branch"
-                              className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"
+                              className="rounded-lg border border-emerald-200 dark:border-emerald-500/30 px-3 py-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 disabled:opacity-40"
                             >
                               Restore
                             </button>
@@ -415,7 +415,7 @@ const BranchesSettings = () => {
                                     ? "An organization needs at least one branch"
                                     : "Remove branch"
                               }
-                              className="rounded-lg border p-2 text-red-600 hover:bg-red-50 disabled:opacity-40"
+                              className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-40"
                             >
                               <FiTrash2 size={15} />
                             </button>
@@ -430,7 +430,7 @@ const BranchesSettings = () => {
           )}
         </div>
 
-        <p className="mt-6 text-sm text-gray-500">
+        <p className="mt-6 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
           A new branch starts completely empty — nothing is shared between
           outlets. Set up <strong>Kitchen Sections</strong> first, then{" "}
           <strong>Menu</strong> (assigning each item a kitchen section),
@@ -557,14 +557,14 @@ const KitchenBranchesPanel = ({ isOwner }) => {
   }
 
   return (
-    <div className="mt-8 rounded-2xl border bg-white p-6">
+    <div className="mt-8 rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] p-6">
       <div className="mb-1 flex items-center gap-2">
-        <h2 className="text-lg font-semibold text-gray-900">Kitchens</h2>
-        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+        <h2 className="text-lg font-semibold text-[#1F2937] dark:text-[#E4E9E2]">Kitchens</h2>
+        <span className="rounded-full bg-gray-100 dark:bg-[#262B24] px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-[#9CA8A0]">
           {kitchens.length}
         </span>
       </div>
-      <p className="mb-5 text-sm text-gray-500">
+      <p className="mb-5 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
         Physical kitchens in the branch you're currently switched into — one
         per floor or cooking area. Orders are routed to one of these at
         Send&nbsp;to&nbsp;Kitchen, and each kitchen's display shows only its
@@ -573,12 +573,12 @@ const KitchenBranchesPanel = ({ isOwner }) => {
       </p>
 
       {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           <FiAlertCircle className="mt-0.5 shrink-0" /> {error}
         </div>
       )}
       {notice && (
-        <div className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="mb-4 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
           {notice}
         </div>
       )}
@@ -590,12 +590,12 @@ const KitchenBranchesPanel = ({ isOwner }) => {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
             placeholder="e.g. Ground Floor Kitchen"
-            className="h-10 min-w-56 flex-1 rounded-lg border bg-white px-3 text-sm"
+            className="h-10 min-w-56 flex-1 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] px-3 text-sm"
           />
           <button
             onClick={handleCreate}
             disabled={saving}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 h-10 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 dark:bg-emerald-500 px-4 h-10 text-sm font-semibold text-white hover:bg-emerald-700 dark:hover:bg-emerald-600 disabled:opacity-60"
           >
             <FiPlus size={15} /> Add Kitchen
           </button>
@@ -603,15 +603,15 @@ const KitchenBranchesPanel = ({ isOwner }) => {
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-500">Loading kitchens…</p>
+        <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">Loading kitchens…</p>
       ) : kitchens.length === 0 ? (
-        <p className="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+        <p className="rounded-lg bg-gray-50 dark:bg-[#1D231C] px-4 py-6 text-center text-sm text-[#6B7280] dark:text-[#9CA8A0]">
           No kitchens yet. With none configured, orders go to the kitchen
           unrouted and appear on every display — which is exactly right if you
           only have one kitchen.
         </p>
       ) : (
-        <ul className="divide-y rounded-xl border">
+        <ul className="divide-y divide-[#E7EAE1] dark:divide-[#262B24] rounded-xl border border-[#E7EAE1] dark:border-[#262B24]">
           {kitchens.map((k) => (
             <li key={k.id} className="flex items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
@@ -621,18 +621,18 @@ const KitchenBranchesPanel = ({ isOwner }) => {
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleRename(k)}
-                    className="h-9 w-full max-w-sm rounded-lg border bg-white px-3 text-sm"
+                    className="h-9 w-full max-w-sm rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] px-3 text-sm"
                   />
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">{k.name}</span>
+                    <span className="font-medium text-[#1F2937] dark:text-[#E4E9E2]">{k.name}</span>
                     {k.isActive === false && (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                      <span className="rounded-full bg-gray-100 dark:bg-[#262B24] px-2 py-0.5 text-xs font-semibold text-gray-500 dark:text-[#9CA8A0]">
                         Inactive
                       </span>
                     )}
                     {k.floor?.name && (
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                         {k.floor.name}
                       </span>
                     )}
@@ -647,13 +647,13 @@ const KitchenBranchesPanel = ({ isOwner }) => {
                       <button
                         onClick={() => handleRename(k)}
                         disabled={saving}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+                        className="rounded-lg bg-emerald-600 dark:bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
                       >
                         Save
                       </button>
                       <button
                         onClick={() => setEditingId(null)}
-                        className="rounded-lg border px-3 py-1.5 text-sm"
+                        className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] text-[#1F2937] dark:text-[#E4E9E2] px-3 py-1.5 text-sm hover:bg-[#F3F5EE] dark:hover:bg-[#1D231C]"
                       >
                         Cancel
                       </button>
@@ -666,7 +666,7 @@ const KitchenBranchesPanel = ({ isOwner }) => {
                           setEditingName(k.name);
                         }}
                         title="Rename kitchen"
-                        className="rounded-lg border p-2 text-gray-600 hover:bg-gray-50"
+                        className="rounded-lg border border-[#E7EAE1] dark:border-[#262B24] p-2 text-gray-600 dark:text-[#9CA8A0] hover:bg-gray-50 dark:hover:bg-[#1D231C]"
                       >
                         <FiEdit2 size={15} />
                       </button>
@@ -704,16 +704,16 @@ const BranchForm = ({
   error,
   submitLabel,
 }) => (
-  <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-5">
+  <div className="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-500/10 p-5">
     {error && (
-      <div className="mb-4 flex items-start gap-2 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-700">
+      <div className="mb-4 flex items-start gap-2 rounded-lg bg-red-100 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400">
         <FiAlertCircle className="mt-0.5 shrink-0" /> {error}
       </div>
     )}
 
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">
           Branch name <span className="text-red-500">*</span>
         </label>
         <input
@@ -721,36 +721,36 @@ const BranchForm = ({
           value={form.name}
           onChange={(e) => setField("name", e.target.value)}
           placeholder="e.g. Anna Nagar Branch"
-          className="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+          className="h-10 w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] px-3 text-sm"
         />
       </div>
 
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">
           Address
         </label>
         <input
           value={form.address}
           onChange={(e) => setField("address", e.target.value)}
           placeholder="Street, area, city"
-          className="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+          className="h-10 w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] px-3 text-sm"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">
           Phone
         </label>
         <input
           value={form.phone}
           onChange={(e) => setField("phone", e.target.value)}
           placeholder="e.g. +91 98765 43210"
-          className="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+          className="h-10 w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] px-3 text-sm"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">
           GSTIN
         </label>
         <input
@@ -760,15 +760,15 @@ const BranchForm = ({
           onChange={(e) => setField("gstin", e.target.value.toUpperCase())}
           placeholder="e.g. 27AAPFU0939F1ZV"
           maxLength={15}
-          className="h-10 w-full rounded-lg border bg-white px-3 font-mono text-sm"
+          className="h-10 w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] px-3 font-mono text-sm"
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-[#6B7280] dark:text-[#9CA8A0]">
           Optional. Appears on this branch's invoices.
         </p>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">
           FSSAI licence no.
         </label>
         <input
@@ -776,16 +776,16 @@ const BranchForm = ({
           onChange={(e) => setField("fssai", e.target.value)}
           placeholder="e.g. 11223344005566"
           maxLength={20}
-          className="h-10 w-full rounded-lg border bg-white px-3 font-mono text-sm"
+          className="h-10 w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] px-3 font-mono text-sm"
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-[#6B7280] dark:text-[#9CA8A0]">
           Printed alongside the GSTIN on the bill header. Legally required on
           restaurant invoices in India.
         </p>
       </div>
 
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-[#1F2937] dark:text-[#E4E9E2]">
           Tagline
         </label>
         <input
@@ -793,9 +793,9 @@ const BranchForm = ({
           onChange={(e) => setField("tagline", e.target.value)}
           placeholder="e.g. Authentic Multi-Cuisine Fine Dining"
           maxLength={120}
-          className="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+          className="h-10 w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] px-3 text-sm"
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-[#6B7280] dark:text-[#9CA8A0]">
           Optional line printed under the restaurant name on the bill.
         </p>
       </div>
@@ -805,14 +805,14 @@ const BranchForm = ({
       <button
         onClick={onSave}
         disabled={saving}
-        className="rounded-lg bg-emerald-600 px-5 h-10 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+        className="rounded-lg bg-emerald-600 dark:bg-emerald-500 px-5 h-10 text-sm font-semibold text-white hover:bg-emerald-700 dark:hover:bg-emerald-600 disabled:opacity-60"
       >
         {saving ? "Saving…" : submitLabel}
       </button>
       <button
         onClick={onCancel}
         disabled={saving}
-        className="flex items-center gap-1.5 rounded-lg border bg-white px-4 h-10 text-sm disabled:opacity-60"
+        className="flex items-center gap-1.5 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] px-4 h-10 text-sm disabled:opacity-60"
       >
         <FiX size={15} /> Cancel
       </button>

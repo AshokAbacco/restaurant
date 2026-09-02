@@ -1,5 +1,6 @@
 // ==============================================
 // src/settings/SettingsDashboard.jsx
+// Updated with dark/light mode support and improved UX
 // ==============================================
 
 import React, { useMemo, useState } from "react";
@@ -34,118 +35,126 @@ const SETTINGS = [
     id: 1,
     title: "Restaurant Profile",
     description:
-      "Manage restaurant information, logo, GST, timings and contact details.",
+      "Update your restaurant information, branding, GST details, business hours, and contact information.",
     icon: FiHome,
-    color: "bg-blue-500",
+    color: "bg-[#3FA34D] dark:bg-[#43B75A]",
     path: "/settings/restaurant",
   },
   {
     id: 20,
     title: "Branches",
     description:
-      "Add and manage outlets. These are what appear on the login outlet picker.",
+      "Add and manage multiple restaurant outlets. Configure which branches appear on the staff login screen.",
     icon: FiMapPin,
-    color: "bg-emerald-500",
+    color: "bg-[#2563EB] dark:bg-[#60A5FA]",
     path: "/settings/branches",
   },
   {
     id: 2,
     title: "Users & Roles",
-    description: "Manage users, staff accounts and permissions.",
+    description:
+      "Create staff accounts, assign roles, and manage user permissions across your restaurant.",
     icon: FiUsers,
-    color: "bg-purple-500",
+    color: "bg-[#9333EA] dark:bg-[#C084FC]",
     path: "/settings/users",
   },
   {
     id: 3,
     title: "Self Order Kiosk",
     description:
-      "Configure kiosk display, welcome screen and customer experience.",
+      "Customize your kiosk display, welcome screen, menu options, and customer experience settings.",
     icon: FiMonitor,
-    color: "bg-orange-500",
+    color: "bg-[#EA580C] dark:bg-[#FB923C]",
     path: "/settings/kiosk",
   },
   {
     id: 4,
     title: "QR Ordering",
-    description: "Manage QR menu, table QR codes and online ordering.",
+    description:
+      "Manage QR menu links, table QR codes, online ordering, and customer ordering preferences.",
     icon: FiSmartphone,
-    color: "bg-green-500",
+    color: "bg-[#0891B2] dark:bg-[#06B6D4]",
     path: "/settings/qr",
   },
   {
     id: 5,
     title: "Payment Gateway",
-    description: "Configure UPI, Card, Cash and payment gateways.",
+    description:
+      "Configure payment methods including UPI, credit/debit cards, cash, and digital wallet options.",
     icon: FiCreditCard,
-    color: "bg-pink-500",
+    color: "bg-[#E11D48] dark:bg-[#FB7185]",
     path: "/settings/payment",
   },
   {
     id: 6,
     title: "Tax & Billing",
-    description: "GST, invoice numbering and billing configuration.",
+    description:
+      "Set up GST details, invoice numbering sequences, and billing configuration for your restaurant.",
     icon: FiFileText,
-    color: "bg-red-500",
+    color: "bg-[#DC2626] dark:bg-[#EF4444]",
     path: "/settings/tax",
   },
   {
     id: 6.5,
     title: "Order Status Labels",
     description:
-      "Rename and recolor order statuses shown on POS, KDS, and reports.",
+      "Customize order status names and colors displayed on your POS system, kitchen displays, and reports.",
     icon: FiTag,
-    color: "bg-teal-500",
+    color: "bg-[#1E7E34] dark:bg-[#22C55E]",
     path: "/settings/order-status",
   },
   {
     id: 6.6,
     title: "Billing Counters",
     description:
-      "Manage physical POS terminals/counters for Counter Summary reporting.",
+      "Manage physical POS terminals and counters for accurate counter-wise sales reporting and analysis.",
     icon: FiMapPin,
-    color: "bg-indigo-500",
+    color: "bg-[#4F46E5] dark:bg-[#818CF8]",
     path: "/settings/counters",
   },
   {
     id: 7,
     title: "Printer Setup",
     description:
-      "Printer models, paper size, print options and connected printers.",
+      "Configure thermal printers, paper sizes, print options, and connected printer devices across your outlet.",
     icon: FiPrinter,
-    color: "bg-yellow-500",
+    color: "bg-[#D97706] dark:bg-[#FCD34D]",
     path: "/settings/printer",
   },
   {
     id: 8,
     title: "Notifications",
-    description: "SMS, WhatsApp, Email and alert settings.",
+    description:
+      "Enable SMS, WhatsApp, email alerts, and push notifications for orders and important restaurant events.",
     icon: FiBell,
-    color: "bg-indigo-500",
+    color: "bg-[#4F46E5] dark:bg-[#818CF8]",
     path: "/settings/notifications",
   },
   {
     id: 9,
     title: "Appearance",
-    description: "Customize themes, branding and dashboard appearance.",
+    description:
+      "Customize your dashboard theme, color scheme, logo placement, and visual branding throughout the system.",
     icon: FiImage,
-    color: "bg-teal-500",
+    color: "bg-[#0891B2] dark:bg-[#06B6D4]",
     path: "/settings/appearance",
   },
   {
     id: 10,
     title: "Backup & Restore",
-    description: "Create backups, restore data and export information.",
+    description:
+      "Create data backups, restore from previous backups, and export your restaurant's critical information.",
     icon: FiDatabase,
-    color: "bg-cyan-500",
+    color: "bg-[#0369A1] dark:bg-[#0EA5E9]",
     path: "/settings/backup",
   },
   {
     id: 11,
     title: "Subscription & System",
-    description: "License, subscription, updates and system information.",
+    description:
+      "Manage your subscription plan, license details, system updates, and view system information.",
     icon: FiCpu,
-    color: "bg-slate-600",
+    color: "bg-[#475569] dark:bg-[#94A3B8]",
     path: "/settings/system",
   },
 ];
@@ -172,37 +181,39 @@ const SettingsDashboard = () => {
   }, [search]);
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
       {/* ======================================
           HERO
       ====================================== */}
 
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white dark:bg-[#171C17] border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div className="max-w-7xl mx-auto px-8 py-10">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center">
+                <div className="w-16 h-16 rounded-2xl bg-[#2563EB] dark:bg-[#60A5FA] text-white flex items-center justify-center">
                   <FiSettings size={34} />
                 </div>
 
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800">Settings</h1>
+                  <h1 className="text-4xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
+                    Settings
+                  </h1>
 
-                  <p className="text-gray-500 mt-2">
-                    Configure and manage your restaurant system.
+                  <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-2">
+                    Configure and manage your restaurant system. Works perfectly on PCs, laptops, and mobile devices.
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="hidden lg:flex items-center gap-6">
-              <div className="bg-blue-50 rounded-2xl px-8 py-5 text-center">
-                <h2 className="text-3xl font-bold text-blue-600">
+              <div className="bg-blue-50 dark:bg-blue-500/10 rounded-2xl px-8 py-5 text-center border border-[#E7EAE1] dark:border-[#262B24]">
+                <h2 className="text-3xl font-bold text-[#2563EB] dark:text-[#60A5FA]">
                   {SETTINGS.length}
                 </h2>
 
-                <p className="text-gray-600">Modules</p>
+                <p className="text-[#6B7280] dark:text-[#9CA8A0]">Modules</p>
               </div>
             </div>
           </div>
@@ -212,14 +223,14 @@ const SettingsDashboard = () => {
           <div className="mt-10 relative max-w-xl">
             <FiSearch
               size={22}
-              className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute left-5 top-1/2 -translate-y-1/2 text-[#9CA3AF] dark:text-[#6B7280]"
             />
 
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search settings..."
-              className="w-full h-16 rounded-2xl border border-gray-300 bg-white pl-14 pr-5 text-lg focus:outline-none focus:border-blue-500"
+              className="w-full h-16 rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2] pl-14 pr-5 text-lg focus:outline-none focus:border-[#2563EB] dark:focus:border-[#60A5FA]"
             />
           </div>
         </div>
@@ -232,32 +243,34 @@ const SettingsDashboard = () => {
         {/* Quick Stats */}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-200">
-            <p className="text-gray-500 text-sm uppercase tracking-wide">
+          <div className="bg-white dark:bg-[#171C17] rounded-3xl p-6 shadow-sm border border-[#E7EAE1] dark:border-[#262B24]">
+            <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm uppercase tracking-wide">
               Total Modules
             </p>
 
-            <h2 className="mt-3 text-4xl font-bold text-blue-600">
+            <h2 className="mt-3 text-4xl font-bold text-[#2563EB] dark:text-[#60A5FA]">
               {SETTINGS.length}
             </h2>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-200">
-            <p className="text-gray-500 text-sm uppercase tracking-wide">
+          <div className="bg-white dark:bg-[#171C17] rounded-3xl p-6 shadow-sm border border-[#E7EAE1] dark:border-[#262B24]">
+            <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm uppercase tracking-wide">
               Search Results
             </p>
 
-            <h2 className="mt-3 text-4xl font-bold text-green-600">
+            <h2 className="mt-3 text-4xl font-bold text-[#3FA34D] dark:text-[#43B75A]">
               {filteredSettings.length}
             </h2>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-200">
-            <p className="text-gray-500 text-sm uppercase tracking-wide">
+          <div className="bg-white dark:bg-[#171C17] rounded-3xl p-6 shadow-sm border border-[#E7EAE1] dark:border-[#262B24]">
+            <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm uppercase tracking-wide">
               System Status
             </p>
 
-            <h2 className="mt-3 text-4xl font-bold text-orange-500">Active</h2>
+            <h2 className="mt-3 text-4xl font-bold text-[#3FA34D] dark:text-[#43B75A]">
+              Active
+            </h2>
           </div>
         </div>
 
@@ -274,16 +287,20 @@ const SettingsDashboard = () => {
                 className="
                   group
                   bg-white
+                  dark:bg-[#171C17]
                   rounded-3xl
                   border
-                  border-gray-200
+                  border-[#E7EAE1]
+                  dark:border-[#262B24]
                   p-7
                   cursor-pointer
                   transition-all
                   duration-300
-                  hover:shadow-xl
+                  hover:shadow-lg
+                  dark:hover:shadow-2xl
                   hover:-translate-y-2
-                  hover:border-blue-300
+                  hover:border-[#2563EB]
+                  dark:hover:border-[#60A5FA]
                 "
               >
                 {/* Icon */}
@@ -308,20 +325,20 @@ const SettingsDashboard = () => {
 
                 {/* Title */}
 
-                <h2 className="mt-6 text-2xl font-bold text-gray-800">
+                <h2 className="mt-6 text-2xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
                   {setting.title}
                 </h2>
 
                 {/* Description */}
 
-                <p className="mt-4 text-gray-500 leading-7 min-h-[84px]">
+                <p className="mt-4 text-[#6B7280] dark:text-[#9CA8A0] leading-7 min-h-[84px]">
                   {setting.description}
                 </p>
 
                 {/* Footer */}
 
                 <div className="mt-8 flex items-center justify-between">
-                  <span className="text-blue-600 font-semibold">
+                  <span className="text-[#2563EB] dark:text-[#60A5FA] font-semibold">
                     Open Settings
                   </span>
 
@@ -331,13 +348,16 @@ const SettingsDashboard = () => {
                       h-10
                       rounded-full
                       bg-blue-50
+                      dark:bg-blue-500/10
                       flex
                       items-center
                       justify-center
-                      text-blue-600
+                      text-[#2563EB]
+                      dark:text-[#60A5FA]
                       transition-all
                       duration-300
-                      group-hover:bg-blue-600
+                      group-hover:bg-[#2563EB]
+                      dark:group-hover:bg-[#60A5FA]
                       group-hover:text-white
                     "
                   >
@@ -352,17 +372,17 @@ const SettingsDashboard = () => {
         {/* Empty State */}
 
         {filteredSettings.length === 0 && (
-          <div className="mt-20 bg-white rounded-3xl border border-gray-200 py-20 text-center">
-            <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mx-auto">
-              <FiSearch size={42} className="text-gray-400" />
+          <div className="mt-20 bg-white dark:bg-[#171C17] rounded-3xl border border-[#E7EAE1] dark:border-[#262B24] py-20 text-center">
+            <div className="w-24 h-24 rounded-full bg-[#F3F5EE] dark:bg-[#1D231C] flex items-center justify-center mx-auto">
+              <FiSearch size={42} className="text-[#9CA3AF] dark:text-[#6B7280]" />
             </div>
 
-            <h2 className="mt-8 text-3xl font-bold text-gray-700">
+            <h2 className="mt-8 text-3xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
               No Settings Found
             </h2>
 
-            <p className="mt-4 text-gray-500 text-lg">
-              Try searching with another keyword.
+            <p className="mt-4 text-[#6B7280] dark:text-[#9CA8A0] text-lg">
+              Try searching with different keywords.
             </p>
           </div>
         )}
@@ -373,17 +393,19 @@ const SettingsDashboard = () => {
         <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Help */}
 
-          <div className="bg-white rounded-3xl border border-gray-200 p-8">
+          <div className="bg-white dark:bg-[#171C17] rounded-3xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center">
-                <FiAward size={28} className="text-blue-600" />
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
+                <FiAward size={28} className="text-[#2563EB] dark:text-[#60A5FA]" />
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">Need Help?</h2>
+                <h2 className="text-2xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
+                  Need Help?
+                </h2>
 
-                <p className="text-gray-500">
-                  Learn how to configure your restaurant.
+                <p className="text-[#6B7280] dark:text-[#9CA8A0]">
+                  Learn how to configure your restaurant settings and features.
                 </p>
               </div>
             </div>
@@ -394,8 +416,10 @@ const SettingsDashboard = () => {
                   w-full
                   h-14
                   rounded-2xl
-                  bg-blue-600
-                  hover:bg-blue-700
+                  bg-[#2563EB]
+                  dark:bg-[#60A5FA]
+                  hover:bg-[#1D4ED8]
+                  dark:hover:bg-[#3B82F6]
                   text-white
                   font-semibold
                   transition
@@ -410,8 +434,12 @@ const SettingsDashboard = () => {
                   h-14
                   rounded-2xl
                   border
-                  border-gray-300
-                  hover:bg-gray-100
+                  border-[#E7EAE1]
+                  dark:border-[#262B24]
+                  hover:bg-[#F3F5EE]
+                  dark:hover:bg-[#1D231C]
+                  text-[#1F2937]
+                  dark:text-[#E4E9E2]
                   font-semibold
                   transition
                 "
@@ -423,41 +451,51 @@ const SettingsDashboard = () => {
 
           {/* Recent Updates */}
 
-          <div className="bg-white rounded-3xl border border-gray-200 p-8">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Recent Configuration
+          <div className="bg-white dark:bg-[#171C17] rounded-3xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
+            <h2 className="text-2xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
+              Quick Setup Tips
             </h2>
 
             <div className="mt-8 space-y-6">
               <div className="flex items-start gap-4">
-                <div className="w-3 h-3 rounded-full bg-green-500 mt-2" />
+                <div className="w-3 h-3 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] mt-2 flex-shrink-0" />
 
                 <div>
-                  <h4 className="font-semibold">Restaurant Profile</h4>
+                  <h4 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                    Complete Your Profile
+                  </h4>
 
-                  <p className="text-gray-500 text-sm">Last updated recently</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-3 h-3 rounded-full bg-blue-500 mt-2" />
-
-                <div>
-                  <h4 className="font-semibold">Payment Gateway</h4>
-
-                  <p className="text-gray-500 text-sm">
-                    Configuration available
+                  <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
+                    Start by setting up your restaurant profile and business details.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-4">
-                <div className="w-3 h-3 rounded-full bg-orange-500 mt-2" />
+                <div className="w-3 h-3 rounded-full bg-[#2563EB] dark:bg-[#60A5FA] mt-2 flex-shrink-0" />
 
                 <div>
-                  <h4 className="font-semibold">Kiosk Settings</h4>
+                  <h4 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                    Configure Payment Methods
+                  </h4>
 
-                  <p className="text-gray-500 text-sm">Ready to configure</p>
+                  <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
+                    Enable payment gateways and set up your preferred payment methods.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-3 h-3 rounded-full bg-[#D97706] dark:bg-[#FCD34D] mt-2 flex-shrink-0" />
+
+                <div>
+                  <h4 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                    Set Up Printers
+                  </h4>
+
+                  <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
+                    Connect your kitchen and billing printers for smooth operations.
+                  </p>
                 </div>
               </div>
             </div>
@@ -469,12 +507,14 @@ const SettingsDashboard = () => {
           FOOTER
       ====================================== */}
 
-      <footer className="border-t border-gray-200 bg-white py-6 mt-12">
+      <footer className="border-t border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] py-6 mt-12">
         <div className="max-w-7xl mx-auto px-8 flex flex-col md:flex-row items-center justify-between">
-          <p className="text-gray-500">Restaurant ERP • Settings Center</p>
+          <p className="text-[#6B7280] dark:text-[#9CA8A0]">
+            Restaurant ERP • Settings Center • Optimized for all devices
+          </p>
 
-          <p className="text-gray-400 text-sm mt-3 md:mt-0">
-            Manage your restaurant configuration from one place.
+          <p className="text-[#9CA3AF] dark:text-[#6B7280] text-sm mt-3 md:mt-0">
+            Access your settings anytime, anywhere on PC, laptop, or mobile.
           </p>
         </div>
       </footer>

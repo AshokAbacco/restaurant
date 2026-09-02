@@ -1,9 +1,43 @@
 // ==============================================
 // src/settings/appearance/AppearanceSettings.jsx
+// Updated with dark/light mode support, matching SettingsDashboard
 // ==============================================
 
 import React, { useState } from "react";
 import { FiMonitor, FiSave, FiRefreshCw } from "react-icons/fi";
+
+const inputClass =
+  "w-full h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg px-4 bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] dark:[color-scheme:dark] focus:outline-none focus:border-[#2563EB] dark:focus:border-[#60A5FA] transition-colors";
+
+const fileInputClass =
+  "w-full border border-[#E7EAE1] dark:border-[#262B24] rounded-lg p-3 bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#F3F5EE] dark:file:bg-white/5 file:text-[#1F2937] dark:file:text-[#E4E9E2] transition-colors";
+
+const Card = ({ title, children, className = "" }) => (
+  <div
+    className={`bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8 mt-8 ${className}`}
+  >
+    <h2 className="text-2xl font-bold mb-8 text-[#1F2937] dark:text-[#E4E9E2]">
+      {title}
+    </h2>
+    {children}
+  </div>
+);
+
+const ToggleRow = ({ title, description, checked, onChange, name }) => (
+  <label className="flex items-center justify-between border border-[#E7EAE1] dark:border-[#262B24] rounded-xl p-5">
+    <div>
+      <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">{title}</h3>
+      <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">{description}</p>
+    </div>
+    <input
+      type="checkbox"
+      name={name}
+      checked={checked}
+      onChange={onChange}
+      className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
+    />
+  </label>
+);
 
 const AppearanceSettings = () => {
   const [settings, setSettings] = useState({
@@ -39,24 +73,24 @@ const AppearanceSettings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
       {/* ======================================
           HEADER
       ====================================== */}
 
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white dark:bg-[#171C17] border-b border-[#E7EAE1] dark:border-[#262B24]">
         <div className="max-w-6xl mx-auto px-8 py-8 flex items-center justify-between">
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-purple-600 text-white flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-[#0891B2] dark:bg-[#06B6D4] text-white flex items-center justify-center">
               <FiMonitor size={30} />
             </div>
 
             <div>
-              <h1 className="text-4xl font-bold text-gray-800">
+              <h1 className="text-4xl font-bold text-[#1F2937] dark:text-[#E4E9E2]">
                 Appearance Settings
               </h1>
 
-              <p className="mt-2 text-gray-500">
+              <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0]">
                 Customize the appearance of your restaurant ERP.
               </p>
             </div>
@@ -69,11 +103,16 @@ const AppearanceSettings = () => {
                 px-6
                 rounded-xl
                 border
-                border-gray-300
-                hover:bg-gray-100
+                border-[#E7EAE1]
+                dark:border-[#262B24]
+                text-[#1F2937]
+                dark:text-[#E4E9E2]
+                hover:bg-[#F3F5EE]
+                dark:hover:bg-white/5
                 flex
                 items-center
                 gap-2
+                transition-colors
               "
             >
               <FiRefreshCw />
@@ -86,12 +125,16 @@ const AppearanceSettings = () => {
                 h-12
                 px-8
                 rounded-xl
-                bg-blue-600
-                hover:bg-blue-700
+                bg-[#3FA34D]
+                dark:bg-[#43B75A]
+                hover:bg-[#358F42]
+                dark:hover:bg-[#3AA34E]
                 text-white
                 flex
                 items-center
                 gap-2
+                shadow-lg
+                transition-all
               "
             >
               <FiSave />
@@ -110,20 +153,24 @@ const AppearanceSettings = () => {
             GENERAL APPEARANCE
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8">
-          <h2 className="text-2xl font-bold mb-8">General Appearance</h2>
+        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
+          <h2 className="text-2xl font-bold mb-8 text-[#1F2937] dark:text-[#E4E9E2]">
+            General Appearance
+          </h2>
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* Theme */}
 
             <div>
-              <label className="block mb-2 font-medium">Theme</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Theme
+              </label>
 
               <select
                 name="theme"
                 value={settings.theme}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               >
                 <option>Light</option>
 
@@ -136,13 +183,15 @@ const AppearanceSettings = () => {
             {/* Language */}
 
             <div>
-              <label className="block mb-2 font-medium">Language</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Language
+              </label>
 
               <select
                 name="language"
                 value={settings.language}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               >
                 <option>English</option>
 
@@ -159,13 +208,15 @@ const AppearanceSettings = () => {
             {/* Font */}
 
             <div>
-              <label className="block mb-2 font-medium">Font Size</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Font Size
+              </label>
 
               <select
                 name="fontSize"
                 value={settings.fontSize}
                 onChange={handleChange}
-                className="w-full h-12 border rounded-lg px-4"
+                className={inputClass}
               >
                 <option>Small</option>
 
@@ -177,23 +228,13 @@ const AppearanceSettings = () => {
 
             {/* Compact */}
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
-              <div>
-                <h3 className="font-semibold">Compact Mode</h3>
-
-                <p className="text-sm text-gray-500">
-                  Reduce spacing to display more content.
-                </p>
-              </div>
-
-              <input
-                type="checkbox"
-                name="compactMode"
-                checked={settings.compactMode}
-                onChange={handleChange}
-                className="w-5 h-5"
-              />
-            </label>
+            <ToggleRow
+              title="Compact Mode"
+              description="Reduce spacing to display more content."
+              name="compactMode"
+              checked={settings.compactMode}
+              onChange={handleChange}
+            />
           </div>
         </div>
 
@@ -201,55 +242,54 @@ const AppearanceSettings = () => {
             COLORS
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Brand Colors</h2>
-
+        <Card title="Brand Colors">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block mb-2 font-medium">Primary Color</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Primary Color
+              </label>
 
               <input
                 type="color"
                 name="primaryColor"
                 value={settings.primaryColor}
                 onChange={handleChange}
-                className="w-20 h-12 border rounded-lg"
+                className="w-20 h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg bg-white dark:bg-[#1D231C]"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Secondary Color</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Secondary Color
+              </label>
 
               <input
                 type="color"
                 name="secondaryColor"
                 value={settings.secondaryColor}
                 onChange={handleChange}
-                className="w-20 h-12 border rounded-lg"
+                className="w-20 h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg bg-white dark:bg-[#1D231C]"
               />
             </div>
           </div>
-        </div>
+        </Card>
+
         {/* ======================================
             BRANDING
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Branding</h2>
-
+        <Card title="Branding">
           <div className="grid md:grid-cols-2 gap-8">
             {/* Restaurant Logo */}
 
             <div>
-              <label className="block mb-3 font-medium">Restaurant Logo</label>
+              <label className="block mb-3 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Restaurant Logo
+              </label>
 
-              <input
-                type="file"
-                accept="image/*"
-                className="w-full border rounded-lg p-3"
-              />
+              <input type="file" accept="image/*" className={fileInputClass} />
 
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-2">
                 Used in POS, invoices and customer receipts.
               </p>
             </div>
@@ -257,35 +297,33 @@ const AppearanceSettings = () => {
             {/* Login Background */}
 
             <div>
-              <label className="block mb-3 font-medium">Login Background</label>
+              <label className="block mb-3 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Login Background
+              </label>
 
-              <input
-                type="file"
-                accept="image/*"
-                className="w-full border rounded-lg p-3"
-              />
+              <input type="file" accept="image/*" className={fileInputClass} />
 
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-2">
                 Displayed on the login screen.
               </p>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             MODULE THEMES
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Module Themes</h2>
-
+        <Card title="Module Themes">
           <div className="grid md:grid-cols-2 gap-6">
             {/* POS */}
 
             <div>
-              <label className="block mb-2 font-medium">POS Theme</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                POS Theme
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Default</option>
 
                 <option>Dark</option>
@@ -299,9 +337,11 @@ const AppearanceSettings = () => {
             {/* Kiosk */}
 
             <div>
-              <label className="block mb-2 font-medium">Kiosk Theme</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Kiosk Theme
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Restaurant</option>
 
                 <option>Modern</option>
@@ -315,9 +355,11 @@ const AppearanceSettings = () => {
             {/* QR */}
 
             <div>
-              <label className="block mb-2 font-medium">QR Menu Theme</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                QR Menu Theme
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Default</option>
 
                 <option>Modern</option>
@@ -329,9 +371,11 @@ const AppearanceSettings = () => {
             {/* Receipt */}
 
             <div>
-              <label className="block mb-2 font-medium">Receipt Theme</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Receipt Theme
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Standard</option>
 
                 <option>Compact</option>
@@ -340,22 +384,22 @@ const AppearanceSettings = () => {
               </select>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             UI CUSTOMIZATION
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">UI Customization</h2>
-
+        <Card title="UI Customization">
           <div className="grid md:grid-cols-2 gap-6">
             {/* Button */}
 
             <div>
-              <label className="block mb-2 font-medium">Button Style</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Button Style
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Rounded</option>
 
                 <option>Square</option>
@@ -367,9 +411,11 @@ const AppearanceSettings = () => {
             {/* Radius */}
 
             <div>
-              <label className="block mb-2 font-medium">Border Radius</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Border Radius
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Small</option>
 
                 <option>Medium</option>
@@ -381,9 +427,11 @@ const AppearanceSettings = () => {
             {/* Cards */}
 
             <div>
-              <label className="block mb-2 font-medium">Card Style</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Card Style
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Flat</option>
 
                 <option>Shadow</option>
@@ -394,85 +442,100 @@ const AppearanceSettings = () => {
 
             {/* Animations */}
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
+            <label className="flex items-center justify-between border border-[#E7EAE1] dark:border-[#262B24] rounded-xl p-5">
               <div>
-                <h3 className="font-semibold">Enable Animations</h3>
+                <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                  Enable Animations
+                </h3>
 
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                   Enable smooth UI animations and transitions.
                 </p>
               </div>
 
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
+              <input
+                type="checkbox"
+                defaultChecked
+                className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
+              />
             </label>
           </div>
-        </div>
+        </Card>
+
         {/* ======================================
             INVOICE & RECEIPT BRANDING
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">
-            Invoice & Receipt Branding
-          </h2>
-
+        <Card title="Invoice & Receipt Branding">
           <div className="grid md:grid-cols-2 gap-6">
             {/* Show Logo */}
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
+            <label className="flex items-center justify-between border border-[#E7EAE1] dark:border-[#262B24] rounded-xl p-5">
               <div>
-                <h3 className="font-semibold">Show Restaurant Logo</h3>
+                <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                  Show Restaurant Logo
+                </h3>
 
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                   Display logo on invoices and receipts.
                 </p>
               </div>
 
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
+              <input
+                type="checkbox"
+                defaultChecked
+                className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
+              />
             </label>
 
             {/* QR */}
 
-            <label className="flex items-center justify-between border rounded-xl p-5">
+            <label className="flex items-center justify-between border border-[#E7EAE1] dark:border-[#262B24] rounded-xl p-5">
               <div>
-                <h3 className="font-semibold">Show QR Code</h3>
+                <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                  Show QR Code
+                </h3>
 
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                   Print QR code on customer receipts.
                 </p>
               </div>
 
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
+              <input
+                type="checkbox"
+                defaultChecked
+                className="w-5 h-5 accent-[#3FA34D] dark:accent-[#43B75A]"
+              />
             </label>
 
             {/* Footer */}
 
             <div className="md:col-span-2">
-              <label className="block mb-2 font-medium">
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Receipt Footer Message
               </label>
 
               <textarea
                 rows={4}
-                className="w-full border rounded-lg p-4 resize-none"
+                className="w-full border border-[#E7EAE1] dark:border-[#262B24] rounded-lg p-4 resize-none bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] placeholder-[#9CA3AF] dark:placeholder-[#6B7280] focus:outline-none focus:border-[#2563EB] dark:focus:border-[#60A5FA] transition-colors"
                 placeholder="Thank you for visiting. We look forward to serving you again."
               />
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             DASHBOARD LAYOUT
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Dashboard Layout</h2>
-
+        <Card title="Dashboard Layout">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block mb-2 font-medium">Sidebar Style</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Sidebar Style
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Expanded</option>
 
                 <option>Collapsed</option>
@@ -482,9 +545,11 @@ const AppearanceSettings = () => {
             </div>
 
             <div>
-              <label className="block mb-2 font-medium">Dashboard Layout</label>
+              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
+                Dashboard Layout
+              </label>
 
-              <select className="w-full h-12 border rounded-lg px-4">
+              <select className={inputClass}>
                 <option>Comfortable</option>
 
                 <option>Compact</option>
@@ -493,16 +558,14 @@ const AppearanceSettings = () => {
               </select>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             LIVE PREVIEW
         ====================================== */}
 
-        <div className="bg-white rounded-2xl border p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8">Theme Preview</h2>
-
-          <div className="rounded-2xl border overflow-hidden">
+        <Card title="Theme Preview">
+          <div className="rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] overflow-hidden">
             <div
               className="h-16 flex items-center px-6 text-white font-bold"
               style={{
@@ -512,29 +575,41 @@ const AppearanceSettings = () => {
               Restaurant ERP
             </div>
 
-            <div className="p-8 bg-gray-50">
+            <div className="p-8 bg-[#F3F5EE] dark:bg-[#12160F]">
               <div className="grid md:grid-cols-3 gap-6">
-                <div className="bg-white rounded-xl shadow p-5">
-                  <h3 className="font-semibold">Orders</h3>
+                <div className="bg-white dark:bg-[#171C17] rounded-xl shadow p-5 border border-transparent dark:border-[#262B24]">
+                  <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                    Orders
+                  </h3>
 
-                  <p className="text-gray-500 mt-2">125 Today</p>
+                  <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-2">
+                    125 Today
+                  </p>
                 </div>
 
-                <div className="bg-white rounded-xl shadow p-5">
-                  <h3 className="font-semibold">Revenue</h3>
+                <div className="bg-white dark:bg-[#171C17] rounded-xl shadow p-5 border border-transparent dark:border-[#262B24]">
+                  <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                    Revenue
+                  </h3>
 
-                  <p className="text-gray-500 mt-2">₹24,500</p>
+                  <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-2">
+                    ₹24,500
+                  </p>
                 </div>
 
-                <div className="bg-white rounded-xl shadow p-5">
-                  <h3 className="font-semibold">Customers</h3>
+                <div className="bg-white dark:bg-[#171C17] rounded-xl shadow p-5 border border-transparent dark:border-[#262B24]">
+                  <h3 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                    Customers
+                  </h3>
 
-                  <p className="text-gray-500 mt-2">42 New</p>
+                  <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-2">
+                    42 New
+                  </p>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* ======================================
             FOOTER
@@ -547,8 +622,13 @@ const AppearanceSettings = () => {
               px-6
               rounded-xl
               border
-              border-gray-300
-              hover:bg-gray-100
+              border-[#E7EAE1]
+              dark:border-[#262B24]
+              text-[#1F2937]
+              dark:text-[#E4E9E2]
+              hover:bg-[#F3F5EE]
+              dark:hover:bg-white/5
+              transition-colors
             "
           >
             Restore Defaults
@@ -560,12 +640,16 @@ const AppearanceSettings = () => {
               h-12
               px-8
               rounded-xl
-              bg-blue-600
-              hover:bg-blue-700
+              bg-[#3FA34D]
+              dark:bg-[#43B75A]
+              hover:bg-[#358F42]
+              dark:hover:bg-[#3AA34E]
               text-white
               flex
               items-center
               gap-2
+              shadow-lg
+              transition-all
             "
           >
             <FiSave />
