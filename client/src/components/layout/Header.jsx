@@ -216,7 +216,7 @@ const Header = ({ onMenuClick }) => {
 
           <OfflineIndicator />
 
-          <NotificationBell />
+          {/* <NotificationBell /> */}
 
           {/* Profile */}
 

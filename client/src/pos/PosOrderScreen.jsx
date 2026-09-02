@@ -343,6 +343,7 @@ export default function PosOrderScreen() {
 
         {printKotOrderId && (
           <KotPrintModal
+            key={printKotOrderId}  // ← Add this
             orderId={printKotOrderId}
             onClose={() => setPrintKotOrderId(null)}
           />

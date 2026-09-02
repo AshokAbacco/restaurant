@@ -80,14 +80,14 @@ const OverviewTab = () => {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-[#9CA8A0]">
           {dashboard
             ? `Today's snapshot, plus the trend for your selected range`
             : "Revenue, cost of goods sold, and operating expenses"}
         </p>
         <button
           onClick={load}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-[#262B24] bg-white dark:bg-[#171C17] px-4 py-2 text-sm font-medium text-gray-600 dark:text-[#9CA8A0] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
         >
           <FiRefreshCw className="w-4 h-4" />
           Refresh
@@ -132,8 +132,8 @@ const OverviewTab = () => {
             </div>
           )}
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">
+          <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5 mb-6">
+            <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4">
               Revenue Trend
             </h2>
 
@@ -186,8 +186,8 @@ const OverviewTab = () => {
             )}
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">
+          <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5">
+            <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4">
               Payment-wise Revenue (reconciliation)
             </h2>
 
@@ -196,14 +196,17 @@ const OverviewTab = () => {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {paymentRevenue.byMethod.map((m) => (
-                  <div key={m.method} className="rounded-xl bg-gray-50 p-4">
-                    <div className="text-xs font-medium text-gray-500 mb-1">
+                  <div
+                    key={m.method}
+                    className="rounded-xl bg-gray-50 dark:bg-white/5 p-4"
+                  >
+                    <div className="text-xs font-medium text-gray-500 dark:text-[#9CA8A0] mb-1">
                       {m.method}
                     </div>
-                    <div className="text-lg font-semibold text-gray-800">
+                    <div className="text-lg font-semibold text-gray-800 dark:text-white">
                       {currency(m.amount)}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-gray-400 dark:text-[#6B7280]">
                       {m.count} payments
                     </div>
                   </div>

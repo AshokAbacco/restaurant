@@ -2,10 +2,16 @@
 //
 // Shown the moment an order reaches the kitchen.
 //
-// The print dialog is NOT opened automatically any more. An auto-opened
-// dialog alongside a visible Print button is how the same ticket ends up
-// queued twice — the operator sees a dialog they didn't ask for, dismisses
-// it, then presses the button. One explicit button, one job.
+// The print dialog is NOT opened automatically. An auto-opened dialog
+// alongside a visible Print button is how the same ticket ends up queued
+// twice — the operator sees a dialog they didn't ask for, dismisses it, then
+// presses the button. One explicit button, one job.
+//
+// This modal deliberately does NOT poke at data-print-active in the DOM.
+// Ownership of that attribute belongs to the component rendering the
+// ticket (KotTicket, via its `active` prop); an effect reaching in to strip
+// it raced React's own render and could clear the marker off the very
+// ticket about to be printed.
 import { useEffect, useState } from "react";
 import { FiPrinter, FiX } from "react-icons/fi";
 import { getKotsForOrder } from "../api/posApi";
@@ -46,9 +52,14 @@ export default function KotPrintModal({ orderId, onClose }) {
             {kots.length > 1 ? ` (${kots.length} stations)` : ""}
           </h3>
           <div className="flex items-center gap-2">
+            {/* Disabled until there is actually a ticket on screen, so a
+                press during loading can't fire an empty job that the
+                operator then repeats. printOnce() also ignores a second
+                press within a second. */}
             <button
               onClick={() => printOnce()}
-              className="flex items-center gap-1.5 rounded-lg bg-[#3FA34D] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#358F42] dark:bg-[#43B75A]"
+              disabled={loading || !!error || kots.length === 0}
+              className="flex items-center gap-1.5 rounded-lg bg-[#3FA34D] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#358F42] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#43B75A]"
             >
               <FiPrinter size={14} />
               Print
@@ -76,7 +87,7 @@ export default function KotPrintModal({ orderId, onClose }) {
               loaded for printing: {error}
             </p>
           ) : (
-            <KotTicket kots={kots} />
+            <KotTicket kots={kots} active />
           )}
         </div>
 

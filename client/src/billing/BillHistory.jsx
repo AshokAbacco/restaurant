@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { FiArrowLeft, FiPrinter, FiSearch, FiX } from "react-icons/fi";
 import { getBillHistory, getInvoiceForOrder } from "../pos/api/posApi";
 import InvoiceView from "./InvoiceView";
+import { printOnce } from "../print/printing";
 
 const money = (n) => `₹${Number(n || 0).toFixed(2)}`;
 
@@ -308,11 +309,13 @@ export default function BillHistory() {
               </h3>
               <div className="flex shrink-0 items-center gap-2">
                 {/* Duplicates InvoiceView's own Print button, which sits below
-                    the receipt and needs scrolling to reach. Same
-                    window.print() — the @media print rules are global while
-                    the modal is open, so only the receipt is put on paper. */}
+                    the receipt and needs scrolling to reach. Routed through
+                    printOnce() rather than window.print(): this modal is
+                    position:fixed, and a raw print() left the browser free to
+                    repeat that fixed box on every page — the same defect that
+                    printed kitchen tickets twice. */}
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => printOnce()}
                   className="flex items-center gap-1.5 rounded-lg bg-[#3FA34D] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
                 >
                   <FiPrinter size={14} />

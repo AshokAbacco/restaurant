@@ -87,26 +87,32 @@ const formatPeriodLabel = (isoString) => {
 
 const SummaryCard = ({ label, value, icon: Icon, tone = "neutral", sub }) => {
   const toneClasses = {
-    neutral: "text-gray-800",
-    positive: "text-green-600",
-    negative: "text-red-600",
+    neutral: "text-gray-800 dark:text-white",
+    positive: "text-green-600 dark:text-green-400",
+    negative: "text-red-600 dark:text-red-400",
   }[tone];
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-gray-500">{label}</span>
+        <span className="text-sm font-medium text-gray-500 dark:text-[#9CA8A0]">
+          {label}
+        </span>
         {Icon && <Icon className={`w-5 h-5 ${toneClasses}`} />}
       </div>
       <div className={`text-2xl font-bold ${toneClasses}`}>{value}</div>
-      {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
+      {sub && (
+        <div className="text-xs text-gray-400 dark:text-[#6B7280] mt-1">
+          {sub}
+        </div>
+      )}
     </div>
   );
 };
 
 const Loader = () => (
   <div className="flex items-center justify-center py-24">
-    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <div className="w-10 h-10 border-4 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full animate-spin" />
   </div>
 );
 
@@ -170,14 +176,14 @@ const ProfitLossDashboard = () => {
   const netProfitPositive = (summary?.netProfit ?? 0) >= 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#12160F]">
       {/* ========================================== HEADER ========================================== */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
             Profit &amp; Loss
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-[#9CA8A0] mt-1">
             {summary
               ? `${new Date(summary.period.from).toLocaleDateString("en-IN")} – ${new Date(
                   summary.period.to,
@@ -188,7 +194,7 @@ const ProfitLossDashboard = () => {
 
         <button
           onClick={loadData}
-          className="inline-flex items-center gap-2 self-start rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          className="inline-flex items-center gap-2 self-start rounded-xl border border-gray-200 dark:border-[#262B24] bg-white dark:bg-[#171C17] px-4 py-2 text-sm font-medium text-gray-600 dark:text-[#9CA8A0] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
         >
           <FiRefreshCw className="w-4 h-4" />
           Refresh
@@ -196,7 +202,7 @@ const ProfitLossDashboard = () => {
       </div>
 
       {/* ========================================== FILTERS ========================================== */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6 flex flex-wrap items-center gap-3">
+      <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-4 mb-6 flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap gap-2">
           {PRESETS.map((p) => (
             <button
@@ -205,7 +211,7 @@ const ProfitLossDashboard = () => {
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 preset === p.key
                   ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-[#9CA8A0] hover:bg-gray-200 dark:hover:bg-white/10"
               }`}
             >
               {p.label}
@@ -219,14 +225,16 @@ const ProfitLossDashboard = () => {
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm"
+              className="rounded-lg border border-gray-200 dark:border-[#262B24] bg-white dark:bg-[#171C17] px-3 py-1.5 text-sm text-gray-700 dark:text-[#E4E9E2] dark:[color-scheme:dark]"
             />
-            <span className="text-gray-400 text-sm">to</span>
+            <span className="text-gray-400 dark:text-[#6B7280] text-sm">
+              to
+            </span>
             <input
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm"
+              className="rounded-lg border border-gray-200 dark:border-[#262B24] bg-white dark:bg-[#171C17] px-3 py-1.5 text-sm text-gray-700 dark:text-[#E4E9E2] dark:[color-scheme:dark]"
             />
           </div>
         )}
@@ -236,13 +244,13 @@ const ProfitLossDashboard = () => {
           placeholder="Filter by store (optional)"
           value={store}
           onChange={(e) => setStore(e.target.value)}
-          className="ml-auto rounded-lg border border-gray-200 px-3 py-1.5 text-sm w-56"
+          className="ml-auto rounded-lg border border-gray-200 dark:border-[#262B24] bg-white dark:bg-[#171C17] px-3 py-1.5 text-sm text-gray-700 dark:text-[#E4E9E2] placeholder-gray-400 dark:placeholder-[#6B7280] w-56"
         />
       </div>
 
       {/* ========================================== ERROR ========================================== */}
       {error && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           <FiAlertTriangle className="w-5 h-5 shrink-0" />
           {error}
         </div>
@@ -306,7 +314,7 @@ const ProfitLossDashboard = () => {
             </div>
 
             {summary.capex.count > 0 && (
-              <div className="mb-6 text-xs text-gray-400">
+              <div className="mb-6 text-xs text-gray-400 dark:text-[#6B7280]">
                 Note: {currency(summary.capex.total)} in asset purchases this
                 period is shown for reference only and is not included in Net
                 Profit above.
@@ -314,13 +322,13 @@ const ProfitLossDashboard = () => {
             )}
 
             {/* ========================================== TREND CHART ========================================== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
-              <h2 className="text-base font-semibold text-gray-700 mb-4">
+            <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5 mb-6">
+              <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4">
                 Revenue vs. Expenses
               </h2>
 
               {trend.length === 0 ? (
-                <p className="text-sm text-gray-400 py-10 text-center">
+                <p className="text-sm text-gray-400 dark:text-[#6B7280] py-10 text-center">
                   No data for the selected period.
                 </p>
               ) : (
@@ -409,14 +417,14 @@ const ProfitLossDashboard = () => {
             </div>
 
             {/* ========================================== EXPENSE BREAKDOWN ========================================== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h2 className="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+            <div className="bg-white dark:bg-[#171C17] rounded-2xl shadow-sm border border-gray-100 dark:border-[#262B24] p-5">
+              <h2 className="text-base font-semibold text-gray-700 dark:text-[#E4E9E2] mb-4 flex items-center gap-2">
                 <FiPieChart className="w-4 h-4" />
                 Expense Breakdown
               </h2>
 
               {!expenseBreakdown || expenseBreakdown.items.length === 0 ? (
-                <p className="text-sm text-gray-400 py-10 text-center">
+                <p className="text-sm text-gray-400 dark:text-[#6B7280] py-10 text-center">
                   No expenses recorded for this period.
                 </p>
               ) : (
@@ -450,9 +458,9 @@ const ProfitLossDashboard = () => {
                     {expenseBreakdown.items.map((item, index) => (
                       <li
                         key={item.label}
-                        className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0"
+                        className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 dark:border-[#262B24] last:border-0"
                       >
-                        <span className="flex items-center gap-2 text-gray-600">
+                        <span className="flex items-center gap-2 text-gray-600 dark:text-[#9CA8A0]">
                           <span
                             className="w-2.5 h-2.5 rounded-full"
                             style={{
@@ -462,7 +470,7 @@ const ProfitLossDashboard = () => {
                           />
                           {item.label}
                         </span>
-                        <span className="font-medium text-gray-800">
+                        <span className="font-medium text-gray-800 dark:text-white">
                           {currency(item.amount)}
                         </span>
                       </li>

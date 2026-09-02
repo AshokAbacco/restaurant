@@ -110,7 +110,8 @@ const SETTINGS = [
   {
     id: 7,
     title: "Printer Setup",
-    description: "Kitchen printer, receipt printer and print preferences.",
+    description:
+      "Printer models, paper size, print options and connected printers.",
     icon: FiPrinter,
     color: "bg-yellow-500",
     path: "/settings/printer",

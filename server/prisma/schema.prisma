@@ -726,6 +726,7 @@ model Outlet {
   cashDrawerSessions     CashDrawerSession[]
   cashDrawerTransactions CashDrawerTransaction[]
   onlinePlatforms        OnlinePlatform[]
+  printerProfiles        PrinterProfile[]
   owner                  Owner?
 
   @@unique([organizationId, name])
@@ -1780,6 +1781,87 @@ model BillingCounter {
   @@unique([outletId, name])
   @@index([outletId])
   @@map("billing_counters")
+}
+
+model PrinterProfile {
+  id       String @id @default(uuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  // What staff pick from ("Front counter — Posiflow 80mm").
+  name  String
+  // Manufacturer model string, e.g. "Posiflow KP307-UEWB".
+  model String?
+
+  // ---- Paper geometry -------------------------------------------------
+  // Physical roll width (80 / 70 / 58). paperWidthMm - printableWidthMm is
+  // the unprintable edge the print margin has to leave alone, which is what
+  // stops content being clipped or shifted to one side.
+  paperWidthMm     Int @default(80)
+  printableWidthMm Int @default(72)
+  // Head resolution across the printable area (576 dots on a 72mm 203dpi
+  // head). Reference/diagnostic only — the browser lays out in CSS px.
+  printableDots    Int @default(576)
+  // Characters per line in the printer's own Font A. Not used to measure
+  // text (the browser does that in `ch` units), but it IS the signal for
+  // how much a layout can hold: under ~40 the invoice meta block drops from
+  // two columns to one rather than wrapping every line in half.
+  columns          Int @default(48)
+
+  // ---- Print behaviour ------------------------------------------------
+  // Rated feed speed, e.g. 300 mm/s. Informational.
+  speedMmPerSec Int?  @default(300)
+  // Base font size the receipt renders at on paper. Kept explicit rather
+  // than derived from `columns`: derived sizing shrank an 80mm bill that
+  // was already correct, because almost no receipt line uses the printer's
+  // full character capacity.
+  baseFontPx    Float @default(10)
+  // Extra margin beyond the unprintable edge, for printers whose driver
+  // already inserts its own.
+  extraMarginMm Float @default(0)
+
+  // ---- Connection -----------------------------------------------------
+  // How the printer is reached. Informational for now: the browser prints
+  // through the OS print dialog, so this records what staff plugged in
+  // rather than driving a transport.
+  connectionType String? @default("SYSTEM") // SYSTEM | NETWORK | USB | BLUETOOTH
+  ipAddress      String?
+
+  // ---- Print behaviour per printer -------------------------------------
+  // These used to live as component state on the Printer Settings mockup and
+  // were lost on refresh. They hang off the printer rather than the outlet
+  // because they genuinely differ per device: the kitchen printer auto-prints
+  // KOTs and must never show prices, the counter printer auto-prints receipts
+  // and opens a cash drawer.
+  copies           Int     @default(1)
+  autoPrintKot     Boolean @default(true)
+  autoPrintReceipt Boolean @default(true)
+  autoPrintInvoice Boolean @default(false)
+  allowReprint     Boolean @default(true)
+  printLogo        Boolean @default(true)
+  printGstDetails  Boolean @default(true)
+  printQrCode      Boolean @default(true)
+  printBarcode     Boolean @default(false)
+  printItemNotes   Boolean @default(true)
+  printTableNumber Boolean @default(true)
+  printOrderTime   Boolean @default(true)
+  openCashDrawer   Boolean @default(false)
+
+  // Free-text device label, e.g. "Front counter terminal".
+  deviceLabel String?
+  notes       String?
+
+  // Exactly one default per outlet — enforced in the service, which clears
+  // the previous default in the same transaction.
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([outletId, name])
+  @@index([outletId])
+  @@map("printer_profiles")
 }
 
 // Online Orders — list of aggregator names (Swiggy, Zomato, etc.) a

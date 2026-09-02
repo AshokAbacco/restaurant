@@ -7,8 +7,9 @@
 // PDF" as the destination) so no extra PDF-generation dependency is needed.
 // "Share" uses the Web Share API where available and falls back to copying a
 // plain-text summary to the clipboard.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import BillCodes from "./BillCodes";
+import { ensurePrintStyles, printOnce } from "../print/printing";
 
 const PAYMENT_METHOD_LABEL = {
   CASH: "Cash",
@@ -63,19 +64,31 @@ const Rule = ({ solid = false }) => (
   />
 );
 
+// gap-2 not gap-3, and the value never wraps: on 72mm of paper a totals row
+// like "CGST (2.5%) + SGST (2.5%):" + "+ ₹46.35" only just fits, and the
+// three px saved are the difference between one line and two.
 const Row = ({ label, value, bold = false, muted = false }) => (
   <div
-    className={`flex justify-between gap-3 ${
+    className={`flex justify-between gap-3 print:gap-2 ${
       bold ? "font-bold" : ""
     } ${muted ? "text-[#6B7280] dark:text-[#9CA8A0]" : ""}`}
   >
-    <span>{label}</span>
-    <span className="whitespace-nowrap tabular-nums">{value}</span>
+    <span className="min-w-0">{label}</span>
+    <span className="shrink-0 whitespace-nowrap tabular-nums">{value}</span>
   </div>
 );
 
 export default function InvoiceView({ invoice, summary, payments, onDone }) {
   const [copied, setCopied] = useState(false);
+
+  // Print rules live in print/printing.js, not in a <style> block here. This
+  // component used to ship its own `body * { visibility: hidden }` — the same
+  // rule the shared sheet uses, but without !important, so once a kitchen
+  // ticket had been printed in the session the global rule outranked it and
+  // every subsequent bill came out blank.
+  useEffect(() => {
+    ensurePrintStyles();
+  }, []);
 
   const order = invoice.order;
   const items = order.items || [];
@@ -135,7 +148,7 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
     .join(", ");
 
   function handlePrint() {
-    window.print();
+    printOnce();
   }
 
   async function handleShare() {
@@ -177,8 +190,18 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
           size, which is what actually lets it scroll rather than grow. */}
       <div className="min-h-0 flex-1 overflow-y-auto bg-[#F3F5EE] dark:bg-[#12160F] px-4 py-5">
         {/* Fixed narrow column so the on-screen bill matches the proportions
-            of the paper it prints on. */}
-        <div className="invoice-print-area mx-auto w-full max-w-[380px] bg-white dark:bg-[#171C17] p-5 font-mono text-[11px] leading-relaxed text-[#1F2937] dark:text-[#E4E9E2] shadow-sm">
+            of the paper it prints on.
+
+            The print:* classes are what put it on paper correctly. An 80mm
+            roll leaves ~72mm printable; the p-5 screen padding ate 40px of
+            that on top of the page margin, which squeezed the meta columns
+            and the totals rows until nearly every line wrapped — "Bill: INV-"
+            / "000019", "Items: 3 (Qty:" / "3)". On paper the receipt runs
+            edge to edge (the @page margin IS the physical margin) one type
+            size down, which is what makes each line fit whole. */}
+        <div
+          data-print-active="true"
+          className="invoice-print-area mx-auto w-full max-w-[380px] bg-white dark:bg-[#171C17] p-5 font-mono text-[11px] leading-relaxed text-[#1F2937] dark:text-[#E4E9E2] shadow-sm print:max-w-none print:p-0 print:text-[10px] print:leading-snug print:shadow-none">
           {/* ============ HEADER ============ */}
           <div className="text-center">
             <h3 className="text-[15px] font-bold uppercase tracking-wide">
@@ -212,7 +235,12 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
               no cashier on an older bill) is dropped from the list, and
               everything after it shifts up to fill the space. Even indices sit
               left, odd indices right. */}
-          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 font-semibold">
+          {/* On screen: two equal columns. On paper: the right column shrinks to
+              whatever it actually holds ("DELIVERY", "Date: 01/09/2026") and
+              gives the rest to the left, which carries the long entries
+              ("Cashier: POS Cashier"). An even 50/50 split left the left
+              column ~2px short and wrapped it. */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 font-semibold print:grid-cols-[1fr_auto] print:gap-x-2">
             {[
               `Bill: ${invoice.invoiceNumber}`,
               tableName
@@ -245,8 +273,8 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
           {/* ============ ITEMS ============ */}
           <div className="flex justify-between font-bold uppercase">
             <span className="flex-1">Item</span>
-            <span className="w-10 text-center">Qty</span>
-            <span className="w-20 text-right">Amount</span>
+            <span className="w-10 shrink-0 text-center print:w-8">Qty</span>
+            <span className="w-20 shrink-0 text-right print:w-[64px]">Amount</span>
           </div>
 
           <Rule />
@@ -260,10 +288,10 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
                     <span className="flex-1 font-semibold">
                       {item.menuItem?.name || item.name}
                     </span>
-                    <span className="w-10 text-center tabular-nums">
+                    <span className="w-10 shrink-0 text-center tabular-nums print:w-8">
                       {item.quantity}
                     </span>
-                    <span className="w-20 text-right font-semibold tabular-nums">
+                    <span className="w-20 shrink-0 text-right font-semibold tabular-nums print:w-[64px]">
                       {money(Number(item.totalPrice) + addOnTotal)}
                     </span>
                   </div>
@@ -275,10 +303,10 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
                       <span className="flex-1 pl-2">
                         + {a.addOn?.name || a.name}
                       </span>
-                      <span className="w-10 text-center tabular-nums">
+                      <span className="w-10 shrink-0 text-center tabular-nums print:w-8">
                         {a.quantity}
                       </span>
-                      <span className="w-20 text-right tabular-nums">
+                      <span className="w-20 shrink-0 text-right tabular-nums print:w-[64px]">
                         {money(a.totalPrice)}
                       </span>
                     </div>
@@ -402,32 +430,6 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
         </button>
       </div>
 
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .invoice-print-area, .invoice-print-area * { visibility: visible; }
-          .invoice-print-area {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            max-width: none;
-            padding: 0;
-            box-shadow: none;
-          }
-          /* Paper is always white — force legible ink regardless of whether
-             the app is in light or dark mode on screen. */
-          .invoice-print-area, .invoice-print-area * {
-            background: #fff !important;
-            color: #000 !important;
-            border-color: #000 !important;
-          }
-        }
-        /* 80mm thermal roll. Without an explicit page size the browser
-           defaults to A4 and the receipt prints as a narrow strip in the
-           corner of a mostly-empty sheet. */
-        @page { size: 80mm auto; margin: 4mm; }
-      `}</style>
     </div>
   );
 }

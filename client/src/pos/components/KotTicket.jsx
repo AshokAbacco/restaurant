@@ -12,8 +12,8 @@
 // discount or payment. A kitchen slip showing prices invites being handed to
 // a customer as a bill. listKotsForOrder enforces this at the data layer too,
 // selecting order fields explicitly rather than `order: true`.
-import { ensurePrintStyles } from "../../print/printing";
 import { useEffect } from "react";
+import { ensurePrintStyles } from "../../print/printing";
 
 const ORDER_TYPE_LABEL = {
   DINE_IN: "DINE IN",
@@ -40,7 +40,10 @@ const Line = () => <div className="my-1.5 border-t border-dashed border-black" /
 // `active` marks this as THE element to print (see print/printing.js). Only
 // one printable component may be active at a time, which is what stops the
 // bill and the ticket ending up on the same job.
-export default function KotTicket({ kots = [], active = true }) {
+//
+// Defaults to FALSE — opting in has to be deliberate. A KotTicket rendered
+// for preview somewhere else must not quietly become a second print target.
+export default function KotTicket({ kots = [], active = false }) {
   useEffect(() => {
     ensurePrintStyles();
   }, []);
