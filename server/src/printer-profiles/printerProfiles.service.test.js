@@ -1,4 +1,4 @@
-// server/src/printer-profiles/printerProfiles.service.test.js
+// server/src/pos/printer-profiles/printerProfiles.service.test.js
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockPrisma = vi.hoisted(() => {
@@ -107,10 +107,12 @@ describe("createPrinterProfile", () => {
     expect(result.isDefault).toBe(false);
   });
 
-  it("clears the previous default when a new one is created as default", async () => {
+  it("clears the previous default of the SAME purpose only", async () => {
+    // VALID carries no purpose, so it lands in the BOTH stream. A KOT or
+    // INVOICE default elsewhere must survive this.
     await service.createPrinterProfile({ ...VALID, isDefault: true }, OUTLET);
     expect(mockPrisma.printerProfile.updateMany).toHaveBeenCalledWith({
-      where: { outletId: OUTLET, isDefault: true },
+      where: { outletId: OUTLET, isDefault: true, purpose: "BOTH" },
       data: { isDefault: false },
     });
   });
@@ -288,6 +290,125 @@ describe("getDefaultPrinterProfile", () => {
   it("returns null when the outlet has no printers at all", async () => {
     mockPrisma.printerProfile.findFirst.mockResolvedValue(null);
     expect(await service.getDefaultPrinterProfile(OUTLET)).toBeNull();
+  });
+});
+
+describe("purpose + kitchen routing", () => {
+  it("rejects an unknown purpose", async () => {
+    await expect(
+      service.createPrinterProfile({ ...VALID, purpose: "RECEIPTS" }, OUTLET),
+    ).rejects.toThrow(/purpose must be one of/i);
+  });
+
+  it("normalises purpose case and keeps the kitchen binding", async () => {
+    const result = await service.createPrinterProfile(
+      { ...VALID, purpose: "kot", kitchenBranchId: "kitchen-1" },
+      OUTLET,
+    );
+    expect(result.purpose).toBe("KOT");
+    expect(result.kitchenBranchId).toBe("kitchen-1");
+  });
+
+  it("lets an explicit null clear the kitchen binding", async () => {
+    mockPrisma.printerProfile.findFirst.mockResolvedValue({ id: "p1", ...VALID });
+    await service.updatePrinterProfile("p1", { kitchenBranchId: null }, OUTLET);
+    expect(mockPrisma.printerProfile.update).toHaveBeenCalledWith({
+      where: { id: "p1" },
+      data: { kitchenBranchId: null },
+    });
+  });
+
+  it("scopes the first-profile default to its own purpose", async () => {
+    // An outlet that already has an invoice printer but no KOT printer:
+    // the first KOT printer must still become the KOT default.
+    mockPrisma.printerProfile.count.mockResolvedValue(0);
+    const result = await service.createPrinterProfile(
+      { ...VALID, purpose: "KOT" },
+      OUTLET,
+    );
+    expect(mockPrisma.printerProfile.count).toHaveBeenCalledWith({
+      where: { outletId: OUTLET, purpose: "KOT" },
+    });
+    expect(result.isDefault).toBe(true);
+  });
+
+  it("only demotes defaults of the same purpose", async () => {
+    await service.createPrinterProfile(
+      { ...VALID, purpose: "INVOICE", isDefault: true },
+      OUTLET,
+    );
+    expect(mockPrisma.printerProfile.updateMany).toHaveBeenCalledWith({
+      where: { outletId: OUTLET, isDefault: true, purpose: "INVOICE" },
+      data: { isDefault: false },
+    });
+  });
+});
+
+describe("resolvePrinterProfile", () => {
+  const hit = (profile) => mockPrisma.printerProfile.findFirst.mockResolvedValueOnce(profile);
+
+  it("prefers a KOT printer bound to that exact kitchen", async () => {
+    hit({ id: "kot-rooftop", purpose: "KOT", kitchenBranchId: "rooftop" });
+    const out = await service.resolvePrinterProfile(
+      { purpose: "KOT", kitchenBranchId: "rooftop" },
+      OUTLET,
+    );
+    expect(out.profile.id).toBe("kot-rooftop");
+    expect(out.matchedOn).toBe("KITCHEN_EXACT");
+  });
+
+  it("falls back to a shared printer in the same kitchen", async () => {
+    hit(null); // no dedicated KOT printer there
+    hit({ id: "both-rooftop", purpose: "BOTH", kitchenBranchId: "rooftop" });
+    const out = await service.resolvePrinterProfile(
+      { purpose: "KOT", kitchenBranchId: "rooftop" },
+      OUTLET,
+    );
+    expect(out.profile.id).toBe("both-rooftop");
+    expect(out.matchedOn).toBe("KITCHEN_SHARED");
+  });
+
+  it("falls back to an unbound KOT printer for a kitchen with none of its own", async () => {
+    hit(null);
+    hit(null);
+    hit({ id: "kot-any", purpose: "KOT", kitchenBranchId: null });
+    const out = await service.resolvePrinterProfile(
+      { purpose: "KOT", kitchenBranchId: "new-kitchen" },
+      OUTLET,
+    );
+    expect(out.profile.id).toBe("kot-any");
+    expect(out.matchedOn).toBe("PURPOSE_ANY");
+  });
+
+  it("never returns a KOT printer for an invoice", async () => {
+    // No INVOICE or BOTH printer configured anywhere.
+    mockPrisma.printerProfile.findFirst.mockResolvedValue(null);
+    const out = await service.resolvePrinterProfile({ purpose: "INVOICE" }, OUTLET);
+    expect(out.profile).toBeNull();
+    expect(out.matchedOn).toBe("NONE");
+    // Every query it ran was constrained to INVOICE or BOTH.
+    for (const call of mockPrisma.printerProfile.findFirst.mock.calls) {
+      const w = call[0].where;
+      const p = w.purpose;
+      const allowed = typeof p === "string" ? [p] : p?.in || [];
+      expect(allowed.every((x) => x === "INVOICE" || x === "BOTH")).toBe(true);
+    }
+  });
+
+  it("reports NONE rather than guessing when nothing is configured", async () => {
+    mockPrisma.printerProfile.findFirst.mockResolvedValue(null);
+    const out = await service.resolvePrinterProfile(
+      { purpose: "KOT", kitchenBranchId: "rooftop" },
+      OUTLET,
+    );
+    expect(out.profile).toBeNull();
+    expect(out.matchedOn).toBe("NONE");
+  });
+
+  it("rejects an unknown purpose", async () => {
+    await expect(
+      service.resolvePrinterProfile({ purpose: "NONSENSE" }, OUTLET),
+    ).rejects.toThrow(/purpose must be one of/i);
   });
 });
 

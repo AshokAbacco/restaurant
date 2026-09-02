@@ -79,9 +79,7 @@ const RecentActivities = ({ activities = [], loading = false }) => {
           </p>
         </div>
 
-        <button className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition">
-          View All
-        </button>
+        
       </div>
 
       {/* Timeline */}
@@ -145,7 +143,7 @@ const RecentActivities = ({ activities = [], loading = false }) => {
 
         <button className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition">
           Activity Log
-          <FiArrowRight />
+          {/* <FiArrowRight /> */}
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 // src/pos/components/TableOrderCard.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const STATUS_BADGE = {
   NEW: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30",
@@ -111,23 +112,59 @@ function money(n) {
   return `₹${Number(n || 0).toFixed(2)}`;
 }
 
+// Width of the tooltip card below (`w-72` = 18rem = 288px at the default
+// text size). Kept as a constant so the clamping math and the className
+// can't drift apart.
+const TOOLTIP_WIDTH = 288;
+
 // Hover detail for a card: every line item with its quantity and cost, plus
-// the order total. Rendered inline (not in a portal) and positioned
-// absolutely over the card, so it needs pointer-events-none — otherwise
-// moving the cursor onto the tooltip would count as leaving the card and it
-// would flicker.
+// the order total.
+//
+// FIX: this used to be `position: absolute` inside the card, shown via a
+// `group-hover` CSS trick. That broke on laptop-width screens — the orders
+// grid's wrapper has `overflow-y-auto`, and per the CSS spec setting
+// overflow on one axis forces the other axis to clip too, so the tooltip
+// got sliced off wherever it crossed that container's left edge (visible in
+// the client's screenshot: the card next to the sidebar had its tooltip cut
+// clean off). No z-index fix could help — it wasn't a stacking problem, it
+// was actually being clipped by an ancestor.
+//
+// Now the tooltip is portaled straight to `document.body` as
+// `position: fixed`, positioned from the card's own
+// getBoundingClientRect(), and clamped to stay within the viewport. That
+// takes it out of every scrollable/overflow-clipped ancestor (the grid, and
+// any future scrolling wrapper) and guarantees it never renders under the
+// sidebar or off the right edge on narrow screens either.
 //
 // `itemLines` is supplied in the same shape by both sources of cards: the
 // tables board flattens it server-side (tables.service.js) and OrdersPage's
 // orderToBoardItem flattens the raw /pos/orders response the same way.
-function OrderItemsTooltip({ order }) {
+function OrderItemsTooltip({ order, anchorRect, visible }) {
   const lines = order.itemLines || [];
-  if (lines.length === 0) return null;
+  if (lines.length === 0 || !anchorRect) return null;
 
   const totalQty = lines.reduce((sum, l) => sum + (l.quantity || 0), 0);
 
-  return (
-    <div className="pointer-events-none absolute left-1/2 top-2 z-30 w-72 -translate-x-1/2 scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+  // Center over the card like before, but clamp so the tooltip always has
+  // an 8px margin from both viewport edges — this is what stops it sliding
+  // under the sidebar or off-screen on the right at laptop widths.
+  const edgeMargin = 8;
+  const idealLeft = anchorRect.left + anchorRect.width / 2 - TOOLTIP_WIDTH / 2;
+  const left = Math.min(
+    Math.max(idealLeft, edgeMargin),
+    window.innerWidth - TOOLTIP_WIDTH - edgeMargin,
+  );
+  // Sits just above where the card's own top edge is, matching the old
+  // `top-2` offset the absolutely-positioned version used.
+  const top = anchorRect.top + 8;
+
+  return createPortal(
+    <div
+      className={`pointer-events-none fixed z-50 w-72 transition-all duration-150 ${
+        visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
+      }`}
+      style={{ top, left }}
+    >
       <div className="rounded-xl border border-[#E7EAE1] dark:border-[#2E3A2E] bg-white dark:bg-[#1D231D] p-3 shadow-xl shadow-black/10 dark:shadow-black/50">
         <div className="flex items-baseline justify-between gap-2 border-b border-[#E7EAE1] dark:border-[#262B24] pb-2">
           <span className="text-xs font-bold uppercase tracking-wide text-[#1F2937] dark:text-white">
@@ -171,7 +208,8 @@ function OrderItemsTooltip({ order }) {
           Total includes GST, add-ons and charges
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -214,9 +252,30 @@ export default function TableOrderCard({
   const categoryMeta = CATEGORY_META[category];
   const typeBadge = order?.orderType ? ORDER_TYPE_BADGE[order.orderType] : null;
 
+  // Drives the portaled tooltip above — see the FIX note on
+  // OrderItemsTooltip for why this replaced the old group-hover approach.
+  const cardRef = useRef(null);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [anchorRect, setAnchorRect] = useState(null);
+
+  const handleMouseEnter = () => {
+    if (cardRef.current) {
+      setAnchorRect(cardRef.current.getBoundingClientRect());
+    }
+    setTooltipVisible(true);
+  };
+  const handleMouseLeave = () => setTooltipVisible(false);
+
   return (
-    <div className="group relative">
-      {!isFree && <OrderItemsTooltip order={order} />}
+    <div
+      ref={cardRef}
+      className="group relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {!isFree && (
+        <OrderItemsTooltip order={order} anchorRect={anchorRect} visible={tooltipVisible} />
+      )}
       <div
       className={`flex h-full flex-col rounded-2xl border bg-white dark:bg-[#1D231D] p-5 shadow-sm transition-shadow ${
         isFree

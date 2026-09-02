@@ -12,6 +12,8 @@ const router = Router();
 // id and the lookup 404s.
 router.get("/", printerProfilesController.getPrinterProfiles);
 router.get("/default", printerProfilesController.getDefaultPrinterProfile);
+// Also above /:id — "resolve" would otherwise be read as a profile id.
+router.get("/resolve", printerProfilesController.resolvePrinterProfile);
 router.get("/:id", printerProfilesController.getPrinterProfile);
 
 // Editing the hardware spec is Owner/Admin, same as BillingCounter: getting

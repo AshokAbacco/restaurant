@@ -14,7 +14,7 @@ import {
   FiFileText,
 } from "react-icons/fi";
 import { humanizeEnum } from "../utils/format";
-
+import { useNavigate } from "react-router-dom";
 // Visual styling keyed by the PaymentMethod enum from schema.prisma
 const methodStyles = {
   CASH: {
@@ -51,7 +51,7 @@ const methodStyles = {
 
 const PaymentSummary = ({ data, loading = false }) => {
   const { totalAmount = 0, totalTransactions = 0, methods = [] } = data || {};
-
+  const navigate = useNavigate();
   return (
     <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm shadow-black/[0.02] dark:shadow-none transition-colors">
       {/* Header */}
@@ -176,7 +176,9 @@ const PaymentSummary = ({ data, loading = false }) => {
           Live Collection
         </div>
 
-        <button className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition font-medium">
+        <button
+         onClick={() => navigate("/payments")}
+         className="flex items-center gap-2 hover:cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition font-medium">
           Payment Report
           <FiArrowRight />
         </button>

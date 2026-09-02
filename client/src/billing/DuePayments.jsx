@@ -175,7 +175,7 @@ export default function DuePayments() {
   return (
     <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#12160F] p-6">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-[#1F2937] dark:text-white">
               Due Payments
@@ -195,7 +195,7 @@ export default function DuePayments() {
           </div>
         </div>
 
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
           {[
             { key: "", label: "Outstanding + Partial" },
             { key: "OUTSTANDING", label: "Outstanding" },
@@ -258,7 +258,7 @@ export default function DuePayments() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 sm:gap-4">
                     <div className="text-right">
                       <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                         ₹{Number(d.amountPaid).toFixed(2)} of ₹

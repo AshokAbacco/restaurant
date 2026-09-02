@@ -1,4 +1,4 @@
-// server/src/printer-profiles/printerProfiles.service.js
+// server/src/pos/printer-profiles/printerProfiles.service.js
 //
 // Thermal printer / paper geometry per outlet. See the PrinterProfile model
 // in schema.prisma for why this exists: a receipt is laid out against paper,
@@ -27,6 +27,11 @@ const LIMITS = {
 // documents what staff physically connected rather than selecting a
 // transport. Rejected if unrecognised so the UI can rely on the set.
 const CONNECTION_TYPES = ["SYSTEM", "NETWORK", "USB", "BLUETOOTH"];
+
+// What a printer is allowed to receive. The whole point of this feature: a
+// kitchen printer must never produce an invoice and a cashier printer must
+// never produce a KOT.
+const PURPOSES = ["KOT", "INVOICE", "BOTH"];
 
 // Per-printer print behaviour. Listed rather than spread so an unknown key in
 // the request body can't quietly become a column.
@@ -73,6 +78,8 @@ function assertGeometry({ paperWidthMm, printableWidthMm }) {
   }
 }
 
+const purposeOf = (data) => data.purpose || "BOTH";
+
 function normalise(input, { partial = false } = {}) {
   const data = {};
   const has = (k) => input[k] !== undefined && input[k] !== null && input[k] !== "";
@@ -99,6 +106,20 @@ function normalise(input, { partial = false } = {}) {
     if (has(key)) data[key] = toNumber(input[key], key);
   }
 
+  if (has("purpose")) {
+    const value = String(input.purpose).toUpperCase();
+    if (!PURPOSES.includes(value)) {
+      fail(`purpose must be one of ${PURPOSES.join(", ")}.`);
+    }
+    data.purpose = value;
+  }
+
+  // Explicit null is meaningful here — it clears the binding back to "any
+  // kitchen" — so this can't go through the `has()` truthiness check.
+  if (input.kitchenBranchId !== undefined) {
+    data.kitchenBranchId = input.kitchenBranchId || null;
+  }
+
   if (has("connectionType")) {
     const value = String(input.connectionType).toUpperCase();
     if (!CONNECTION_TYPES.includes(value)) {
@@ -121,12 +142,18 @@ function normalise(input, { partial = false } = {}) {
   return data;
 }
 
-export async function listPrinterProfiles({ activeOnly } = {}, outletId) {
+export async function listPrinterProfiles(
+  { activeOnly, purpose, kitchenBranchId } = {},
+  outletId,
+) {
   return prisma.printerProfile.findMany({
     where: {
       outletId,
       ...(activeOnly === "true" || activeOnly === true ? { isActive: true } : {}),
+      ...(purpose ? { purpose: String(purpose).toUpperCase() } : {}),
+      ...(kitchenBranchId ? { kitchenBranchId } : {}),
     },
+    include: { kitchenBranch: { select: { id: true, name: true } } },
     // Default first — the client picks profiles[0] as its fallback when a
     // device has never chosen one.
     orderBy: [{ isDefault: "desc" }, { name: "asc" }],
@@ -138,16 +165,76 @@ export async function getPrinterProfileById(id, outletId) {
 }
 
 // The profile a device should use when it hasn't picked one itself.
-export async function getDefaultPrinterProfile(outletId) {
+// `purpose` narrows it to that stream's default.
+export async function getDefaultPrinterProfile(outletId, purpose) {
+  const purposeFilter =
+    purpose && purpose !== "BOTH"
+      ? { purpose: { in: [purpose, "BOTH"] } }
+      : {};
+
   return (
     (await prisma.printerProfile.findFirst({
-      where: { outletId, isDefault: true, isActive: true },
+      where: { outletId, isDefault: true, isActive: true, ...purposeFilter },
+      // A printer dedicated to this purpose beats a BOTH catch-all.
+      orderBy: { purpose: "asc" },
     })) ||
     (await prisma.printerProfile.findFirst({
-      where: { outletId, isActive: true },
-      orderBy: { name: "asc" },
+      where: { outletId, isActive: true, ...purposeFilter },
+      orderBy: [{ purpose: "asc" }, { name: "asc" }],
     }))
   );
+}
+
+// Which printer should this specific job go to?
+//
+// Resolution order for a KOT, most specific first:
+//   1. a KOT printer bound to this exact kitchen
+//   2. that kitchen's BOTH printer
+//   3. an unbound KOT printer ("any kitchen" — correct for single-kitchen
+//      outlets, and the sane fallback when a new kitchen has no printer yet)
+//   4. the outlet default for this purpose
+//
+// Returns { profile, matchedOn } so the caller can tell an exact hit from a
+// fallback. That distinction matters: silently printing a Rooftop ticket on
+// the Ground Floor printer is worse than saying the routing is incomplete.
+export async function resolvePrinterProfile(
+  { purpose = "BOTH", kitchenBranchId } = {},
+  outletId,
+) {
+  const target = String(purpose).toUpperCase();
+  if (!PURPOSES.includes(target)) {
+    fail(`purpose must be one of ${PURPOSES.join(", ")}.`);
+  }
+
+  const base = { outletId, isActive: true };
+
+  if (target === "KOT" && kitchenBranchId) {
+    const exact = await prisma.printerProfile.findFirst({
+      where: { ...base, purpose: "KOT", kitchenBranchId },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    });
+    if (exact) return { profile: exact, matchedOn: "KITCHEN_EXACT" };
+
+    const shared = await prisma.printerProfile.findFirst({
+      where: { ...base, purpose: "BOTH", kitchenBranchId },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    });
+    if (shared) return { profile: shared, matchedOn: "KITCHEN_SHARED" };
+  }
+
+  if (target !== "BOTH") {
+    const unbound = await prisma.printerProfile.findFirst({
+      where: { ...base, purpose: target, kitchenBranchId: null },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    });
+    if (unbound) return { profile: unbound, matchedOn: "PURPOSE_ANY" };
+  }
+
+  const fallback = await getDefaultPrinterProfile(outletId, target);
+  return {
+    profile: fallback || null,
+    matchedOn: fallback ? "OUTLET_DEFAULT" : "NONE",
+  };
 }
 
 export async function createPrinterProfile(body, outletId) {
@@ -163,14 +250,18 @@ export async function createPrinterProfile(body, outletId) {
   // First profile for an outlet becomes the default automatically —
   // otherwise a freshly-configured outlet has printers but nothing for a new
   // device to fall back to.
-  const existingCount = await prisma.printerProfile.count({ where: { outletId } });
+  // Scoped to this purpose: the first KOT printer and the first invoice
+  // printer each become the default for their own stream.
+  const existingCount = await prisma.printerProfile.count({
+    where: { outletId, purpose: purposeOf(data) },
+  });
   const shouldDefault = data.isDefault === true || existingCount === 0;
 
   try {
     return await prisma.$transaction(async (tx) => {
       if (shouldDefault) {
         await tx.printerProfile.updateMany({
-          where: { outletId, isDefault: true },
+          where: { outletId, isDefault: true, purpose: purposeOf(data) },
           data: { isDefault: false },
         });
       }
@@ -211,7 +302,12 @@ export async function updatePrinterProfile(id, body, outletId) {
     return await prisma.$transaction(async (tx) => {
       if (data.isDefault === true) {
         await tx.printerProfile.updateMany({
-          where: { outletId, isDefault: true, NOT: { id } },
+          where: {
+            outletId,
+            isDefault: true,
+            purpose: data.purpose ?? existing.purpose,
+            NOT: { id },
+          },
           data: { isDefault: false },
         });
       }

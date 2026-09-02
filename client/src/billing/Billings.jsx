@@ -406,10 +406,19 @@ export default function Billings() {
     [orders, selectedOrderId],
   );
 
+  // Three side-by-side columns only from xl up. Below that the viewport
+  // can't give each one a usable width — on a tablet they landed at ~250px
+  // each, which is what wrapped "Items:" and "Subtotal:" into each other on
+  // the printed-style invoice.
+  //
+  // The height rule matters as much as the direction: h-[calc(100vh-4rem)]
+  // with overflow-hidden means the page itself never scrolls, so anything
+  // past the fold on a short screen was unreachable. Below xl it becomes
+  // auto-height and the page scrolls normally.
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4 overflow-hidden bg-[#F3F5EE] dark:bg-[#12160F] p-4">
+    <div className="flex flex-col xl:flex-row xl:h-[calc(100vh-4rem)] gap-4 overflow-visible xl:overflow-hidden bg-[#F3F5EE] dark:bg-[#12160F] p-3 sm:p-4">
       {/* ============ Active Orders (left) ============ */}
-      <div className="flex w-72 min-h-[500px] shrink-0 flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
+      <div className="flex w-full xl:w-72 max-h-[45vh] xl:max-h-none min-h-[240px] xl:min-h-[500px] shrink-0 flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
         <div className="shrink-0 border-b border-[#E7EAE1] dark:border-[#262B24] px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold uppercase tracking-wide text-[#1F2937] dark:text-white">
@@ -515,7 +524,7 @@ export default function Billings() {
       </div>
 
       {/* ============ Billing panel (middle) ============ */}
-      <div className="flex flex-1 min-h-[500px] flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
+      <div className="flex w-full xl:flex-1 min-h-[420px] xl:min-h-[500px] flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
         {!selectedOrderId ? (
           <div className="flex flex-1 items-center justify-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
             Select an order from the list to view its bill.
@@ -550,8 +559,8 @@ export default function Billings() {
             </div>
 
             {/* Scrollable content — everything except the header and footer button */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-white/5 p-3 text-sm">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-5">
+              <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-white/5 p-3 text-sm">
                 <div>
                   <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                     Table
@@ -884,7 +893,7 @@ export default function Billings() {
 
       {/* ============ Invoice (right) — only appears once paid ============ */}
       {selectedOrderId && (summary || result) && (
-        <div className="flex flex-1 min-h-[500px] flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
+        <div className="flex w-full xl:flex-1 min-h-[420px] xl:min-h-[500px] flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
           {result && result.invoice ? (
             <InvoiceView
               invoice={result.invoice}

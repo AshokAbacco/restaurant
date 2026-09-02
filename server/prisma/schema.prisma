@@ -125,9 +125,10 @@ model KitchenBranch {
   floorId String?
   floor   Floor?  @relation(fields: [floorId], references: [id])
 
-  orders        Order[]
-  kitchenOrders KitchenOrder[]
-  staff         Employee[]
+  orders          Order[]
+  kitchenOrders   KitchenOrder[]
+  staff           Employee[]
+  printerProfiles PrinterProfile[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1783,6 +1784,19 @@ model BillingCounter {
   @@map("billing_counters")
 }
 
+// Thermal printer / paper geometry, per outlet. One row per physical printer
+// model an outlet actually owns ("Posiflow KP307-UEWB", "Sunmi V2 handheld").
+//
+// This exists because a receipt is laid out against PAPER, not a screen: an
+// 80mm roll gives ~72mm of printable width, a 58mm roll gives ~48mm, and a
+// layout tuned for one is unreadable on the other. The KOT and the invoice
+// read these numbers at print time (client/src/print/printing.js) and size
+// @page, the font and the item columns from them, instead of the 80mm
+// constants that used to be hard-coded.
+//
+// Deactivated rather than deleted (isActive), same reasoning as
+// BillingCounter — an outlet that retires a printer shouldn't break the
+// devices still pointing at that profile mid-shift.
 model PrinterProfile {
   id       String @id @default(uuid())
   outletId String
@@ -1820,6 +1834,27 @@ model PrinterProfile {
   // already inserts its own.
   extraMarginMm Float @default(0)
 
+  // ---- Routing --------------------------------------------------------
+  // WHAT this printer is for. A kitchen printer must never receive an
+  // invoice (it would hand a customer a slip with no prices, or worse, put
+  // the bill in the kitchen), and a cashier printer must never receive a
+  // KOT. This is the field that separates the two streams.
+  //   KOT     — kitchen tickets only
+  //   INVOICE — bills/receipts only
+  //   BOTH    — single-printer outlets, the previous behaviour
+  purpose String @default("BOTH")
+
+  // WHICH physical kitchen this printer sits in. Required in practice for
+  // purpose=KOT once an outlet runs more than one kitchen: it is what routes
+  // an order's ticket to the right room. Null means "any kitchen", which is
+  // correct for a single-kitchen outlet and for INVOICE printers.
+  //
+  // KitchenBranch, not KitchenSection: sections (Grill, Beverage) are
+  // functional and several share one physical printer; branches are rooms,
+  // and rooms are where printers live.
+  kitchenBranchId String?
+  kitchenBranch   KitchenBranch? @relation(fields: [kitchenBranchId], references: [id])
+
   // ---- Connection -----------------------------------------------------
   // How the printer is reached. Informational for now: the browser prints
   // through the OS print dialog, so this records what staff plugged in
@@ -1851,8 +1886,11 @@ model PrinterProfile {
   deviceLabel String?
   notes       String?
 
-  // Exactly one default per outlet — enforced in the service, which clears
-  // the previous default in the same transaction.
+  // Exactly one default PER PURPOSE per outlet — enforced in the service,
+  // which clears the previous default in the same transaction. Scoped by
+  // purpose because an outlet needs a default KOT printer and a default
+  // invoice printer at the same time; a single global default can't express
+  // that.
   isDefault Boolean @default(false)
   isActive  Boolean @default(true)
 
@@ -1861,6 +1899,8 @@ model PrinterProfile {
 
   @@unique([outletId, name])
   @@index([outletId])
+  @@index([outletId, purpose, isActive])
+  @@index([kitchenBranchId])
   @@map("printer_profiles")
 }
 

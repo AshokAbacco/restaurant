@@ -15,37 +15,128 @@ import { FALLBACK_PROFILE, toPrintGeometry } from "./printerProfiles";
 const STORAGE_KEY = "print:selectedProfileId";
 
 // ---------------------------------------------------------------------------
+// API base
+// ---------------------------------------------------------------------------
+
+// MUST match where printerProfilesRoutes is mounted in server/src/index.js.
+// Currently:  app.use("/api/pos/printer-profiles", ..., printerProfilesRoutes)
+//
+// The module lives at server/src/printer-profiles/ but keeps a /pos/ URL —
+// the same arrangement reservations uses, so the frontend path never had to
+// change.
+//
+// One constant rather than the path repeated across eight calls. A mismatch
+// here produces a 404 with no JSON body, which `unwrap` below turns into its
+// generic fallback ("Couldn't save that printer profile.") with nothing
+// pointing at the real cause — so this is worth exactly one place to edit.
+const PRINTER_API = "/pos/printer-profiles";
+
+// ---------------------------------------------------------------------------
+// Vocabulary
+// ---------------------------------------------------------------------------
+
+// What a printer is allowed to receive. Mirrors PURPOSES in
+// server/src/printer-profiles/printerProfiles.service.js — the server rejects
+// anything outside this set, so the two lists have to agree.
+export const PRINTER_PURPOSES = [
+  {
+    key: "KOT",
+    label: "Kitchen (KOT)",
+    hint: "Kitchen tickets only — never bills.",
+  },
+  {
+    key: "INVOICE",
+    label: "Invoice / Bill",
+    hint: "Customer bills only — never kitchen tickets.",
+  },
+  {
+    key: "BOTH",
+    label: "Both",
+    hint: "One printer handling everything (single-counter outlets).",
+  },
+];
+
+// ---------------------------------------------------------------------------
 // API
 // ---------------------------------------------------------------------------
 
-const unwrap = ({ ok, data }, fallbackMessage) => {
-  if (!ok) throw new Error(data?.message || fallbackMessage);
-  return data;
+// Carries the HTTP status through when the server sends no JSON body.
+//
+// Without it every failure collapsed to the same sentence, which hid the one
+// fact that identifies the cause:
+//   404 — the route isn't mounted (server not restarted / wrong path)
+//   403 — a role gate above this mount rejected the request
+//   502 — the server is down or crashed on boot
+//   500 — it reached the handler and something threw (that case DOES carry a
+//         message, so it prints the real one)
+const unwrap = ({ ok, status, data }, fallbackMessage) => {
+  if (ok) return data;
+
+  // A JSON body with a message is the server explaining itself — trust it.
+  if (data?.message) throw new Error(data.message);
+
+  // No parseable body: say so, and say what the status was.
+  const hint =
+    status === 404
+      ? "the printer routes aren't reachable at this URL — check PRINTER_API below matches the mount in server/src/index.js, and that the server was restarted"
+      : status === 403
+        ? "blocked by a role check before reaching the printer routes"
+        : status === 0 || !status
+          ? "no response from the server"
+          : "the server returned no details";
+
+  throw new Error(`${fallbackMessage} (HTTP ${status || "?"} — ${hint})`);
 };
 
 export const listPrinterProfiles = async (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return unwrap(
-    await apiRequest(`/pos/printer-profiles${qs ? `?${qs}` : ""}`),
+    await apiRequest(`${PRINTER_API}${qs ? `?${qs}` : ""}`),
     "Couldn't load printer profiles.",
   );
 };
 
 export const getPrinterProfile = async (id) =>
   unwrap(
-    await apiRequest(`/pos/printer-profiles/${id}`),
+    await apiRequest(`${PRINTER_API}/${id}`),
     "Couldn't load that printer profile.",
   );
 
-export const getDefaultPrinterProfile = async () =>
-  unwrap(
-    await apiRequest("/pos/printer-profiles/default"),
+// `purpose` narrows this to that stream's default — an outlet has a default
+// KOT printer and a default invoice printer at the same time.
+export const getDefaultPrinterProfile = async (purpose) => {
+  const qs = purpose ? `?purpose=${encodeURIComponent(purpose)}` : "";
+  return unwrap(
+    await apiRequest(`${PRINTER_API}/default${qs}`),
     "Couldn't load the default printer profile.",
   );
+};
+
+// Which printer should this specific job go to?
+//
+// `purpose` is required; `kitchenBranchId` narrows a KOT to the kitchen that
+// actually has to cook it. Resolution happens server-side, most specific
+// first: that kitchen's KOT printer, then that kitchen's shared printer, then
+// an unbound KOT printer, then the outlet default.
+//
+// Returns { profile, matchedOn }. `matchedOn` distinguishes an exact hit
+// (KITCHEN_EXACT) from a fallback (OUTLET_DEFAULT) or nothing configured at
+// all (NONE), so a caller can warn rather than silently print a Rooftop
+// ticket on the Ground Floor printer.
+export const resolvePrinterProfile = async ({ purpose, kitchenBranchId } = {}) => {
+  const qs = new URLSearchParams({
+    purpose: purpose || "BOTH",
+    ...(kitchenBranchId ? { kitchenBranchId } : {}),
+  }).toString();
+  return unwrap(
+    await apiRequest(`${PRINTER_API}/resolve?${qs}`),
+    "Couldn't work out which printer to use.",
+  );
+};
 
 export const createPrinterProfile = async (payload) =>
   unwrap(
-    await apiRequest("/pos/printer-profiles", {
+    await apiRequest(PRINTER_API, {
       method: "POST",
       body: JSON.stringify(payload),
     }),
@@ -54,7 +145,7 @@ export const createPrinterProfile = async (payload) =>
 
 export const updatePrinterProfile = async (id, payload) =>
   unwrap(
-    await apiRequest(`/pos/printer-profiles/${id}`, {
+    await apiRequest(`${PRINTER_API}/${id}`, {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
@@ -63,13 +154,13 @@ export const updatePrinterProfile = async (id, payload) =>
 
 export const makePrinterProfileDefault = async (id) =>
   unwrap(
-    await apiRequest(`/pos/printer-profiles/${id}/default`, { method: "POST" }),
+    await apiRequest(`${PRINTER_API}/${id}/default`, { method: "POST" }),
     "Couldn't change the default printer.",
   );
 
 export const deactivatePrinterProfile = async (id) =>
   unwrap(
-    await apiRequest(`/pos/printer-profiles/${id}`, { method: "DELETE" }),
+    await apiRequest(`${PRINTER_API}/${id}`, { method: "DELETE" }),
     "Couldn't remove that printer profile.",
   );
 
@@ -153,6 +244,11 @@ export async function setSelectedProfile(profile) {
 // Resolve what this device should print against: its own pick if it still
 // exists and is active, otherwise the outlet default, otherwise the built-in
 // 80mm fallback.
+//
+// This stays purpose-agnostic on purpose. It answers "what paper is loaded in
+// the printer attached to this terminal", which is a property of the device.
+// "Which printer should THIS job go to" is a different question, answered by
+// resolvePrinterProfile() above.
 //
 // Never throws — a printer-config fetch failing must not stop someone
 // printing a bill.

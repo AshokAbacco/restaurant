@@ -1,4 +1,4 @@
-// server/src/printer-profiles/printerProfiles.controller.js
+// server/src/pos/printer-profiles/printerProfiles.controller.js
 import * as printerProfilesService from "./printerProfiles.service.js";
 
 function handleError(res, err) {
@@ -22,10 +22,25 @@ export async function getDefaultPrinterProfile(req, res) {
   try {
     const profile = await printerProfilesService.getDefaultPrinterProfile(
       req.tenant.outletId,
+      req.query.purpose,
     );
     // Null, not 404: an outlet with no printers configured yet is a normal
     // state, and the client falls back to its built-in 80mm geometry.
     res.json(profile || null);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+// Which printer should this job go to? The one endpoint the POS and the
+// billing screen call before printing anything.
+export async function resolvePrinterProfile(req, res) {
+  try {
+    const result = await printerProfilesService.resolvePrinterProfile(
+      req.query,
+      req.tenant.outletId,
+    );
+    res.json(result);
   } catch (err) {
     handleError(res, err);
   }

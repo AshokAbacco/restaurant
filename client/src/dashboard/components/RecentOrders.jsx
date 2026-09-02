@@ -5,7 +5,7 @@
 import React from "react";
 import { FiEye, FiClock, FiCheckCircle } from "react-icons/fi";
 import { formatTimeAgo, humanizeEnum } from "../utils/format";
-
+import { useNavigate } from "react-router-dom";
 // Keys match the OrderStatus / PaymentStatus enums from schema.prisma
 const statusStyle = {
   NEW: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-400",
@@ -35,6 +35,7 @@ const RecentOrders = ({
   loading = false,
   title = "Recent Orders",
 }) => {
+  const navigate = useNavigate();
   return (
     <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm shadow-black/[0.02] dark:shadow-none transition-colors">
       {/* Header */}
@@ -49,7 +50,9 @@ const RecentOrders = ({
           </p>
         </div>
 
-        <button className="text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-700 dark:hover:text-blue-300 transition">
+        <button 
+         onClick={() => navigate("/pos/orders")}
+         className="text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-700 dark:hover:text-blue-300 transition hover:cursor-pointer">
           View All
         </button>
       </div>
@@ -145,9 +148,12 @@ const RecentOrders = ({
                       {formatTimeAgo(order.time)}
                     </td>
                     <td className="px-6 py-5 text-center">
-                      <button className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/15 hover:bg-blue-100 dark:hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto transition">
-                        <FiEye />
-                      </button>
+                     <button
+                      onClick={() => navigate("/pos/orders")}
+                      className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/15 hover:bg-blue-100 dark:hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto transition hover:cursor-pointer"
+                    >
+                      <FiEye />
+                    </button>
                     </td>
                   </tr>
                 ))}

@@ -9,7 +9,7 @@ import {
   FiArrowRight,
   FiTrendingDown,
 } from "react-icons/fi";
-
+import { useNavigate } from "react-router-dom";
 const statusStyles = {
   Critical: {
     badge: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400",
@@ -27,6 +27,7 @@ const LowStockAlert = ({ items = [], loading = false }) => {
     (item) => item.status === "Critical",
   ).length;
 
+  const navigate = useNavigate();
   return (
     <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm shadow-black/[0.02] dark:shadow-none transition-colors">
       {/* Header */}
@@ -158,7 +159,9 @@ const LowStockAlert = ({ items = [], loading = false }) => {
           Restock Required
         </div>
 
-        <button className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition">
+        <button
+         onClick={() => navigate("/inventory")}
+         className="flex items-center gap-2 text-blue-600 hover:cursor-pointer dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition">
           Manage Inventory
           <FiArrowRight />
         </button>

@@ -4,7 +4,7 @@
 
 import React from "react";
 import { FiTrendingUp, FiShoppingBag, FiArrowRight } from "react-icons/fi";
-
+import { useNavigate } from "react-router-dom";
 const badgeColors = [
   "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400",
   "bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400",
@@ -17,6 +17,7 @@ const TopSellingItems = ({ items = [], loading = false }) => {
   const totalSold = items.reduce((sum, item) => sum + item.sold, 0);
   const totalRevenue = items.reduce((sum, item) => sum + item.revenue, 0);
 
+  const navigate = useNavigate();
   return (
     <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm shadow-black/[0.02] dark:shadow-none transition-colors">
       {/* Header */}
@@ -123,7 +124,9 @@ const TopSellingItems = ({ items = [], loading = false }) => {
           Sales Increasing
         </div>
 
-        <button className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition">
+        <button 
+        onClick={() => navigate("/menu")}
+        className="flex items-center gap-2 text-blue-600 hover:cursor-pointer dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition">
           View Menu Analytics
           <FiArrowRight />
         </button>

@@ -29,11 +29,14 @@ import {
   FiAlertCircle,
   FiStar,
   FiMonitor,
+  FiCoffee,
+  FiFileText,
 } from "react-icons/fi";
 
 import PageHeader from "../../components/layout/PageHeader";
 import PaperPreview from "../printer-profiles/PaperPreview";
 import {
+  PRINTER_PURPOSES,
   listPrinterProfiles,
   createPrinterProfile,
   updatePrinterProfile,
@@ -45,6 +48,7 @@ import {
 } from "../../print/printerConfig";
 import { PRINTER_CATALOGUE, findCatalogueModel } from "../../print/printerProfiles";
 import { printOnce } from "../../print/printing";
+import { getKitchenBranches } from "../../pos/api/posApi";
 
 // Paper size presets. The bracketed figure is the printable width — the part
 // the head can actually reach — which is what the layout is built against.
@@ -99,6 +103,8 @@ const EMPTY = {
   speedMmPerSec: 300,
   baseFontPx: 10,
   extraMarginMm: 0,
+  purpose: "BOTH",
+  kitchenBranchId: "",
   connectionType: "SYSTEM",
   ipAddress: "",
   copies: 1,
@@ -124,6 +130,23 @@ const inputClass =
 const labelClass =
   "block mb-1.5 text-xs font-semibold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0]";
 
+const PURPOSE_BADGE = {
+  KOT: {
+    label: "Kitchen (KOT)",
+    className:
+      "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+  },
+  INVOICE: {
+    label: "Invoice",
+    className: "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300",
+  },
+  BOTH: {
+    label: "Both",
+    className:
+      "bg-[#F3F5EE] text-[#4B5563] dark:bg-white/5 dark:text-[#9CA8A0]",
+  },
+};
+
 const Card = ({ title, right, children }) => (
   <section className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm">
     <header className="flex items-center justify-between gap-3 flex-wrap px-5 py-3.5 border-b border-[#E7EAE1] dark:border-[#262B24]">
@@ -146,6 +169,11 @@ const PrinterSettings = () => {
   const [confirmId, setConfirmId] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [deviceProfileId, setDeviceProfileId] = useState(getSelectedProfileId());
+  // Physical kitchens ("Ground Floor Kitchen", "Rooftop Kitchen") — a KOT
+  // printer is bound to one so an order's ticket prints in the room that has
+  // to cook it. Failing to load these must not block adding a printer, so the
+  // error is swallowed and the picker just falls back to "Any kitchen".
+  const [kitchens, setKitchens] = useState([]);
   const formRef = useRef(null);
   const testRef = useRef(null);
 
@@ -164,7 +192,24 @@ const PrinterSettings = () => {
     load();
   }, [load]);
 
+  useEffect(() => {
+    getKitchenBranches()
+      .then((data) => setKitchens(Array.isArray(data) ? data : []))
+      .catch(() => setKitchens([]));
+  }, []);
+
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  // An invoice printer has no kitchen. Clearing the binding on switch stops a
+  // stale kitchenBranchId riding along on the save and making a cashier
+  // printer look like it lives in the Rooftop kitchen.
+  function setPurpose(purpose) {
+    setForm((f) => ({
+      ...f,
+      purpose,
+      kitchenBranchId: purpose === "INVOICE" ? "" : f.kitchenBranchId,
+    }));
+  }
 
   function applyModel(id) {
     const preset = findCatalogueModel(id);
@@ -220,6 +265,9 @@ const PrinterSettings = () => {
     payload.model = form.model.trim() || null;
     payload.deviceLabel = form.deviceLabel.trim() || null;
     payload.ipAddress = form.ipAddress.trim() || null;
+    // "" from the select means "any kitchen" — send null, not an empty string,
+    // or Prisma tries to match a branch whose id is "".
+    payload.kitchenBranchId = form.kitchenBranchId || null;
     // The server rejects clearing a default rather than un-setting it.
     if (editingId && !form.isDefault) delete payload.isDefault;
 
@@ -275,6 +323,30 @@ const PrinterSettings = () => {
     }
   }
 
+  // The failure mode this feature exists to prevent is silent: a kitchen with
+  // no printer of its own doesn't error, it just quietly prints somewhere
+  // else. Both gaps are surfaced here rather than discovered mid-service.
+  const coverage = useMemo(() => {
+    const live = profiles.filter((p) => p.isActive);
+    const takesKot = live.filter((p) => p.purpose === "KOT" || p.purpose === "BOTH");
+    const takesInvoice = live.filter(
+      (p) => p.purpose === "INVOICE" || p.purpose === "BOTH",
+    );
+    const boundKitchenIds = new Set(
+      takesKot.map((p) => p.kitchenBranchId).filter(Boolean),
+    );
+    // An unbound KOT printer covers every kitchen, so nothing is uncovered.
+    const hasCatchAllKot = takesKot.some((p) => !p.kitchenBranchId);
+
+    return {
+      hasKot: takesKot.length > 0,
+      hasInvoice: takesInvoice.length > 0,
+      uncoveredKitchens: hasCatchAllKot
+        ? []
+        : kitchens.filter((k) => !boundKitchenIds.has(k.id)),
+    };
+  }, [profiles, kitchens]);
+
   const activePaper = useMemo(
     () =>
       PAPER_SIZES.find(
@@ -326,6 +398,68 @@ const PrinterSettings = () => {
             )
           }
         >
+          {/* Purpose comes first because it decides what the rest of the form
+              even means: an invoice printer has no kitchen, and a kitchen
+              printer must never be offered as an invoice target. */}
+          <div className="mb-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div>
+              <label className={labelClass}>What does this printer print?</label>
+              <div className="flex flex-wrap gap-2">
+                {PRINTER_PURPOSES.map((p) => {
+                  const active = form.purpose === p.key;
+                  const Icon =
+                    p.key === "KOT" ? FiCoffee : p.key === "INVOICE" ? FiFileText : FiPrinter;
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => setPurpose(p.key)}
+                      title={p.hint}
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                        active
+                          ? "border-[#3FA34D] dark:border-[#43B75A] bg-[#EAF6EC] dark:bg-[#43B75A]/10 text-[#3FA34D] dark:text-[#43B75A]"
+                          : "border-[#E7EAE1] dark:border-[#262B24] text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <Icon size={14} />
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                {PRINTER_PURPOSES.find((p) => p.key === form.purpose)?.hint}
+              </p>
+            </div>
+
+            {/* Only meaningful for a printer that receives kitchen tickets. */}
+            {form.purpose !== "INVOICE" && (
+              <div>
+                <label className={labelClass}>Which kitchen is it in?</label>
+                <select
+                  value={form.kitchenBranchId}
+                  onChange={(e) => set("kitchenBranchId", e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Any kitchen (no specific branch)</option>
+                  {kitchens.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.name}
+                      {k.floor?.name ? ` · ${k.floor.name}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                  {kitchens.length === 0
+                    ? "No kitchens set up yet — add them under Settings → Branches."
+                    : form.kitchenBranchId
+                      ? "Orders sent to this kitchen print here."
+                      : "Used for any kitchen without a printer of its own."}
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div>
               <label className={labelClass}>Printer Hardware Model</label>
@@ -528,6 +662,39 @@ const PrinterSettings = () => {
 
       {/* ============ 3. ALL CONNECTED PRINTERS ============ */}
 
+      {!loading && (coverage.uncoveredKitchens.length > 0 || !coverage.hasKot || !coverage.hasInvoice) && (
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+          <p className="flex items-center gap-2 font-semibold">
+            <FiAlertCircle className="shrink-0" />
+            Printer routing is incomplete
+          </p>
+          <ul className="mt-2 space-y-1 text-xs list-disc pl-8">
+            {!coverage.hasKot && (
+              <li>
+                No printer accepts kitchen tickets — add one set to
+                <strong> Kitchen (KOT)</strong> or <strong>Both</strong>.
+              </li>
+            )}
+            {!coverage.hasInvoice && (
+              <li>
+                No printer accepts invoices — add one set to
+                <strong> Invoice</strong> or <strong>Both</strong>.
+              </li>
+            )}
+            {coverage.uncoveredKitchens.length > 0 && (
+              <li>
+                No printer assigned to{" "}
+                <strong>
+                  {coverage.uncoveredKitchens.map((k) => k.name).join(", ")}
+                </strong>
+                . Tickets for {coverage.uncoveredKitchens.length === 1 ? "it" : "them"}{" "}
+                fall back to another printer.
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+
       <Card
         title="All Connected Printers"
         right={
@@ -540,11 +707,11 @@ const PrinterSettings = () => {
           <table className="w-full text-left">
             <thead className="bg-[#F3F5EE] dark:bg-[#1D231C] border-b border-[#E7EAE1] dark:border-[#262B24]">
               <tr>
-                {["Printer", "Model", "Paper", "Connection", "Status", ""].map((h, i) => (
+                {["Printer", "Prints", "Kitchen", "Paper", "Connection", "Status", ""].map((h, i) => (
                   <th
                     key={h || i}
                     className={`px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0] ${
-                      i === 5 ? "text-right" : ""
+                      i === 6 ? "text-right" : ""
                     }`}
                   >
                     {h}
@@ -555,13 +722,13 @@ const PrinterSettings = () => {
             <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                     Loading printers…
                   </td>
                 </tr>
               ) : profiles.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-[#6B7280] dark:text-[#9CA8A0]">
                     No printers added yet — receipts print on standard 80mm
                     geometry until you add one.
                   </td>
@@ -593,8 +760,27 @@ const PrinterSettings = () => {
                         )}
                       </div>
                     </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          (PURPOSE_BADGE[p.purpose] || PURPOSE_BADGE.BOTH).className
+                        }`}
+                      >
+                        {(PURPOSE_BADGE[p.purpose] || PURPOSE_BADGE.BOTH).label}
+                      </span>
+                      <span className="block mt-1 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                        {p.model || "Custom"}
+                      </span>
+                    </td>
                     <td className="px-5 py-3 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
-                      {p.model || "Custom"}
+                      {p.purpose === "INVOICE"
+                        ? "—"
+                        : p.kitchenBranch?.name ||
+                          kitchens.find((k) => k.id === p.kitchenBranchId)?.name || (
+                            <span className="text-[#9CA3AF] dark:text-[#6B7280]">
+                              Any kitchen
+                            </span>
+                          )}
                     </td>
                     <td className="px-5 py-3 font-mono text-sm text-[#1F2937] dark:text-[#E4E9E2] whitespace-nowrap">
                       {p.paperWidthMm}mm ({p.printableWidthMm}mm)
