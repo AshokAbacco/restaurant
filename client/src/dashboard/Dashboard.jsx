@@ -109,7 +109,7 @@ const Dashboard = () => {
           KPI CARDS
       ====================================== */}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
         {waiterView ? (
           <>
             <StatCard
@@ -183,14 +183,14 @@ const Dashboard = () => {
               loading={loading}
             />
 
-            <StatCard
+            {/* <StatCard
               title="Customers"
               value={stats?.customers?.value ?? "—"}
               icon={<FiUsers />}
               color="purple"
               subtitle="Visited today"
               loading={loading}
-            />
+            /> */}
 
             {showInventory && (
               <StatCard
@@ -299,7 +299,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               <div className="text-center">
                 <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
                   Revenue
@@ -318,14 +318,14 @@ const Dashboard = () => {
                 </h3>
               </div>
 
-              <div className="text-center">
+              {/* <div className="text-center">
                 <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
                   Customers
                 </p>
                 <h3 className="text-2xl font-bold text-violet-600 dark:text-violet-400 mt-2">
                   {stats.customers?.value ?? 0}
                 </h3>
-              </div>
+              </div> */}
 
               <div className="text-center">
                 <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">

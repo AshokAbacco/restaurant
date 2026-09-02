@@ -585,7 +585,7 @@ const Login = () => {
             {/* Footer */}
 
             <div className="mt-6 sm:mt-8">
-              <div className="flex items-center gap-3" aria-hidden="true">
+              {/* <div className="flex items-center gap-3" aria-hidden="true">
                 <span className="h-px flex-1 bg-[#E4E0D2] dark:bg-[#262B24]" />
                 <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
                   or
@@ -596,7 +596,7 @@ const Login = () => {
               <div className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl border border-[#E4E0D2] dark:border-[#262B24] py-3 text-[#22B368] dark:text-[#59C97A] text-sm font-medium">
                 <FiCheckCircle />
                 Secure login
-              </div>
+              </div> */}
 
               {/* Entry point to the public Owner signup. Without this link
                   /register is unreachable from the UI — a new restaurant
