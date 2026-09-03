@@ -9,10 +9,24 @@ const REFRESH_COOKIE_NAME = "refresh_token";
 
 const isProd = process.env.NODE_ENV === "production";
 
+// sameSite was "strict" in production. That works only while the app and the
+// API share a site. Deployed on Render they don't: onrender.com is on the
+// Public Suffix List, so app.onrender.com and api.onrender.com are different
+// SITES, and a Strict/Lax cookie is never attached to a cross-site fetch.
+// POST /api/auth/refresh then arrives with no cookie, returns 401, and the
+// user is logged out the moment the access token expires.
+//
+// "none" is what a cross-site session cookie requires, and browsers only
+// honour None together with Secure. Still httpOnly, still scoped to
+// /api/auth. Locally NODE_ENV=development keeps "lax", which is correct
+// because localhost:5173 and localhost:5001 ARE the same site.
+//
+// If you later serve the API and app from one domain, "lax" becomes the
+// stricter and better choice — this follows the deployment shape.
 const cookieOptions = {
   httpOnly: true,
-  secure: isProd, // requires HTTPS in production
-  sameSite: isProd ? "strict" : "lax",
+  secure: isProd, // required by SameSite=None, and correct in prod anyway
+  sameSite: isProd ? "none" : "lax",
   path: "/api/auth", // only sent to auth endpoints
   maxAge: REFRESH_TOKEN_TTL_MS,
 };
@@ -118,6 +132,13 @@ export const refreshHandler = async (req, res) => {
       .status(result.status)
       .json({ success: false, message: result.message });
   }
+
+  // Slide the window forward on every refresh. Without this the session died
+  // exactly N days after LOGIN however much it was used — someone on the till
+  // daily would still be thrown out mid-shift. Re-issuing the cookie (and the
+  // DB row's expiry, in the service) makes it N days of INACTIVITY, which is
+  // what "stay logged in until Logout is pressed" means in practice.
+  res.cookie(REFRESH_COOKIE_NAME, rawRefreshToken, cookieOptions);
 
   return res.status(200).json({
     success: true,

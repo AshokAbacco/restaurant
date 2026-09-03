@@ -12,6 +12,7 @@ import InvoiceView from "./InvoiceView";
 import {
   getOrders,
   getBillingSummary,
+  removeOrderItem,
   sendToKitchen,
   getKotsForOrder,
 } from "../pos/api/posApi";
@@ -70,6 +71,11 @@ export default function Billings() {
   );
 
   const [summary, setSummary] = useState(null);
+  // Voiding a line off a live bill: two-step, because it moves money and
+  // there is no undo once the item is gone.
+  const [confirmVoidId, setConfirmVoidId] = useState(null);
+  const [voidingId, setVoidingId] = useState(null);
+  const [voidError, setVoidError] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
 
@@ -213,6 +219,26 @@ export default function Billings() {
   useEffect(() => {
     if (selectedOrderId) loadSummary(selectedOrderId);
   }, [selectedOrderId, loadSummary]);
+
+  // Re-reads the summary from the server afterwards rather than patching
+  // local state: the server owns the re-priced subtotal/GST/total, and a
+  // locally-subtracted figure that disagreed with the invoice would be far
+  // worse than a brief spinner.
+  async function handleVoidItem(itemId) {
+    if (!selectedOrderId) return;
+    setVoidingId(itemId);
+    setVoidError(null);
+    try {
+      await removeOrderItem(selectedOrderId, itemId);
+      setConfirmVoidId(null);
+      await loadSummary(selectedOrderId);
+      loadOrders(); // the order total in the left-hand list changed
+    } catch (err) {
+      setVoidError(err.message);
+    } finally {
+      setVoidingId(null);
+    }
+  }
 
   function selectOrder(orderId) {
     setSelectedOrderId(orderId);
@@ -601,16 +627,70 @@ export default function Billings() {
                         </p>
                       ))}
                     </div>
-                    <span className="font-mono font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-                      ₹
-                      {(
-                        item.totalPrice +
-                        item.addOns.reduce((s, a) => s + a.totalPrice, 0)
-                      ).toFixed(2)}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="font-mono font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                        ₹
+                        {(
+                          item.totalPrice +
+                          item.addOns.reduce((s, a) => s + a.totalPrice, 0)
+                        ).toFixed(2)}
+                      </span>
+
+                      {/* Void this line. Hidden once the bill is paid — the
+                          invoice exists by then and the money is recorded, so
+                          changing what it contains would put paper and
+                          database out of step. Also hidden offline: the
+                          re-price happens server-side and there's no queued
+                          replay for it. */}
+                      {!result && !isOffline && summary.items.length > 1 && (
+                        confirmVoidId === item.id ? (
+                          <span className="flex items-center gap-2 whitespace-nowrap">
+                            <button
+                              onClick={() => setConfirmVoidId(null)}
+                              className="text-xs font-medium text-[#6B7280] dark:text-[#9CA8A0] hover:text-[#1F2937] dark:hover:text-white"
+                            >
+                              Keep
+                            </button>
+                            <button
+                              onClick={() => handleVoidItem(item.id)}
+                              disabled={voidingId === item.id}
+                              className="rounded-lg bg-[#EF5350] px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                            >
+                              {voidingId === item.id ? "Removing…" : "Remove"}
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setVoidError(null);
+                              setConfirmVoidId(item.id);
+                            }}
+                            title="Remove this item from the bill"
+                            aria-label={`Remove ${item.name} from the bill`}
+                            className="rounded-lg p-1.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-[#EF5350] dark:hover:text-red-400"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+                              <path
+                                d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6h14z"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        )
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
+
+              {voidError && (
+                <p className="mb-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs font-medium text-[#EF5350] dark:text-red-400">
+                  {voidError}
+                </p>
+              )}
 
               {!result && (
                 <div className="mb-4 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-3">

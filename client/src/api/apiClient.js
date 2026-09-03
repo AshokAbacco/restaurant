@@ -50,7 +50,10 @@ const rawRequest = async (path, options = {}) => {
   return { ok: res.ok, status: res.status, data };
 };
 
-const refreshAccessToken = async () => {
+// Exported so session restore can try the refresh COOKIE even when there is
+// no access token in memory. The cookie is httpOnly, so JS can't inspect it —
+// the only way to know whether a session is still alive is to ask.
+export const refreshAccessToken = async () => {
   if (!refreshPromise) {
     refreshPromise = rawRequest("/auth/refresh", { method: "POST" }).finally(
       () => {

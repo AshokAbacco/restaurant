@@ -4,7 +4,12 @@
 // ==============================================
 
 import { jwtDecode } from "jwt-decode";
-import { apiRequest, setAccessToken, getAccessToken } from "../api/apiClient";
+import {
+  apiRequest,
+  setAccessToken,
+  getAccessToken,
+  refreshAccessToken,
+} from "../api/apiClient";
 
 // ==============================================
 // REGISTER (public Owner signup)
@@ -129,9 +134,27 @@ const logout = async () => {
 // ==============================================
 
 const restoreSession = async () => {
-  // Nothing stored → don't even hit the server
+  // THE 15-MINUTE LOGOUT LIVED HERE.
+  //
+  // This used to `return null` whenever there was no access token in memory,
+  // which reads as "not logged in". But the access token is deliberately
+  // short-lived (15m) while the refresh COOKIE is good for 30 days — so "no
+  // access token" is the normal state after a short break, not a logged-out
+  // one. Any single failed refresh also nulls the token, and from then on
+  // this early return meant the app never asked again: permanently logged
+  // out with a perfectly valid 30-day cookie sitting in the browser.
+  //
+  // The cookie is httpOnly, so JS cannot look at it. The only way to find out
+  // whether the session is alive is to attempt the refresh.
   if (!getAccessToken()) {
-    return null;
+    try {
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) return null; // genuinely no session — the cookie is gone
+    } catch {
+      // Network failure, not a rejection. Nothing cached to fall back on
+      // (no token at all), so this one really is a logged-out state.
+      return null;
+    }
   }
 
   try {

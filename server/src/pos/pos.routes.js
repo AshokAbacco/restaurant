@@ -30,6 +30,15 @@ router.post("/orders/:id/hold", posController.holdOrder);
 router.post("/orders/:id/resume", posController.resumeOrder);
 router.post("/orders/:id/transfer-table", posController.transferTable);
 router.post("/orders/:id/items", posController.addItems);
+// Voiding a line off a live bill is a shrinkage route, so unlike the rest of
+// this router it carries a role check. CASHIER is included deliberately —
+// this happens at the till, mid-payment, and routing it through a manager
+// every time would just get worked around.
+router.delete(
+  "/orders/:id/items/:itemId",
+  requireRole("OWNER", "ADMIN", "MANAGER", "CASHIER"),
+  posController.removeOrderItem,
+);
 // Owner-only — everything else on this router still has no per-route role
 // check (see comment above), but a permanent delete is destructive enough
 // that it's restricted regardless. requireAuth already ran at the /api/pos

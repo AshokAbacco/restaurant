@@ -831,6 +831,140 @@ export async function addItemsToOrder(orderId, items, outletId) {
   return { order: updatedOrder, newItems };
 }
 
+// ==============================================
+// VOID AN ORDER ITEM (billing-time cancellation)
+// ==============================================
+//
+// A waiter asks for a dish to come off the bill while the cashier is taking
+// payment. Removes ONE OrderItem and re-prices the order from what's left.
+//
+// Three things make this more than a delete:
+//
+//  1. KitchenOrderItem.orderItemId has NO onDelete: Cascade (schema.prisma).
+//     Deleting an OrderItem that already reached a kitchen ticket raises
+//     `kitchen_order_items_orderItemId_fkey` — the same violation
+//     deleteOrder() had to be fixed for. Those rows are cleared first, in
+//     the same transaction.
+//
+//  2. recalculateOrderTotals() does NOT recompute GST — it keeps
+//     `order.gstAmount` as-is (see its own "recompute if needed" comment).
+//     Reusing it here would leave the customer paying tax on a dish that is
+//     no longer on the bill. GST is recomputed from the surviving items.
+//
+//  3. Removing items from a bill is a textbook shrinkage route, so every
+//     void writes an AuditLog row naming who did it and what it was worth.
+//     There is no isVoided column to soft-delete into, and adding one is a
+//     migration; the audit entry gives the trail without one.
+export async function removeOrderItem(orderId, orderItemId, actor, outletId) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, outletId },
+    include: { items: true },
+  });
+  if (!order) throw new Error("Order not found");
+
+  // Once an order is billed the invoice exists and the money is recorded —
+  // changing what it contains at that point would put the paper and the
+  // database out of step. Refunds are a different flow.
+  if (order.status === "COMPLETED") {
+    throw new Error(
+      "This order is already completed and billed. Items can't be removed.",
+    );
+  }
+  if (order.status === "CANCELLED") {
+    throw new Error("This order is cancelled.");
+  }
+
+  const target = order.items.find((i) => i.id === orderItemId);
+  if (!target) throw new Error("Item not found on this order");
+
+  // An order with nothing on it isn't a bill. Cancelling the whole order is
+  // a different, deliberate action with its own reason/audit trail.
+  if (order.items.length === 1) {
+    throw new Error(
+      "This is the only item on the order — cancel the whole order instead.",
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // See (1) above. OrderItemAddOn DOES cascade from OrderItem, so those
+    // need no explicit cleanup.
+    await tx.kitchenOrderItem.deleteMany({ where: { orderItemId } });
+    await tx.orderItem.delete({ where: { id: orderItemId } });
+
+    // See (3). Written inside the transaction so a void is never recorded
+    // for a delete that then rolled back.
+    await tx.auditLog.create({
+      data: {
+        action: "ORDER_ITEM_VOIDED",
+        entityType: "OrderItem",
+        entityId: orderItemId,
+        performedById: actor?.employeeId ?? null,
+        performedByRole: actor?.role ?? null,
+        outletId,
+        metadata: {
+          orderId,
+          orderNumber: order.orderNumber,
+          quantity: target.quantity,
+          unitPrice: Number(target.unitPrice),
+          lineTotal: Number(target.totalPrice),
+          orderStatus: order.status,
+        },
+      },
+    });
+  });
+
+  return repriceOrderFromItems(orderId);
+}
+
+// Re-derives subtotal AND gst from the order's surviving items, then the
+// grand total from those. Separate from recalculateOrderTotals() so that
+// function's existing callers keep their current behaviour untouched.
+//
+// Per-item gstPercent is read from the MenuItem rather than stored on the
+// line, matching how computeItemPricing() calculates it at order time.
+export async function repriceOrderFromItems(orderId) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { include: { menuItem: true, addOns: true } } },
+  });
+  if (!order) throw new Error("Order not found");
+
+  let subtotal = 0;
+  let gstAmount = 0;
+
+  for (const item of order.items) {
+    const addOnTotal = (item.addOns || []).reduce(
+      (sum, a) => sum + Number(a.totalPrice || 0),
+      0,
+    );
+    const lineTotal = Number(item.totalPrice) + addOnTotal;
+    subtotal += lineTotal;
+    // GST follows the dish, not its add-ons — same basis computeItemPricing
+    // uses, so a voided item removes exactly the tax it added.
+    gstAmount +=
+      (Number(item.totalPrice) * Number(item.menuItem?.gstPercent || 0)) / 100;
+  }
+
+  const round2 = (n) => Math.round(n * 100) / 100;
+  subtotal = round2(subtotal);
+  gstAmount = round2(gstAmount);
+
+  const grandTotal = round2(
+    subtotal +
+      gstAmount +
+      Number(order.serviceChargeAmount || 0) +
+      Number(order.deliveryCharge || 0) +
+      Number(order.packagingCharge || 0) -
+      Number(order.discountAmount || 0),
+  );
+
+  return prisma.order.update({
+    where: { id: orderId },
+    data: { subtotal, gstAmount, grandTotal },
+    include: { items: { include: { menuItem: true, addOns: true } } },
+  });
+}
+
 export async function recalculateOrderTotals(orderId) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },

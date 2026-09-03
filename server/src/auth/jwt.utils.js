@@ -9,7 +9,17 @@ const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || "15m";
-const REFRESH_TOKEN_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 7);
+// 30 days. NOTE: .env currently sets REFRESH_TOKEN_TTL_DAYS=7, and the env
+// value WINS over this default — change it there too or sessions still end
+// after a week.
+//
+// The access token stays short (15m) deliberately. It is the credential sent
+// on every request, and keeping it short is what limits the damage of a
+// leaked one. Session LENGTH is the refresh token's job: it lives in an
+// httpOnly cookie the page's JS cannot read, and revoking its row kills the
+// session instantly on logout. Making the ACCESS token 30 days would "fix"
+// the logouts by handing every XSS a month-long, unrevokable credential.
+const REFRESH_TOKEN_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
 
 if (!ACCESS_SECRET || !REFRESH_SECRET) {
   // Fail loudly at boot rather than silently signing tokens with `undefined`

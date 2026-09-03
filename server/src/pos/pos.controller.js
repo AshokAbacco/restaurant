@@ -163,6 +163,25 @@ export async function addItems(req, res) {
   }
 }
 
+// Removes ONE item from an unbilled order and re-prices it. Used by the
+// Billing screen when a waiter asks for a dish to come off the bill mid-
+// payment. `req.user` is passed for the audit trail — never a client field.
+export async function removeOrderItem(req, res) {
+  try {
+    const order = await posService.removeOrderItem(
+      req.params.id,
+      req.params.itemId,
+      req.user,
+      req.tenant.outletId,
+    );
+    res.json(order);
+  } catch (err) {
+    res
+      .status(400)
+      .json({ message: "Failed to remove item", error: err.message });
+  }
+}
+
 // Owner-only (enforced in pos.routes.js) — permanently removes the order
 // and its payments/invoice, used by the Payments page's Delete action.
 export async function deleteOrder(req, res) {

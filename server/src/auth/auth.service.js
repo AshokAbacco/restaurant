@@ -561,6 +561,21 @@ export const refreshAccessToken = async (rawRefreshToken) => {
     };
   }
 
+  // Keep the stored expiry in step with the re-issued cookie (see
+  // refreshHandler). If they disagree, a browser holding a cookie the DB
+  // thinks is expired gets a 401 and a surprise logout.
+  //
+  // A failed write here must not break an otherwise-valid session — it just
+  // means this particular refresh didn't extend the window.
+  try {
+    await prisma.refreshToken.update({
+      where: { tokenHash },
+      data: { expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) },
+    });
+  } catch (err) {
+    console.warn("[auth] could not extend refresh token expiry:", err.message);
+  }
+
   const accessToken = signAccessToken({
     sub: account.id,
     employeeId: account.employeeId,

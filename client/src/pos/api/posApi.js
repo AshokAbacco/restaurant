@@ -147,6 +147,12 @@ export const deleteOrder = (id) =>
 // asks for 2 more items mid-meal). Returns { order, newItems } — newItems is
 // what you pass to sendToKitchen next, so only the new stuff gets a ticket,
 // not the whole order again.
+// Voids ONE line off an unbilled order and returns the re-priced order.
+// The server recomputes subtotal/GST/grand total from what's left — the
+// client never sends a total.
+export const removeOrderItem = (orderId, orderItemId) =>
+  request(`/pos/orders/${orderId}/items/${orderItemId}`, { method: "DELETE" });
+
 export const addItemsToOrder = (orderId, items) =>
   request(`/pos/orders/${orderId}/items`, {
     method: "POST",
