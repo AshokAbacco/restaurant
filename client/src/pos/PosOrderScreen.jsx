@@ -20,6 +20,7 @@ import {
 } from "./api/posApi";
 import { placeDineInOrder } from "../offline/offlineQueue";
 import { getSelectedCounterId } from "./api/counterContext";
+import { fetchWithOfflineFallback } from "../offline/offlineCache";
 
 export default function PosOrderScreen() {
   const navigate = useNavigate();
@@ -120,10 +121,15 @@ export default function PosOrderScreen() {
 
     let cancelled = false;
 
-    getTablesBoard()
-      .then((board) => {
+    // Reads the board TableStrip is already fetching for this floor rather
+    // than issuing a second full-board request. It's the same cache key, so
+    // on a warm cache this costs nothing; previously this was a duplicate
+    // fetch of every table in the building to identify one of them, racing
+    // TableStrip's own fetch on page load.
+    fetchWithOfflineFallback("pos:tables-board", getTablesBoard)
+      .then(({ data }) => {
         if (cancelled) return;
-        const table = (board || []).find((t) => t.id === deepLinkTableId);
+        const table = (data || []).find((t) => t.id === deepLinkTableId);
         if (!table) return;
         setSelectedTable(table);
         setDeepLinkFloorId(table.floorId || null);

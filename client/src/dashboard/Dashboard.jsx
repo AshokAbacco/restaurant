@@ -20,7 +20,7 @@
 // it shared across terminals means adding a `clearedAt` column to Order,
 // which needs a migration.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiRefreshCw, FiWifiOff } from "react-icons/fi";
 
@@ -86,11 +86,23 @@ const Dashboard = () => {
   // Date, since nothing renders the value itself.
   const [, setTick] = useState(0);
 
+  // Guards against overlapping loads. If a refresh ever takes longer than
+  // the poll interval, every tick would queue another one on top of the one
+  // still running — so a single slow response turns into a pile-up that
+  // makes the page slower the longer it's left open. A ref, not state,
+  // because the check has to be synchronous.
+  const inFlight = useRef(false);
+
   // ==========================================
   // LOAD
   // ==========================================
 
   const load = useCallback(async ({ silent = true } = {}) => {
+    // A manual refresh press is worth waiting for; a background poll that
+    // lands on a busy moment is not — there'll be another in 15 seconds.
+    if (inFlight.current && silent) return;
+    inFlight.current = true;
+
     if (!silent) setRefreshing(true);
 
     try {
@@ -99,7 +111,15 @@ const Dashboard = () => {
       // render a counter that only ever shows the last few.
       const dayStart = new Date();
       dayStart.setHours(0, 0, 0, 0);
-      const counterParams = { from: dayStart.toISOString(), limit: 100 };
+      // view=board: the slim card-shaped payload. The default response
+      // carries every order's items, add-ons and menu items, which is
+      // megabytes of JSON to draw cards that show four fields each — and
+      // this refetches every 15 seconds.
+      const counterParams = {
+        from: dayStart.toISOString(),
+        limit: 100,
+        view: "board",
+      };
 
       // The board is the one that matters — if the counter lists fail, the
       // floor should still render, so their rejections are caught
@@ -125,6 +145,7 @@ const Dashboard = () => {
     } catch (err) {
       setError(err.message || "Couldn't load the floor.");
     } finally {
+      inFlight.current = false;
       setLoading(false);
       setRefreshing(false);
     }
