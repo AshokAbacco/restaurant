@@ -805,7 +805,17 @@ function emptySummaryGroup(key, label) {
     totalDiscount: 0,
     totalTax: 0,
     totalSales: 0,
+    // Billed but not collected: an invoice was raised and the money never
+    // fully arrived. Distinct from duePayment, which is the subset that was
+    // deliberately put on a customer's tab — this one is the leak.
+    notPaid: 0,
     duePayment: 0,
+    // Cash handed to a delivery rider for an order that came in through a
+    // platform. It's already counted inside paymentBreakdown.CASH; this is
+    // a separate view of the same money, because reconciling the till means
+    // knowing which cash walked in the door and which came back with a
+    // rider.
+    onlineCash: 0,
     paymentBreakdown: Object.fromEntries(PAYMENT_METHODS_FOR_SUMMARY.map((m) => [m, 0])),
   };
 }
@@ -817,7 +827,9 @@ function roundGroup(g) {
     totalDiscount: Math.round(g.totalDiscount * 100) / 100,
     totalTax: Math.round(g.totalTax * 100) / 100,
     totalSales: Math.round(g.totalSales * 100) / 100,
+    notPaid: Math.round(g.notPaid * 100) / 100,
     duePayment: Math.round(g.duePayment * 100) / 100,
+    onlineCash: Math.round(g.onlineCash * 100) / 100,
     paymentBreakdown: Object.fromEntries(
       Object.entries(g.paymentBreakdown).map(([k, v]) => [k, Math.round(v * 100) / 100]),
     ),
@@ -826,7 +838,7 @@ function roundGroup(g) {
 
 // groupKeyFn/labelFn receive the raw Order row (with .payments, .counter,
 // .waiter already included) and decide which group a row belongs to.
-async function buildBillingSummary(filters, groupKeyFn, labelFn) {
+async function buildBillingSummary(filters, groupKeyFn, labelFn, seedGroups) {
   // includeAllStatuses: true — unlike almost every other report in this
   // file, this one NEEDS cancelled/refunded orders, since counting them
   // (not just excluding them) is the whole point of this report.
@@ -838,10 +850,26 @@ async function buildBillingSummary(filters, groupKeyFn, labelFn) {
       payments: { where: { status: "PAID" } },
       counter: { select: { id: true, name: true } },
       waiter: { select: { id: true, fullName: true } },
+      // Whether a bill was ever raised — the difference between "still
+      // being eaten" and "billed and not paid for".
+      invoice: { select: { id: true } },
+      // A tab that was deliberately opened gets its own column, so it must
+      // not also be counted as unpaid.
+      duePayment: { select: { id: true } },
     },
   });
 
   const groups = new Map();
+
+  // Seed the groups so a counter that took no money in the period still
+  // appears, as a row of zeros. Building groups purely from orders meant a
+  // counter nobody used simply vanished from the report — which reads as
+  // "no such counter" when the answer is "that till took nothing today",
+  // and those are very different things at end of day.
+  for (const seed of seedGroups || []) {
+    groups.set(seed.key, emptySummaryGroup(seed.key, seed.label));
+  }
+
   for (const order of orders) {
     const key = groupKeyFn(order) ?? "unassigned";
     if (!groups.has(key)) {
@@ -862,10 +890,29 @@ async function buildBillingSummary(filters, groupKeyFn, labelFn) {
     g.totalTax += num(order.gstAmount);
     g.totalSales += num(order.grandTotal);
 
+    let paidOnThisOrder = 0;
     for (const p of order.payments) {
+      paidOnThisOrder += num(p.amount);
       if (g.paymentBreakdown[p.method] !== undefined) {
         g.paymentBreakdown[p.method] += num(p.amount);
       }
+
+      // "Online cash" is cash collected against a platform delivery order.
+      // Derived from the order rather than stored as its own payment method,
+      // because it IS ordinary cash — it just arrives via a rider, and the
+      // till reconciliation needs to tell the two apart.
+      if (p.method === "CASH" && order.onlinePlatformId) {
+        g.onlineCash += num(p.amount);
+      }
+    }
+
+    // Billed, not collected. Only counted once an invoice exists — an open
+    // table with food on it isn't "not paid", it's still being eaten. Orders
+    // with a due payment are excluded so the same rupees don't appear in
+    // both this column and the due column.
+    if (order.invoice && !order.duePayment) {
+      const shortfall = num(order.grandTotal) - paidOnThisOrder;
+      if (shortfall > 0) g.notPaid += shortfall;
     }
   }
 
@@ -892,10 +939,21 @@ async function buildBillingSummary(filters, groupKeyFn, labelFn) {
 }
 
 async function getCounterSummary(filters) {
+  // Every till the outlet has configured, so the report is a complete
+  // picture of the counters rather than only the ones that rang something
+  // up. Deactivated counters are left out — they'd only show as permanent
+  // zero rows.
+  const counters = await prisma.billingCounter.findMany({
+    where: { outletId: filters.outletId, isActive: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
   return buildBillingSummary(
     filters,
     (order) => order.counterId,
     (order) => order.counter?.name || "Unassigned",
+    counters.map((c) => ({ key: c.id, label: c.name })),
   );
 }
 

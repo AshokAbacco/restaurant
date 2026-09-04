@@ -32,10 +32,10 @@ const PageHeader = ({
           <div className="min-w-0">
             <Breadcrumb />
 
-            <h1 className="mt-3 text-3xl font-bold text-[#1F2937] dark:text-white">{title}</h1>
+            <h1 className="mt-3 text-1xl font-bold text-[#1F2937] dark:text-white">{title}</h1>
 
             {subtitle && (
-              <p className="mt-2 text-[#6B7280] dark:text-[#9CA8A0] leading-7 max-w-3xl">
+              <p className="mt-2 text-[14px] text-[#000] dark:text-[#9CA8A0] leading-7 max-w-3xl">
                 {subtitle}
               </p>
             )}

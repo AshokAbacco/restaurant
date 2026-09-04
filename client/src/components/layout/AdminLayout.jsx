@@ -15,7 +15,7 @@ const AdminLayout = () => {
   // STATES
   // ==========================================
 
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
 
   // ==========================================
@@ -47,11 +47,11 @@ const AdminLayout = () => {
   // ==========================================
 
   const openSidebar = () => {
-    setMobileSidebarOpen(true);
+    setSidebarOpen(true);
   };
 
   const closeSidebar = () => {
-    setMobileSidebarOpen(false);
+    setSidebarOpen(false);
   };
 
   return (
@@ -60,18 +60,17 @@ const AdminLayout = () => {
           SIDEBAR
       ====================================== */}
 
-      {/* The desktop rail expands on hover and overlays the page, so it no
-          longer needs a collapsed flag from here — and the margin below must
-          NOT follow it. Reserving the collapsed width permanently is what
-          stops the whole page reflowing every time the cursor passes the
-          screen edge. */}
-      <Sidebar mobileOpen={mobileSidebarOpen} onClose={closeSidebar} />
+      {/* One overlay drawer at every width, opened only from the header's
+          menu button and closed the moment a menu item is picked. It floats
+          over the page, so the main column below reserves no width for it —
+          the full screen belongs to the floor. */}
+      <Sidebar open={sidebarOpen} onClose={closeSidebar} />
 
       {/* ======================================
           MAIN CONTENT
       ====================================== */}
 
-      <div className="flex flex-col min-h-screen lg:ml-24">
+      <div className="flex flex-col min-h-screen">
         {/* Header */}
 
         <Header onMenuClick={openSidebar} />
@@ -83,21 +82,7 @@ const AdminLayout = () => {
             {/* ================= PAGE CONTAINER ================= */}
 
             <div className="relative">
-              {/* Background Decoration */}
-
-              <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 dark:bg-[#43B75A]/[0.06] rounded-full blur-3xl" />
-
-                <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/5 dark:bg-cyan-400/[0.05] rounded-full blur-3xl" />
-              </div>
-
-              {/* Content */}
-
-              <div className="relative">
-                <div className="animate-fadeIn">
-                  <Outlet />
-                </div>
-              </div>
+              <Outlet />
             </div>
           </div>
         </main>
@@ -106,20 +91,6 @@ const AdminLayout = () => {
 
         {/* <Footer /> */}
       </div>
-
-      {/* ================= SCROLL TO TOP ================= */}
-
-      <button
-        onClick={() =>
-          window.scrollTo({
-            top: 0,
-            behavior: "smooth",
-          })
-        }
-        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-blue-600 dark:bg-[#43B75A] hover:bg-blue-700 dark:hover:bg-[#3FA34D] text-white shadow-xl transition-all duration-300 hover:scale-110 z-20"
-      >
-        ↑
-      </button>
 
       {/* ================= GLOBAL LOADING (Future) ================= */}
     </div>

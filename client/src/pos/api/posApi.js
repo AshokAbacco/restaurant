@@ -170,6 +170,11 @@ export const sendToKitchen = (orderId, orderItemIds) =>
 // available to move.
 export const getKotsForOrder = (orderId) => request(`/pos/kot/orders/${orderId}`);
 
+// Navbar "KOT No." lookup — matches on KOT number, the parent order's
+// number, or the table name. Returns at most 10 tickets.
+export const searchKots = (q) =>
+  request(`/pos/kot/search?q=${encodeURIComponent(q)}`);
+
 // ==============================================
 // MOVE KOT / ITEMS (Phase 1.4)
 // Table View's three-tab "Move KOT/Items" dialog. Every variant returns

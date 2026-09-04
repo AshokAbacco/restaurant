@@ -7,7 +7,7 @@
 // Driven off invoices, not orders: an order that's still open on a table, or
 // was cancelled, never produced a bill and correctly isn't listed here.
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { FiArrowLeft, FiPrinter, FiSearch, FiX } from "react-icons/fi";
 import { getBillHistory, getInvoiceForOrder } from "../pos/api/posApi";
 import InvoiceView from "./InvoiceView";
@@ -35,9 +35,16 @@ const ORDER_TYPE_LABEL = {
 };
 
 export default function BillHistory() {
-  const [from, setFrom] = useState(todayISO());
-  const [to, setTo] = useState(todayISO());
-  const [search, setSearch] = useState("");
+  // The navbar's Bill No lookup lands here as ?search=INV-000021. Arriving
+  // with a term means "find me this bill", so the date range starts empty
+  // rather than at today — the whole point is that the bill might be old.
+  // Typing in the search box below leaves the dates alone, as before.
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get("search") || "";
+
+  const [from, setFrom] = useState(initialSearch ? "" : todayISO());
+  const [to, setTo] = useState(initialSearch ? "" : todayISO());
+  const [search, setSearch] = useState(initialSearch);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -123,7 +130,7 @@ export default function BillHistory() {
             <input
               type="date"
               value={from}
-              max={to}
+              max={to || undefined}
               onChange={(e) => setFrom(e.target.value)}
               className="h-10 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 text-sm text-[#1F2937] dark:text-[#E4E9E2]"
             />
@@ -135,7 +142,7 @@ export default function BillHistory() {
             <input
               type="date"
               value={to}
-              min={from}
+              min={from || undefined}
               onChange={(e) => setTo(e.target.value)}
               className="h-10 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#12160F] px-3 text-sm text-[#1F2937] dark:text-[#E4E9E2]"
             />

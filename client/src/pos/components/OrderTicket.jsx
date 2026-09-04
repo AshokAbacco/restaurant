@@ -24,6 +24,12 @@ export default function OrderTicket({
   kitchenBranches = [],
   selectedKitchenBranchId,
   onChangeKitchenBranch,
+  // The order already open on this table / counter, if any. When set, this
+  // ticket is adding to it rather than starting a new one: its already-sent
+  // items render above the cart as a read-only block, and the button changes
+  // from "Send to Kitchen" to "Add to Order".
+  existingOrder = null,
+  loadingExistingOrder = false,
   cart,
   onIncrement,
   onDecrement,
@@ -76,8 +82,17 @@ export default function OrderTicket({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0]">
             Order Ticket
           </h2>
-          <span className="rounded-lg bg-[#EAF6EC] dark:bg-[#43B75A]/10 px-2 py-0.5 font-mono text-xs font-semibold text-[#3FA34D] dark:text-[#43B75A]">
-            NEW
+          {/* Which order you're about to affect is the single most
+              important thing on this panel — adding a round to table 12's
+              open bill and starting a fresh one look identical otherwise. */}
+          <span
+            className={`rounded-lg px-2 py-0.5 font-mono text-xs font-semibold ${
+              existingOrder
+                ? "bg-[#E8F4FB] text-[#1B6E9C] dark:bg-[#4AA8E0]/10 dark:text-[#6FC0EA]"
+                : "bg-[#EAF6EC] text-[#3FA34D] dark:bg-[#43B75A]/10 dark:text-[#43B75A]"
+            }`}
+          >
+            {existingOrder ? existingOrder.orderNumber : "NEW"}
           </span>
         </div>
 
@@ -92,7 +107,11 @@ export default function OrderTicket({
                   : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
               }`}
             >
-              {{ DINE_IN: "DINE IN", TAKEAWAY: "TAKEAWAY", ONLINE: "ONLINE ORDERS" }[type]}
+              {/* "ONLINE" is kept as the internal tab value because the
+                  server records these as DELIVERY orders tagged with a
+                  platform, and several call sites branch on it. Only the
+                  label changes. */}
+              {{ DINE_IN: "DINE IN", TAKEAWAY: "TAKEAWAY", ONLINE: "DELIVERY" }[type]}
             </button>
           ))}
         </div>
@@ -124,9 +143,12 @@ export default function OrderTicket({
           </div>
         )}
 
-        {/* Online Orders — platform picker, only shown on that tab */}
+        {/* Delivery — which platform the order came from. Only on that tab. */}
         {orderType === "ONLINE" && (
           <div className="mt-2.5">
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
+              Delivery platform
+            </label>
             <div className="flex gap-1.5">
               <select
                 value={selectedPlatformId || ""}
@@ -174,9 +196,60 @@ export default function OrderTicket({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {/* ============ ALREADY ON THIS ORDER ============ */}
+
+        {/* Read-only on purpose. These items are already cooking or eaten —
+            a stray tap on a quantity stepper here would silently disagree
+            with a KOT the kitchen already has on the rail. Changing them is
+            a void, which belongs in Billing where it's recorded. */}
+        {loadingExistingOrder && (
+          <p className="mb-3 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+            Loading what's already on this table…
+          </p>
+        )}
+
+        {existingOrder?.items?.length > 0 && (
+          <div className="mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
+                Already ordered
+              </h3>
+              <span className="font-mono text-[10px] text-[#9CA3AF] dark:text-[#6B7280]">
+                ₹{Number(existingOrder.grandTotal || 0).toFixed(2)}
+              </span>
+            </div>
+
+            <ul className="space-y-1.5 rounded-lg bg-[#F3F5EE] px-3 py-2 dark:bg-white/5">
+              {existingOrder.items.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-start justify-between gap-2 text-xs text-[#6B7280] dark:text-[#9CA8A0]"
+                >
+                  <span className="min-w-0">
+                    <span className="font-mono">{item.quantity}×</span>{" "}
+                    {item.menuItem?.name || item.name}
+                    {item.notes && (
+                      <span className="block italic text-[#9CA3AF] dark:text-[#6B7280]">
+                        {item.notes}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 font-mono">
+                    ₹{Number(item.totalPrice || 0).toFixed(0)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ============ NEW ITEMS ============ */}
+
         {cart.length === 0 ? (
           <p className="mt-8 text-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
-            Tap a dish to add it to this ticket.
+            {existingOrder
+              ? "Tap a dish to add another round to this order."
+              : "Tap a dish to add it to this ticket."}
           </p>
         ) : (
           <ul className="space-y-3">
@@ -284,13 +357,17 @@ export default function OrderTicket({
           disabled={!canPlace}
           className="mt-3 w-full rounded-lg bg-[#3FA34D] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] dark:disabled:bg-[#6B7280]"
         >
-          {orderType === "TAKEAWAY" || orderType === "ONLINE"
+          {existingOrder
             ? placing
-              ? "Proceeding to billing…"
-              : "Proceed to Billing"
-            : placing
-            ? "Placing order…"
-            : "Send to Kitchen"}
+              ? "Adding to order…"
+              : "Add to Order"
+            : orderType === "TAKEAWAY" || orderType === "ONLINE"
+              ? placing
+                ? "Proceeding to billing…"
+                : "Proceed to Billing"
+              : placing
+                ? "Placing order…"
+                : "Send to Kitchen"}
         </button>
       </div>
 

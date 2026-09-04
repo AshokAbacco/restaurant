@@ -1,5 +1,5 @@
 // src/pos/components/TableStrip.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, WifiOff } from "lucide-react";
 import { getTablesBoard, getFloors } from "../api/posApi";
 import TableManagerModal from "./TableManagerModal";
@@ -36,10 +36,23 @@ const STATUS_SORT_RANK = { FREE: 0, OCCUPIED: 1, RESERVED: 2 };
 // a brand-new order on a table shown as FREE is supported offline; that's
 // the one flow the offline queue (offlineQueue.js) actually knows how to
 // replay safely.
-export default function TableStrip({ selectedTableId, onSelect }) {
+// `initialFloorId` lets a deep link (Table View -> POS) open the strip on
+// the floor its table actually lives on, instead of defaulting to the first
+// floor and leaving the selected table hidden under another tab.
+export default function TableStrip({
+  selectedTableId,
+  initialFloorId = null,
+  onSelect,
+}) {
   const [floors, setFloors] = useState([]);
   const [floorsLoading, setFloorsLoading] = useState(true);
   const [selectedFloorId, setSelectedFloorId] = useState(null);
+
+  // Whether the person has picked a floor tab themselves. loadFloors
+  // defaults to the first floor immediately, so without this the deep-linked
+  // floor (which resolves a beat later, from a separate request) would find
+  // selectedFloorId already set and quietly do nothing.
+  const floorChosenByUser = useRef(false);
 
   const [tables, setTables] = useState([]);
   const [tablesLoading, setTablesLoading] = useState(true);
@@ -61,7 +74,7 @@ export default function TableStrip({ selectedTableId, onSelect }) {
       if (fromCache) setIsOffline(true);
       // Default to the first floor rather than an "all floors" view — the
       // point of this step is picking one floor before seeing its tables.
-      setSelectedFloorId((prev) => prev ?? data[0]?.id ?? null);
+      setSelectedFloorId((prev) => prev ?? initialFloorId ?? data[0]?.id ?? null);
     } catch {
       setFloors([]);
     } finally {
@@ -81,6 +94,14 @@ export default function TableStrip({ selectedTableId, onSelect }) {
       .catch(() => setTables([]))
       .finally(() => setTablesLoading(false));
   }
+
+  // The deep-linked floor usually resolves a beat after floors load, since
+  // it comes from a separate board request — so this overrides the default
+  // first-floor selection, but never a deliberate one.
+  useEffect(() => {
+    if (!initialFloorId || floorChosenByUser.current) return;
+    setSelectedFloorId(initialFloorId);
+  }, [initialFloorId]);
 
   useEffect(() => {
     if (!selectedFloorId) {
@@ -148,7 +169,10 @@ export default function TableStrip({ selectedTableId, onSelect }) {
           {floors.map((floor) => (
             <button
               key={floor.id}
-              onClick={() => setSelectedFloorId(floor.id)}
+              onClick={() => {
+                floorChosenByUser.current = true;
+                setSelectedFloorId(floor.id);
+              }}
               className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 selectedFloorId === floor.id
                   ? "bg-[#3FA34D] text-white dark:bg-[#43B75A]"

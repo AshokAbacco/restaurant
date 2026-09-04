@@ -555,12 +555,34 @@ export async function createOrderAndSendToKitchen(payload, outletId) {
 }
 
 export async function listOrders(
-  { status, orderType, tableId, customerId, from, to, page = 1, limit = 20 },
+  {
+    status,
+    // "Everything still open" — what the Table View's Takeaway and Delivery
+    // sections need. `status` only takes one value, so without this the
+    // only way to ask for open orders was to fetch every order ever placed
+    // and filter client-side.
+    active,
+    orderType,
+    tableId,
+    customerId,
+    from,
+    to,
+    page = 1,
+    limit = 20,
+  },
   outletId,
 ) {
   const where = {
     outletId,
     ...(status ? { status } : {}),
+    // Same closed-order list the tables board uses, so a takeaway card and
+    // a table card disappear from the floor under the same conditions.
+    // Compared against the string too: the controller hands req.query
+    // straight through, so this arrives as "true", and a bare truthiness
+    // check would also match the string "false".
+    ...((active === true || active === "true") && !status
+      ? { status: { notIn: ["COMPLETED", "CANCELLED", "REFUNDED"] } }
+      : {}),
     ...(orderType ? { orderType } : {}),
     ...(tableId ? { tableId } : {}),
     ...(customerId ? { customerId } : {}),

@@ -46,6 +46,27 @@ export async function getKitchenDisplay(req, res) {
   }
 }
 
+// Navbar "KOT No." lookup. Thin wrapper over listKitchenOrders' existing
+// `search` filter (kotNumber / order number / table name), capped low —
+// this answers "where is KOT-000046?", not "show me every ticket", which
+// is what /display is for.
+export async function searchKots(req, res) {
+  try {
+    const q = (req.query.q || "").trim();
+    if (!q) return res.json([]);
+
+    const tickets = await kotService.listKitchenOrders(
+      { search: q },
+      req.tenant.outletId,
+    );
+    res.json(tickets.slice(0, 10));
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to search KOTs", error: err.message });
+  }
+}
+
 export async function updateKotStatus(req, res) {
   try {
     const { status, reason } = req.body;

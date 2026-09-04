@@ -309,10 +309,18 @@ export async function listBillHistory(
   const end = to ? new Date(to) : new Date();
   if (to) end.setHours(23, 59, 59, 999);
 
+  // A search with no explicit date range isn't browsing, it's a lookup —
+  // someone has an invoice number in front of them and wants that bill.
+  // Defaulting those to today made the navbar's Bill No field silently
+  // return nothing for anything raised yesterday. The Bill History page is
+  // unaffected: it always sends its own from/to.
+  const dateFilter =
+    search && !from && !to ? {} : { createdAt: { gte: start, lte: end } };
+
   const invoices = await prisma.invoice.findMany({
     where: {
       outletId,
-      createdAt: { gte: start, lte: end },
+      ...dateFilter,
       ...(search
         ? {
             OR: [

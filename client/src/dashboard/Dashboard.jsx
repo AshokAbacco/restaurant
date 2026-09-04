@@ -1,386 +1,605 @@
 // ==============================================
 // src/dashboard/Dashboard.jsx
 // ==============================================
+//
+// Table View — the screen the restaurant actually runs on. Every table in
+// the building, grouped by floor, colour-coded by where it is in its
+// lifecycle, with the two actions staff take all day (print the bill, open
+// the order) on the card itself.
+//
+// The analytics dashboard this replaced is still here, at
+// /dashboard/analytics — see dashboardRoutes.jsx.
+//
+// A NOTE ON "SAVE"
+// ----------------
+// completeBilling closes the order, raises the invoice, records payment and
+// frees the table in a single server transaction, so by the time a card
+// turns orange the order is already on the Payments page. Save is an
+// acknowledgement — it clears the card off the board — and it's currently
+// remembered per-device in localStorage (see utils/tableStatus.js). Making
+// it shared across terminals means adding a `clearedAt` column to Order,
+// which needs a migration.
 
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FiRefreshCw, FiWifiOff } from "react-icons/fi";
 
 import {
-  FiDollarSign,
-  FiShoppingCart,
-  FiUsers,
-  FiBox,
-  FiClipboard,
-  FiGrid,
-} from "react-icons/fi";
+  getTablesBoard,
+  getOrders,
+  getOnlinePlatforms,
+} from "../pos/api/posApi";
+import MoveKotItemsModal from "../pos/components/MoveKotItemsModal";
+import { fetchWithOfflineFallback } from "../offline/offlineCache";
 
-import PageHeader from "../components/layout/PageHeader";
-import { useAuth } from "../auth/AuthContext";
+import FloorTableCard from "./components/FloorTableCard";
+import CounterOrderCard from "./components/CounterOrderCard";
+import NewOrderTile from "./components/NewOrderTile";
+import {
+  TABLE_STATE_META,
+  TABLE_STATE_ORDER,
+  cardOrder,
+  deriveTableState,
+  minutesSince,
+  normalizeCounterOrder,
+  readClearedOrderIds,
+  writeClearedOrderIds,
+} from "./utils/tableStatus";
 
-import StatCard from "./components/StatCard";
-import SalesChart from "./components/SalesChart";
-import KitchenStatus from "./components/KitchenStatus";
-import RecentOrders from "./components/RecentOrders";
-import LowStockAlert from "./components/LowStockAlert";
-import PaymentSummary from "./components/PaymentSummary";
-import TopSellingItems from "./components/TopSellingItems";
-import RecentActivities from "./components/RecentActivities";
+// Matches the Orders page. Frequent enough that a bill raised on another
+// terminal shows up before anyone notices it hasn't, cheap enough to leave
+// running on a tablet all service.
+const POLL_INTERVAL_MS = 15000;
 
-import dashboardService from "./dashboardService";
-import { formatCurrency } from "./utils/format";
+// Elapsed times are minutes, so re-deriving them every 30s keeps every card
+// within half a minute of correct without re-rendering the grid constantly.
+const CLOCK_INTERVAL_MS = 30000;
+
+// Tables with no floor set still have to go somewhere. "Other" is what the
+// reference layout calls the same bucket.
+const UNGROUPED_KEY = "__ungrouped__";
+const UNGROUPED_LABEL = "Other";
 
 const Dashboard = () => {
-  const { user, isOwner, isManager, isCashier, isKitchen, isWaiter } =
-    useAuth();
+  const navigate = useNavigate();
 
-  const [period, setPeriod] = useState("daily");
-  const [dashboardData, setDashboardData] = useState(null);
+  const [tables, setTables] = useState([]);
+  const [takeawayOrders, setTakeawayOrders] = useState([]);
+  const [deliveryOrders, setDeliveryOrders] = useState([]);
+
+  // Every platform the outlet has configured, not just the ones with an
+  // order right now. Swiggy and Zomato need to be on screen at 11am with
+  // nothing on them — an empty section is what tells you there's nothing
+  // waiting, where a missing section just looks like the page didn't load.
+  const [platforms, setPlatforms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [isOffline, setIsOffline] = useState(false);
+
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [clearedOrderIds, setClearedOrderIds] = useState(() =>
+    readClearedOrderIds(),
+  );
+
+  // Drives the elapsed-minute recalculation below. A counter rather than a
+  // Date, since nothing renders the value itself.
+  const [, setTick] = useState(0);
 
   // ==========================================
-  // LOAD DASHBOARD DATA
+  // LOAD
   // ==========================================
 
-  const loadDashboard = useCallback(async (p) => {
-    setLoading(true);
-    setError("");
+  const load = useCallback(async ({ silent = true } = {}) => {
+    if (!silent) setRefreshing(true);
 
-    const result = await dashboardService.getDashboardSummary(p);
+    try {
+      // Today only. Takeaway is billed up front, so an outlet doing 300
+      // covers a day would otherwise pull months of closed orders down to
+      // render a counter that only ever shows the last few.
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const counterParams = { from: dayStart.toISOString(), limit: 100 };
 
-    if (!result.success) {
-      setError(result.message);
+      // The board is the one that matters — if the counter lists fail, the
+      // floor should still render, so their rejections are caught
+      // individually rather than taking the whole load down with them.
+      const [board, takeaway, delivery, platformList] = await Promise.all([
+        fetchWithOfflineFallback("dashboard:tables-board", getTablesBoard),
+        getOrders({ ...counterParams, orderType: "TAKEAWAY" }).catch(() => null),
+        getOrders({ ...counterParams, orderType: "DELIVERY" }).catch(() => null),
+        getOnlinePlatforms({ activeOnly: true }).catch(() => null),
+      ]);
+
+      setTables(Array.isArray(board.data) ? board.data : []);
+      setIsOffline(Boolean(board.fromCache));
+
+      // listOrders paginates, so the rows are under `data`.
+      const rows = (result) =>
+        Array.isArray(result) ? result : result?.data || [];
+      if (takeaway) setTakeawayOrders(rows(takeaway));
+      if (delivery) setDeliveryOrders(rows(delivery));
+      if (platformList) setPlatforms(rows(platformList));
+
+      setError("");
+    } catch (err) {
+      setError(err.message || "Couldn't load the floor.");
+    } finally {
       setLoading(false);
-      return;
+      setRefreshing(false);
     }
-
-    setDashboardData(result.data);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
-    loadDashboard(period);
-  }, [period, loadDashboard]);
+    load();
+    const poll = setInterval(() => load(), POLL_INTERVAL_MS);
+    const clock = setInterval(() => setTick((n) => n + 1), CLOCK_INTERVAL_MS);
+    return () => {
+      clearInterval(poll);
+      clearInterval(clock);
+    };
+  }, [load]);
 
   // ==========================================
-  // ROLE-BASED VISIBILITY
+  // GROUP BY FLOOR
   // ==========================================
 
-  const waiterView = isWaiter();
-  const showFinancials = isOwner() || isManager() || isCashier();
-  const showKitchen = isOwner() || isManager() || isKitchen();
-  const showInventory = isOwner() || isManager();
-  const showFullOps = isOwner() || isManager();
+  const floors = useMemo(() => {
+    const groups = new Map();
 
-  const stats = dashboardData?.stats;
-  const waiterSummary = dashboardData?.waiterSummary;
+    for (const table of tables) {
+      const key = table.floorId || UNGROUPED_KEY;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id: key,
+          name: table.floorName || UNGROUPED_LABEL,
+          tables: [],
+        });
+      }
+      groups.get(key).tables.push(table);
+    }
+
+    // Floors keep whatever order the board returned them in; the
+    // unassigned bucket always lands last, since it's a leftover rather
+    // than a place in the restaurant.
+    return [...groups.values()].sort((a, b) => {
+      if (a.id === UNGROUPED_KEY) return 1;
+      if (b.id === UNGROUPED_KEY) return -1;
+      return 0;
+    });
+  }, [tables]);
+
+  // Every card's derived state, computed once per load so the legend counts
+  // and the cards themselves are always reading the same numbers.
+  const cardsByTableId = useMemo(() => {
+    const map = new Map();
+    for (const table of tables) {
+      const order = cardOrder(table, clearedOrderIds);
+      map.set(table.id, {
+        order,
+        state: deriveTableState(order),
+        elapsedMinutes: order ? minutesSince(order.createdAt) : null,
+      });
+    }
+    return map;
+    // `clearedOrderIds` is a Set replaced wholesale on change, so identity
+    // comparison is enough here.
+  }, [tables, clearedOrderIds]);
+
+  // Takeaway and delivery cards, shaped exactly like the table cards so the
+  // same card state, colours and counts apply. Cancelled and refunded orders
+  // drop out entirely; completed ones stay until Save clears them, matching
+  // how a paid table behaves on the floor above.
+  const buildCounterCards = (orders) =>
+    orders
+      .filter((o) => !["CANCELLED", "REFUNDED"].includes(o.status))
+      .filter((o) => !clearedOrderIds.has(o.id))
+      .map((raw) => {
+        const order = normalizeCounterOrder(raw);
+        return {
+          order,
+          state: deriveTableState(order),
+          elapsedMinutes: minutesSince(order.createdAt),
+        };
+      });
+
+  const takeawayCards = useMemo(
+    () => buildCounterCards(takeawayOrders),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [takeawayOrders, clearedOrderIds],
+  );
+
+  // Delivery is grouped by platform (Swiggy, Zomato, anything else the
+  // outlet has configured) because that's how the money is reconciled and
+  // how the packing station works — one platform's bag at a time.
+  const deliveryGroups = useMemo(() => {
+    const cards = buildCounterCards(deliveryOrders);
+    const groups = new Map();
+
+    // Seed a group for every configured platform first, so Swiggy and
+    // Zomato hold their place on the screen whether or not either has an
+    // order right now. Staff learn where a platform sits and reach for it;
+    // groups that appear and vanish with the order flow can't be learned.
+    for (const platform of platforms) {
+      groups.set(platform.id, { id: platform.id, name: platform.name, cards: [] });
+    }
+
+    for (const card of cards) {
+      const platform = card.order.onlinePlatform;
+      // Orders taken over the phone have no platform. They're still
+      // delivery, so they get their own group rather than being dropped.
+      const key = platform?.id || "__direct__";
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id: key,
+          name: platform?.name || "Direct / Phone",
+          cards: [],
+        });
+      }
+      groups.get(key).cards.push(card);
+    }
+
+    // Direct/Phone is a fallback bucket rather than a platform, so it sits
+    // last — and only appears when something is actually in it.
+    return [...groups.values()]
+      .filter((g) => g.id !== "__direct__" || g.cards.length > 0)
+      .sort((a, b) => {
+        if (a.id === "__direct__") return 1;
+        if (b.id === "__direct__") return -1;
+        return a.name.localeCompare(b.name);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryOrders, platforms, clearedOrderIds]);
+
+  const counts = useMemo(() => {
+    const tally = Object.fromEntries(
+      TABLE_STATE_ORDER.map((state) => [state, 0]),
+    );
+    for (const card of cardsByTableId.values()) tally[card.state] += 1;
+
+    // Counter orders count too — "3 running KOTs" should mean three tickets
+    // in the kitchen, wherever they came from.
+    for (const card of takeawayCards) tally[card.state] += 1;
+    for (const group of deliveryGroups)
+      for (const card of group.cards) tally[card.state] += 1;
+
+    return tally;
+  }, [cardsByTableId, takeawayCards, deliveryGroups]);
 
   // ==========================================
-  // ERROR STATE
+  // ACTIONS
   // ==========================================
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F3F5EE] dark:bg-[#0D110C] -m-6 p-6">
-        <div className="text-center">
-          <p className="text-[#EF5350] font-medium">{error}</p>
+  // Billing is where a dine-in bill is raised and printed — the same
+  // destination the Orders page's "Complete Service" uses.
+  const handlePrint = (order) => navigate(`/billing?orderId=${order.id}`);
+
+  // POS opens with this table already selected, so an order is one tap from
+  // being added to rather than four.
+  const handleOpenTable = (table) => navigate(`/pos?tableId=${table.id}`);
+
+  // Takeaway and delivery cards open the order itself rather than a table —
+  // there's no table to preselect, and POS reads ?orderId= to load what's
+  // already on it.
+  const handleOpenOrder = (order) => navigate(`/pos?orderId=${order.id}`);
+
+  function handleSave(order) {
+    const next = new Set(clearedOrderIds);
+    next.add(order.id);
+    setClearedOrderIds(next);
+    writeClearedOrderIds(next);
+  }
+
+  // Counts actual cards, not groups — delivery groups now exist for every
+  // configured platform, so a group count would be non-zero on an outlet
+  // that has Swiggy set up and nothing ordered.
+  const hasCounterOrders =
+    takeawayCards.length > 0 ||
+    deliveryGroups.some((g) => g.cards.length > 0);
+  const showEmptyState = !loading && tables.length === 0 && !hasCounterOrders;
+
+  return (
+    <div className="-m-3 min-h-screen bg-[#F3F5EE] p-3 transition-colors sm:-m-4 sm:p-4 lg:-m-6 lg:p-6 dark:bg-[#0D110C]">
+      {/* ======================================
+          PAGE HEADER
+      ====================================== */}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-[#1F2937] dark:text-white">
+          Table View
+        </h1>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => load({ silent: false })}
+            disabled={refreshing}
+            aria-label="Refresh the floor"
+            title="Refresh"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E7EAE1] bg-white text-[#6B7280] transition-colors hover:text-[#3FA34D] disabled:opacity-50 dark:border-[#262B24] dark:bg-[#171C17] dark:text-[#9CA8A0] dark:hover:text-[#43B75A]"
+          >
+            <FiRefreshCw
+              size={15}
+              className={refreshing ? "animate-spin" : ""}
+            />
+          </button>
 
           <button
-            onClick={() => loadDashboard(period)}
-            className="mt-4 px-6 py-2 rounded-xl bg-[#3FA34D] hover:bg-[#358F42] text-white font-semibold transition-colors"
+            type="button"
+            onClick={() => navigate("/tables")}
+            className="rounded-lg bg-[#3FA34D] px-4 py-2 text-[14px] font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
           >
-            Retry
+            Add Table
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/pos?orderType=DELIVERY")}
+            className="rounded-lg border border-[#E7EAE1] bg-white px-4 py-2 text-[14px] font-semibold text-[#1F2937] transition-colors hover:border-[#3FA34D] hover:text-[#3FA34D] dark:border-[#262B24] dark:bg-[#171C17] dark:text-white dark:hover:border-[#43B75A] dark:hover:text-[#43B75A]"
+          >
+            Delivery
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/pos?orderType=TAKEAWAY")}
+            className="rounded-lg border border-[#E7EAE1] bg-white px-4 py-2 text-[14px] font-semibold text-[#1F2937] transition-colors hover:border-[#3FA34D] hover:text-[#3FA34D] dark:border-[#262B24] dark:bg-[#171C17] dark:text-white dark:hover:border-[#43B75A] dark:hover:text-[#43B75A]"
+          >
+            Pick Up
           </button>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 bg-[#F3F5EE] dark:bg-[#0D110C] min-h-screen -m-6 p-6 transition-colors">
-      <PageHeader
-        title="Restaurant Dashboard"
-        subtitle={`Welcome back${
-          user?.fullName ? `, ${user.fullName}` : ""
-        }! Here's what's happening in your restaurant today.`}
-        icon={<FiShoppingCart />}
-      />
 
       {/* ======================================
-          KPI CARDS
+          TOOLBAR — reservation / move / legend
       ====================================== */}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-        {waiterView ? (
-          <>
-            <StatCard
-              title="My Active Orders"
-              value={waiterSummary?.activeOrders ?? "—"}
-              icon={<FiClipboard />}
-              color="green"
-              subtitle="Currently in progress"
-              loading={loading}
-            />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/table-reservations")}
+            className="rounded-lg bg-[#3FA34D] px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
+          >
+            + Table Reservation
+          </button>
 
-            <StatCard
-              title="My Orders Today"
-              value={waiterSummary?.myOrdersToday ?? "—"}
-              icon={<FiShoppingCart />}
-              color="orange"
-              subtitle="Taken today"
-              loading={loading}
-            />
+          <button
+            type="button"
+            onClick={() => setShowMoveModal(true)}
+            className="rounded-full border border-[#E7EAE1] bg-white px-4 py-2 text-[12px] font-semibold text-[#1F2937] transition-colors hover:border-[#3FA34D] dark:border-[#262B24] dark:bg-[#171C17] dark:text-white dark:hover:border-[#43B75A]"
+          >
+            Move KOT / Items
+          </button>
+        </div>
 
-            <StatCard
-              title="My Tables Occupied"
-              value={waiterSummary?.tablesOccupied ?? "—"}
-              icon={<FiGrid />}
-              color="purple"
-              subtitle="Among tables assigned to you"
-              loading={loading}
-            />
-
-            <StatCard
-              title="My Assigned Tables"
-              value={waiterSummary?.assignedTables ?? "—"}
-              icon={<FiGrid />}
-              color="blue"
-              subtitle="Total tables under your section"
-              loading={loading}
-            />
-          </>
-        ) : (
-          <>
-            {showFinancials && (
-              <StatCard
-                title="Today's Revenue"
-                value={stats ? formatCurrency(stats.revenue?.value) : "—"}
-                icon={<FiDollarSign />}
-                color="green"
-                change={
-                  stats?.revenue?.change !== null &&
-                  stats?.revenue?.change !== undefined
-                    ? `${stats.revenue.change}%`
-                    : undefined
-                }
-                changeType={stats?.revenue?.changeType}
-                subtitle="Compared to yesterday"
-                loading={loading}
+        {/* The legend doubles as a live count — how many tables are cooking
+            right now is one of the things this screen exists to answer. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {TABLE_STATE_ORDER.map((state) => (
+            <span
+              key={state}
+              className="flex items-center gap-1.5 text-[12px] text-[#6B7280] dark:text-[#9CA8A0]"
+            >
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${TABLE_STATE_META[state].swatch}`}
               />
-            )}
-
-            <StatCard
-              title="Orders Today"
-              value={stats?.orders?.value ?? "—"}
-              icon={<FiShoppingCart />}
-              color="orange"
-              change={
-                stats?.orders?.change !== undefined
-                  ? `${stats.orders.change >= 0 ? "+" : ""}${stats.orders.change}`
-                  : undefined
-              }
-              changeType={stats?.orders?.changeType}
-              subtitle="Orders received today"
-              loading={loading}
-            />
-
-            {/* <StatCard
-              title="Customers"
-              value={stats?.customers?.value ?? "—"}
-              icon={<FiUsers />}
-              color="purple"
-              subtitle="Visited today"
-              loading={loading}
-            /> */}
-
-            {showInventory && (
-              <StatCard
-                title="Low Stock Items"
-                value={stats?.lowStock?.value ?? "—"}
-                icon={<FiBox />}
-                color="red"
-                subtitle="Need immediate attention"
-                loading={loading}
-              />
-            )}
-          </>
-        )}
+              {TABLE_STATE_META[state].label}
+              <span className="font-semibold text-[#1F2937] dark:text-white">
+                {counts[state]}
+              </span>
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* ======================================
-          CHART + KITCHEN
+          NOTICES
       ====================================== */}
 
-      {(showFullOps || showKitchen) && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {showFullOps && (
-            <div className="xl:col-span-2">
-              <SalesChart
-                data={dashboardData?.salesChart || []}
-                period={period}
-                onPeriodChange={setPeriod}
-                loading={loading}
-              />
-            </div>
-          )}
+      {isOffline && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#FDF6DC] px-3 py-2 text-[12px] font-medium text-[#8A6D0B] dark:bg-[#332C10] dark:text-[#F0DC96]">
+          <FiWifiOff size={14} />
+          Offline — showing the last synced floor. Amounts and statuses may
+          have moved on.
+        </div>
+      )}
 
-          {showKitchen && (
-            <KitchenStatus
-              data={dashboardData?.kitchenStatus}
-              loading={loading}
-            />
-          )}
+      {error && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] text-[#EF5350] dark:bg-red-500/10 dark:text-red-400">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => load({ silent: false })}
+            className="font-semibold underline underline-offset-2"
+          >
+            Try again
+          </button>
         </div>
       )}
 
       {/* ======================================
-          RECENT ORDERS
+          FLOORS
       ====================================== */}
 
-      <RecentOrders
-        orders={dashboardData?.recentOrders || []}
-        loading={loading}
-        title={waiterView ? "My Recent Orders" : "Recent Orders"}
-      />
-
-      {/* ======================================
-          LOW STOCK + PAYMENT SUMMARY
-      ====================================== */}
-
-      {(showInventory || (showFinancials && dashboardData?.paymentSummary)) && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {showInventory && (
-            <LowStockAlert
-              items={dashboardData?.lowStockAlerts || []}
-              loading={loading}
-            />
-          )}
-
-          {showFinancials && dashboardData?.paymentSummary && (
-            <PaymentSummary
-              data={dashboardData.paymentSummary}
-              loading={loading}
-            />
-          )}
+      {loading ? (
+        <FloorSkeleton />
+      ) : showEmptyState ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#E7EAE1] py-16 text-center dark:border-[#262B24]">
+          <p className="text-[14px] font-medium text-[#6B7280] dark:text-[#9CA8A0]">
+            No tables yet. Add a floor and its tables to see them here.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/tables")}
+            className="mt-4 rounded-lg bg-[#3FA34D] px-4 py-2 text-[14px] font-semibold text-white transition-colors hover:bg-[#358F42] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
+          >
+            Add Table
+          </button>
         </div>
-      )}
-
-      {/* ======================================
-          TOP SELLING + RECENT ACTIVITIES
-      ====================================== */}
-
-      {showFullOps && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <TopSellingItems
-            items={dashboardData?.topSellingItems || []}
-            loading={loading}
-          />
-
-          <RecentActivities
-            activities={dashboardData?.recentActivities || []}
-            loading={loading}
-          />
-        </div>
-      )}
-
-      {/* ======================================
-          DASHBOARD SUMMARY (owner / manager only)
-      ====================================== */}
-
-      {showFullOps && stats && (
-        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] shadow-sm shadow-black/[0.02] dark:shadow-none transition-colors">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 p-6">
-            <div>
-              <h2 className="text-2xl font-bold text-[#1F2937] dark:text-white">
-                Today's Restaurant Summary
+      ) : (
+        <div className="space-y-6">
+          {floors.map((floor) => (
+            <section key={floor.id}>
+              <h2 className="mb-2 text-[14px] font-semibold text-[#1F2937] dark:text-white">
+                {floor.name}
               </h2>
 
-              <p className="text-[#6B7280] dark:text-[#9CA8A0] mt-2">
-                Overall business performance for today.
-              </p>
+              {/* auto-fill rather than a fixed column count: a 90px minimum
+                  means a phone gets 3 across and a POS monitor gets 16,
+                  with no breakpoint list to keep in sync. */}
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
+                {floor.tables.map((table) => {
+                  const card = cardsByTableId.get(table.id);
+                  return (
+                    <FloorTableCard
+                      key={table.id}
+                      table={table}
+                      order={card.order}
+                      state={card.state}
+                      elapsedMinutes={card.elapsedMinutes}
+                      onPrint={() => handlePrint(card.order)}
+                      onView={() => handleOpenTable(table)}
+                      onSave={() => handleSave(card.order)}
+                      onOpen={() => handleOpenTable(table)}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+
+          {/* ============ TAKEAWAY ============ */}
+
+          {/* Always rendered, empty or not. This section is part of the
+              floor's layout, not a result of it — staff should be able to
+              glance at the same spot every time and see either orders or
+              nothing waiting. */}
+          <section>
+            <h2 className="mb-2 text-[14px] font-semibold text-[#1F2937] dark:text-white">
+              Takeaway
+              <span className="ml-2 text-[12px] font-normal text-[#6B7280] dark:text-[#9CA8A0]">
+                {takeawayCards.length}
+              </span>
+            </h2>
+
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
+              {takeawayCards.map((card) => (
+                <CounterOrderCard
+                  key={card.order.id}
+                  order={card.order}
+                  state={card.state}
+                  elapsedMinutes={card.elapsedMinutes}
+                  onPrint={() => handlePrint(card.order)}
+                  onView={() => handleOpenOrder(card.order)}
+                  onSave={() => handleSave(card.order)}
+                />
+              ))}
+
+              <NewOrderTile
+                label="New Takeaway"
+                onClick={() => navigate("/pos?orderType=TAKEAWAY")}
+              />
             </div>
+          </section>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
-                  Revenue
-                </p>
-                <h3 className="text-2xl font-bold text-[#3FA34D] dark:text-[#43B75A] mt-2">
-                  {formatCurrency(stats.revenue?.value)}
-                </h3>
+          {/* ============ DELIVERY ============ */}
+
+          <section>
+              <h2 className="mb-2 text-[14px] font-semibold text-[#1F2937] dark:text-white">
+                Delivery
+              </h2>
+
+              {/* One sub-heading per platform. Nested rather than flat
+                  because a delivery rider asks for "the Zomato order", and
+                  the counter reconciles each platform's takings
+                  separately. */}
+              <div className="space-y-4">
+                {deliveryGroups.map((group) => (
+                  <div key={group.id}>
+                    <h3 className="mb-2 text-[12px] font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
+                      {group.name}
+                      <span className="ml-2 font-normal">
+                        {group.cards.length}
+                      </span>
+                    </h3>
+
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
+                      {group.cards.map((card) => (
+                        <CounterOrderCard
+                          key={card.order.id}
+                          order={card.order}
+                          state={card.state}
+                          elapsedMinutes={card.elapsedMinutes}
+                          onPrint={() => handlePrint(card.order)}
+                          onView={() => handleOpenOrder(card.order)}
+                          onSave={() => handleSave(card.order)}
+                        />
+                      ))}
+
+                      {/* Direct/Phone is a catch-all for orders that
+                          arrived without a platform, so there's nothing
+                          sensible to preselect — no tile there. */}
+                      {group.id !== "__direct__" && (
+                        <NewOrderTile
+                          label={`New ${group.name}`}
+                          onClick={() =>
+                            navigate(
+                              `/pos?orderType=DELIVERY&platformId=${group.id}`,
+                            )
+                          }
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* No platforms configured yet — point at where they're
+                    added rather than showing an empty Delivery heading with
+                    nothing under it. */}
+                {deliveryGroups.length === 0 && (
+                  <p className="text-[12px] text-[#6B7280] dark:text-[#9CA8A0]">
+                    No delivery platforms set up yet. Add Swiggy, Zomato or
+                    another platform from the POS screen's Delivery tab and
+                    orders will group here.
+                  </p>
+                )}
               </div>
-
-              <div className="text-center">
-                <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
-                  Orders
-                </p>
-                <h3 className="text-2xl font-bold text-[#E8873A] dark:text-[#FFA94D] mt-2">
-                  {stats.orders?.value ?? 0}
-                </h3>
-              </div>
-
-              {/* <div className="text-center">
-                <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
-                  Customers
-                </p>
-                <h3 className="text-2xl font-bold text-violet-600 dark:text-violet-400 mt-2">
-                  {stats.customers?.value ?? 0}
-                </h3>
-              </div> */}
-
-              <div className="text-center">
-                <p className="text-[#6B7280] dark:text-[#9CA8A0] text-sm">
-                  Avg. Order
-                </p>
-                <h3 className="text-2xl font-bold text-[#EF5350] mt-2">
-                  {formatCurrency(stats.avgOrder)}
-                </h3>
-              </div>
-            </div>
-          </div>
+            </section>
         </div>
       )}
 
       {/* ======================================
-          FOOTER
+          MOVE KOT / ITEMS
       ====================================== */}
 
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-2xl px-6 py-5 transition-colors">
-        <div>
-          <h4 className="font-semibold text-[#1F2937] dark:text-white">
-            Restaurant ERP Dashboard
-          </h4>
-
-          <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-1">
-            Live dashboard connected to your restaurant operations.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-6">
-          <div className="text-center">
-            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
-              Last Updated
-            </p>
-            <p className="font-semibold text-[#1F2937] dark:text-white">
-              {loading ? "Refreshing..." : "Just Now"}
-            </p>
-          </div>
-
-          <div className="h-10 w-px bg-[#E7EAE1] dark:bg-[#262B24]" />
-
-          <div className="text-center">
-            <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">Status</p>
-
-            <div className="flex items-center gap-2 justify-center">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] animate-pulse"></span>
-              <span className="font-semibold text-[#3FA34D] dark:text-[#43B75A]">
-                Online
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <MoveKotItemsModal
+        open={showMoveModal}
+        onClose={() => setShowMoveModal(false)}
+        tables={tables}
+        onMoved={() => load({ silent: false })}
+      />
     </div>
   );
 };
+
+// Mirrors the real grid's shape so the layout doesn't jump when data lands.
+const FloorSkeleton = () => (
+  <div className="space-y-6">
+    {[0, 1].map((section) => (
+      <div key={section}>
+        <div className="mb-2 h-4 w-28 animate-pulse rounded bg-[#E7EAE1] dark:bg-[#262B24]" />
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
+          {Array.from({ length: 16 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[104px] animate-pulse rounded-lg bg-[#E7EAE1] dark:bg-[#1B211A]"
+            />
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 export default Dashboard;

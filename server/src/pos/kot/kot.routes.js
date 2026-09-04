@@ -8,6 +8,8 @@ const router = Router();
 
 router.get("/display", kotController.getKitchenDisplay);
 router.get("/notes", kotController.getRecentKitchenNotes);
+// Before "/:id/..." below — otherwise "search" is read as a KOT id.
+router.get("/search", kotController.searchKots);
 router.get("/orders/:orderId", kotController.getKotsForOrder);
 router.post("/orders/:orderId", kotController.sendToKitchen);
 router.put("/:id/status", kotController.updateKotStatus);

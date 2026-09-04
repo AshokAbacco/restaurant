@@ -1,309 +1,254 @@
 // ==============================================
 // src/components/layout/Header.jsx
 // ==============================================
+//
+// One row: menu, brand, new order, the two lookups staff use all day, then
+// the account controls. The live clock, breadcrumb, page title and generic
+// search that used to stack three extra rows underneath on mobile are gone —
+// on a POS the header is chrome, and every row it takes is a row of tables
+// the person can't see.
+//
+// The right-hand side (theme, outlet, offline, profile) is carried over
+// as-is; that's the part still due a pass.
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { Link, useLocation } from "react-router-dom";
-
-import {
-  FiMenu,
-  FiSearch,
-  FiCalendar,
-  FiClock,
-  FiChevronRight,
-  FiSun,
-  FiMoon,
-} from "react-icons/fi";
+import { FiMenu, FiSearch, FiSun, FiMoon, FiPlus } from "react-icons/fi";
 
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useRestaurantProfile } from "../../context/RestaurantProfileContext";
 
-import NotificationBell from "./NotificationBell";
+import BrandMark from "./BrandMark";
 import ProfileMenu from "./ProfileMenu";
 import OfflineIndicator from "./OfflineIndicator";
 import OutletSwitcher from "./OutletSwitcher";
 
-const Header = ({ onMenuClick }) => {
-  const { user } = useAuth();
+import { getBillHistory, searchKots } from "../../pos/api/posApi";
 
-  const { theme, toggleTheme } = useTheme();
+// ==============================================
+// LOOKUP FIELD
+// ==============================================
+//
+// Bill No and KOT No are the same interaction with a different query, so
+// they're one component. Both resolve to a single destination rather than a
+// result list: someone typing a bill number already knows which bill they
+// want — a dropdown of one is a second click for no information.
 
-  const location = useLocation();
+const LookupField = ({ label, placeholder, onResolve, widthClass }) => {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const statusTimer = useRef(null);
 
-  const [currentTime, setCurrentTime] = useState(new Date());
+  useEffect(() => () => clearTimeout(statusTimer.current), []);
 
-  // ==========================================
-  // LIVE CLOCK
-  // ==========================================
+  function flash(message) {
+    setStatus(message);
+    clearTimeout(statusTimer.current);
+    statusTimer.current = setTimeout(() => setStatus(""), 4000);
+  }
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+  async function handleSubmit(event) {
+    event.preventDefault();
 
-    return () => clearInterval(timer);
-  }, []);
+    const query = value.trim();
+    if (!query || busy) return;
 
-  // ==========================================
-  // PAGE TITLE
-  // ==========================================
-
-  const pageTitle = useMemo(() => {
-    const path = location.pathname;
-
-    const titles = {
-      "/dashboard": "Dashboard",
-
-      "/pos": "Point Of Sale",
-
-      "/pos/orders": "Orders",
-
-      "/tables": "Table Management",
-
-      "/menu": "Menu Management",
-
-      "/menu/categories": "Menu Categories",
-
-      "/menu/subcategories": "Sub Categories",
-
-      "/menu/kitchen-sections": "Kitchen Sections",
-
-      "/menu/addons": "Add-ons",
-
-      "/menu/combos": "Combo Meals",
-
-      "/menu/reports": "Menu Reports",
-
-      "/inventory": "Inventory",
-
-      "/customers": "Customers",
-
-      "/billing": "Billing",
-
-      "/payments": "Payments",
-
-      "/employees": "Employees",
-
-      "/expenses": "Expenses",
-
-      "/reports": "Reports",
-
-      "/profit-loss": "Profit & Loss",
-
-      "/settings": "Settings",
-
-      "/kitchen": "Kitchen Dashboard",
-    };
-
-    return titles[path] || "Dashboard";
-  }, [location.pathname]);
-
-  // ==========================================
-  // BREADCRUMB
-  // ==========================================
-
-  const breadcrumb = useMemo(() => {
-    const parts = location.pathname.split("/").filter(Boolean);
-
-    return parts;
-  }, [location.pathname]);
-
-  // ==========================================
-  // FORMATTERS
-  // ==========================================
-
-  const formattedDate = currentTime.toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
-  const formattedDateShort = currentTime.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-  });
-
-  const formattedTime = currentTime.toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+    setBusy(true);
+    setStatus("");
+    try {
+      const found = await onResolve(query);
+      if (found) {
+        setValue("");
+      } else {
+        flash(`No ${label.toLowerCase()} matching "${query}".`);
+      }
+    } catch (err) {
+      flash(err.message || "Couldn't run that search.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <header className="sticky top-0 z-20 bg-white dark:bg-[#10140F] border-b border-[#E7EAE1] dark:border-[#262B24] transition-colors">
-      <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4">
+    <form onSubmit={handleSubmit} className={`relative ${widthClass}`}>
+      <label className="sr-only" htmlFor={`lookup-${label}`}>
+        {label}
+      </label>
 
+      <FiSearch
+        size={14}
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] dark:text-[#6B7280]"
+      />
+
+      <input
+        id={`lookup-${label}`}
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholder}
+        disabled={busy}
+        autoComplete="off"
+        className="w-full rounded-lg border border-[#E7EAE1] bg-[#F3F5EE] py-2 pl-9 pr-3 text-[12px] text-[#1F2937] transition-colors placeholder:text-[#9CA3AF] focus:border-[#3FA34D] focus:bg-white focus:outline-none disabled:opacity-60 dark:border-[#262B24] dark:bg-[#171C17] dark:text-white dark:placeholder:text-[#6B7280] dark:focus:border-[#43B75A] dark:focus:bg-[#1E241E]"
+      />
+
+      {status && (
+        // Positioned rather than inline so a miss doesn't shove the rest of
+        // the header sideways.
+        <p
+          role="status"
+          className="absolute left-0 top-full z-10 mt-1 w-max max-w-[240px] rounded-lg bg-[#1F2937] px-2.5 py-1.5 text-[12px] text-white shadow-lg dark:bg-[#262B24]"
+        >
+          {status}
+        </p>
+      )}
+    </form>
+  );
+};
+
+// ==============================================
+// HEADER
+// ==============================================
+
+const Header = ({ onMenuClick }) => {
+  const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const { restaurantName, logoUrl } = useRestaurantProfile();
+
+  const navigate = useNavigate();
+
+  // ==========================================
+  // LOOKUPS
+  // ==========================================
+
+  // Bill History already searches invoice number and order number together
+  // (see billing.service.js), so the navbar doesn't need its own endpoint —
+  // it just needs to know what to do with the first hit.
+  async function resolveBill(query) {
+    const result = await getBillHistory({ search: query, limit: 1 });
+    const bill = (Array.isArray(result) ? result : result?.data)?.[0];
+    if (!bill) return false;
+
+    navigate(`/billing/history?search=${encodeURIComponent(query)}`);
+    return true;
+  }
+
+  // A KOT number identifies a ticket, but what someone wants when they type
+  // one is the order it belongs to — so this lands on that order's bill.
+  async function resolveKot(query) {
+    const tickets = await searchKots(query);
+    const ticket = Array.isArray(tickets) ? tickets[0] : null;
+    const orderId = ticket?.order?.id || ticket?.orderId;
+    if (!orderId) return false;
+
+    navigate(`/billing?orderId=${orderId}`);
+    return true;
+  }
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-[#E7EAE1] bg-white transition-colors dark:border-[#262B24] dark:bg-[#10140F]">
+      <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 lg:px-6">
         {/* ================= LEFT ================= */}
 
-        <div className="flex items-center gap-3 min-w-0">
-          {/* Mobile / tablet menu toggle (sidebar) */}
+        <button
+          onClick={onMenuClick}
+          aria-label="Open menu"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E7EAE1] bg-[#F3F5EE] transition-colors hover:border-[#3FA34D]/40 dark:border-[#262B24] dark:bg-[#171C17] dark:hover:border-[#43B75A]/40"
+        >
+          <FiMenu size={18} className="text-[#1F2937] dark:text-white" />
+        </button>
 
-          <button
-            onClick={onMenuClick}
-            aria-label="Open menu"
-            className="lg:hidden w-10 h-10 flex-shrink-0 rounded-full border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-[#171C17] flex items-center justify-center hover:border-[#3FA34D]/40 dark:hover:border-[#43B75A]/40 transition-colors"
-          >
-            <FiMenu size={18} className="text-[#1F2937] dark:text-white" />
-          </button>
+        {/* Brand. The name is hidden below md rather than truncated — a
+            three-character sliver of a restaurant name tells nobody
+            anything, and the logo already identifies the outlet. */}
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard")}
+          className="flex min-w-0 shrink-0 items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3FA34D]"
+          title={restaurantName}
+        >
+          <BrandMark
+            logoUrl={logoUrl}
+            restaurantName={restaurantName}
+            size="h-9 w-9"
+          />
+          <span className="hidden max-w-[180px] truncate text-[14px] font-bold text-[#1F2937] md:block dark:text-white">
+            {restaurantName}
+          </span>
+        </button>
 
-          {/* Page title (hidden on mobile, shown from md up, replaces the search bar's job of anchoring the header) */}
+        <button
+          type="button"
+          onClick={() => navigate("/pos")}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#3FA34D] px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#358F42] sm:px-4 dark:bg-[#43B75A] dark:hover:bg-[#3AA34E]"
+        >
+          <FiPlus size={14} />
+          <span className="hidden sm:inline">New Order</span>
+        </button>
 
+        {/* ================= LOOKUPS ================= */}
 
-
-           
+        {/* Hidden below md: at phone width these two fields would take the
+            whole row on their own. They move to their own row below. */}
+        <div className="hidden min-w-0 items-center gap-2 md:flex">
+          <LookupField
+            label="Bill No"
+            placeholder="Bill No — INV-000021"
+            onResolve={resolveBill}
+            widthClass="w-[150px] lg:w-[190px]"
+          />
+          <LookupField
+            label="KOT No"
+            placeholder="KOT No — KOT-000046"
+            onResolve={resolveKot}
+            widthClass="w-[150px] lg:w-[190px]"
+          />
         </div>
 
         {/* ================= RIGHT ================= */}
 
-        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 flex-shrink-0">
-          {/* Date & Time (full, desktop only) */}
-
-          <div className="hidden xl:flex items-center gap-6 bg-[#F3F5EE] dark:bg-[#171C17] rounded-xl px-5 py-3 border border-[#E7EAE1] dark:border-[#262B24]">
-            <div className="flex items-center gap-2">
-              <FiCalendar className="text-[#3FA34D] dark:text-[#43B75A]" />
-
-              <span className="text-sm font-medium text-[#1F2937] dark:text-white whitespace-nowrap">
-                {formattedDate}
-              </span>
-            </div>
-
-            <div className="w-px h-5 bg-[#E7EAE1] dark:bg-[#262B24]" />
-
-            <div className="flex items-center gap-2">
-              <FiClock className="text-[#1F2937] dark:text-white" />
-
-              <span className="text-sm font-semibold text-[#1F2937] dark:text-white whitespace-nowrap">
-                {formattedTime}
-              </span>
-            </div>
-          </div>
-
-          {/* Date & Time (compact, tablet only) */}
-
-          <div className="hidden md:flex xl:hidden items-center gap-2 bg-[#F3F5EE] dark:bg-[#171C17] rounded-full px-3 py-2 border border-[#E7EAE1] dark:border-[#262B24]">
-            <FiClock className="text-[#1F2937] dark:text-white flex-shrink-0" size={14} />
-
-            <span className="text-xs font-semibold text-[#1F2937] dark:text-white whitespace-nowrap">
-              {formattedTime}
-            </span>
-          </div>
-
-          {/* ============ THEME TOGGLE ============ */}
-
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           <button
             onClick={toggleTheme}
             aria-label="Toggle light / dark theme"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="w-9 h-9 sm:w-11 sm:h-11 flex-shrink-0 rounded-full border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-[#171C17] flex items-center justify-center hover:border-[#3FA34D]/40 dark:hover:border-[#43B75A]/40 transition-colors"
+            title={
+              theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+            }
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E7EAE1] bg-[#F3F5EE] transition-colors hover:border-[#3FA34D]/40 dark:border-[#262B24] dark:bg-[#171C17] dark:hover:border-[#43B75A]/40"
           >
             {theme === "dark" ? (
-              <FiSun size={16} className="text-[#FFA94D] sm:hidden" />
+              <FiSun size={16} className="text-[#FFA94D]" />
             ) : (
-              <FiMoon size={16} className="text-[#3FA34D] sm:hidden" />
-            )}
-            {theme === "dark" ? (
-              <FiSun size={18} className="hidden sm:block text-[#FFA94D]" />
-            ) : (
-              <FiMoon size={18} className="hidden sm:block text-[#3FA34D]" />
+              <FiMoon size={16} className="text-[#3FA34D]" />
             )}
           </button>
-
-          {/* Notifications */}
 
           <OutletSwitcher />
 
           <OfflineIndicator />
 
-          {/* <NotificationBell /> */}
-
-          {/* Profile */}
-
           <ProfileMenu user={user} />
         </div>
       </div>
 
-      {/* ================= MOBILE PAGE TITLE + BREADCRUMB ================= */}
+      {/* ================= LOOKUPS (below md) ================= */}
 
-      <div className="px-4 sm:px-6 pb-3 md:hidden">
-        <h1 className="text-lg font-bold text-[#1F2937] dark:text-white truncate">{pageTitle}</h1>
-
-        <div className="flex items-center gap-2 mt-1 text-sm text-[#6B7280] dark:text-[#9CA8A0] overflow-x-auto no-scrollbar">
-          <Link to="/dashboard" className="hover:text-[#3FA34D] dark:hover:text-[#43B75A] flex-shrink-0 transition-colors">
-            Home
-          </Link>
-
-          {breadcrumb.map((item, index) => (
-            <React.Fragment key={index}>
-              <FiChevronRight
-                size={14}
-                className="flex-shrink-0 text-[#3FA34D] dark:text-[#43B75A]"
-              />
-
-              <span className="capitalize whitespace-nowrap">
-                {item.replace("-", " ")}
-              </span>
-            </React.Fragment>
-          ))}
-        </div>
+      <div className="flex items-center gap-2 px-3 pb-2.5 sm:px-4 md:hidden">
+        <LookupField
+          label="Bill No"
+          placeholder="Bill No"
+          onResolve={resolveBill}
+          widthClass="flex-1"
+        />
+        <LookupField
+          label="KOT No"
+          placeholder="KOT No"
+          onResolve={resolveKot}
+          widthClass="flex-1"
+        />
       </div>
-
-      {/* ================= MOBILE SEARCH ================= */}
-
-      <div className="px-4 sm:px-6 pb-3 lg:hidden">
-        <div className="relative">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF] dark:text-[#6B7280]" />
-
-          <input
-            type="text"
-            placeholder="Search..."
-            className="w-full pl-11 pr-4 py-2.5 sm:py-3 rounded-full border border-[#E7EAE1] dark:border-[#262B24] bg-[#F3F5EE] dark:bg-[#171C17] text-[#1F2937] dark:text-white placeholder-[#9CA3AF] dark:placeholder-[#6B7280] focus:bg-white dark:focus:bg-[#1E241E] focus:border-[#3FA34D] dark:focus:border-[#43B75A] focus:outline-none transition-all"
-          />
-        </div>
-      </div>
-
-      {/* ================= MOBILE / SMALL-TABLET DATE ROW ================= */}
-      {/* Only needed below md, since md+ has the compact/full date-time in the top row */}
-
-      <div className="md:hidden border-t border-[#E7EAE1] dark:border-[#262B24] px-4 sm:px-6 py-2.5 flex flex-wrap items-center gap-4 sm:gap-6 bg-[#F3F5EE] dark:bg-[#171C17]">
-        <div className="flex items-center gap-2 min-w-0">
-          <FiCalendar className="text-[#3FA34D] dark:text-[#43B75A] flex-shrink-0" size={15} />
-
-          <span className="text-xs sm:text-sm text-[#1F2937] dark:text-white truncate">
-            <span className="hidden xs:inline">{formattedDate}</span>
-            <span className="xs:hidden">{formattedDateShort}</span>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <FiClock className="text-[#1F2937] dark:text-white" size={15} />
-
-          <span className="text-xs sm:text-sm font-medium text-[#1F2937] dark:text-white">
-            {formattedTime}
-          </span>
-        </div>
-      </div>
-
-      {/* ================= FUTURE GLOBAL SEARCH ================= */}
-
-      {/*
-        Future Enhancement:
-        -------------------
-        Replace the search input with a global search component.
-
-        It can search:
-        - Customers
-        - Orders
-        - Menu Items
-        - Tables
-        - Employees
-        - Inventory
-        - Reports
-
-        Example:
-        <GlobalSearch />
-      */}
     </header>
   );
 };

@@ -11,6 +11,7 @@ import ForgotPassword from "./auth/ForgotPassword";
 import ResetPassword from "./auth/ResetPassword";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import ReportsRoutes from "./reports/reportsRoutes";
+import CounterSummaryRoutes from "./counterSummary/counterSummaryRoutes";
 import ProfitLossRoutes from "./profitLoss/profitLossRoutes";
 import InventoryRoutes from "./inventory/inventoryRoutes";
 import EmployeesRoutes from "./employees/employeesRoutes";
@@ -25,7 +26,7 @@ import AdminLayout from "./components/layout/AdminLayout";
 // Dashboard
 // ==============================================
 
-import Dashboard from "./dashboard/Dashboard";
+import DashboardRoutes from "./dashboard/dashboardRoutes";
 
 // ==============================================
 // Profile
@@ -95,7 +96,7 @@ function App() {
         <Route element={<AdminLayout />}>
           {/* Dashboard */}
 
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard/*" element={<DashboardRoutes />} />
 
           {/* Profile */}
 
@@ -117,6 +118,10 @@ function App() {
 
           {/* Reports */}
           <Route path="/reports/*" element={<ReportsRoutes />} />
+          <Route
+            path="/counter-summary/*"
+            element={<CounterSummaryRoutes />}
+          />
 
           {/* Profit Loss */}
           <Route path="/profit-loss/*" element={<ProfitLossRoutes />} />

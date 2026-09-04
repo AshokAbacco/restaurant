@@ -123,12 +123,26 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
     },
     include: {
       waiter: { select: WAITER_SELECT },
+      // Floor View groups its cards under floor headings ("Top Floor",
+      // "Ground Floor"), so the board has to say which floor each table
+      // belongs to. Without this the only way to build that grouping was
+      // one /board request per floor.
+      floor: { select: { id: true, name: true } },
       orders: {
         where: { status: { notIn: ["COMPLETED", "CANCELLED", "REFUNDED"] } },
         orderBy: { createdAt: "desc" },
         take: 1,
         include: {
           customer: { select: { name: true } },
+          // Billing state, for the board's Printed (invoice raised) and
+          // Paid (fully settled) colours. Both are read from the rows that
+          // billing.service.js actually writes, for the same reason
+          // kitchenStatus is read from KitchenOrder — a mirrored field on
+          // Order would need a sync step that can drift.
+          invoice: {
+            select: { id: true, invoiceNumber: true, createdAt: true },
+          },
+          payments: { select: { id: true, amount: true, status: true } },
           // unitPrice/totalPrice/name feed the Orders page's hover tooltip
           // (item lines, quantities, costs). They're a snapshot on OrderItem
           // already, so this doesn't cost an extra query — just more columns
@@ -158,6 +172,17 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
     outletId,
   );
 
+  // Tables billed today whose card hasn't been cleared off the board yet.
+  // completeBilling closes the order and frees the table in one step, so a
+  // just-paid table would otherwise blink straight back to blank — the
+  // cashier never gets to see it settle. Returned separately from `order`
+  // so nothing that consumes the active order (POS, Move KOT/Items,
+  // "add items to this table") ever mistakes a closed order for a live one.
+  const settledByTable = await getSettledOrdersByTable(
+    tables.filter((t) => t.orders.length === 0).map((t) => t.id),
+    outletId,
+  );
+
   return tables.map((table) => {
     const order = table.orders[0] || null;
     return {
@@ -167,12 +192,17 @@ export async function getTablesBoard({ outletId, floorId, waiterId } = {}) {
       section: table.section,
       status: table.status,
       waiter: table.waiter,
+      floorId: table.floorId,
+      floorName: table.floor?.name || null,
       upcomingReservation: upcomingByTable[table.id] || null,
+      settledOrder: settledByTable[table.id] || null,
       order: order
         ? {
             id: order.id,
             orderNumber: order.orderNumber,
             status: order.status,
+            invoice: order.invoice || null,
+            amountPaid: sumPaid(order.payments),
             // The field the Orders page badge and "Complete Service" button
             // should use — always mirrors the Kitchen Display exactly.
             kitchenStatus: deriveKitchenStatus(order.kitchenOrders),
@@ -526,6 +556,72 @@ const RESERVATION_INCLUDE = {
   customer: { select: { id: true, name: true, mobile: true } },
   createdBy: { select: { fullName: true, employeeCode: true } },
 };
+
+// Only PAID rows count toward what's actually been collected. A Payment
+// sitting at UNPAID/PARTIAL is a recorded intent, not money in the drawer,
+// and counting it would turn a half-settled bill green on the board.
+function sumPaid(payments = []) {
+  return payments
+    .filter((p) => p.status === "PAID")
+    .reduce((total, p) => total + Number(p.amount), 0);
+}
+
+// The most recent order billed at each table today. Scoped to today (not
+// "the last completed order, ever") so a table that's been empty since
+// last week comes back blank rather than showing a week-old bill, and
+// limited to orders that actually reached an invoice — a cancelled or
+// refunded order was never settled and has nothing to show.
+async function getSettledOrdersByTable(tableIds, outletId) {
+  if (tableIds.length === 0) return {};
+
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+
+  const orders = await prisma.order.findMany({
+    where: {
+      outletId,
+      tableId: { in: tableIds },
+      status: "COMPLETED",
+      updatedAt: { gte: dayStart },
+      invoice: { isNot: null },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      tableId: true,
+      orderNumber: true,
+      status: true,
+      grandTotal: true,
+      createdAt: true,
+      updatedAt: true,
+      customer: { select: { name: true } },
+      invoice: { select: { id: true, invoiceNumber: true, createdAt: true } },
+      payments: { select: { id: true, amount: true, status: true } },
+      items: { select: { quantity: true } },
+    },
+  });
+
+  const byTable = {};
+  for (const order of orders) {
+    // Sorted newest-first, so the first one seen per table is the one that
+    // just closed; earlier bills on the same table today are already
+    // accounted for on the Payments page.
+    if (byTable[order.tableId]) continue;
+    byTable[order.tableId] = {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      invoice: order.invoice,
+      amountPaid: sumPaid(order.payments),
+      grandTotal: order.grandTotal,
+      customerName: order.customer?.name || null,
+      itemCount: order.items.reduce((sum, i) => sum + i.quantity, 0),
+      createdAt: order.createdAt,
+      settledAt: order.updatedAt,
+    };
+  }
+  return byTable;
+}
 
 // Powers the floor view's "Reserved 7:30 PM" badge — the single next
 // upcoming (still-BOOKED, in-the-future) reservation per table, batched

@@ -1,6 +1,6 @@
 // src/pos/PosOrderScreen.jsx
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import TableStrip from "./components/TableStrip";
 import MenuBrowser from "./components/MenuBrowser";
 import OrderTicket from "./components/OrderTicket";
@@ -13,19 +13,46 @@ import {
   getOnlinePlatforms,
   createOnlinePlatform,
   getKitchenBranches,
+  getTablesBoard,
+  getOrder,
+  addItemsToOrder,
+  sendToKitchen,
 } from "./api/posApi";
 import { placeDineInOrder } from "../offline/offlineQueue";
 import { getSelectedCounterId } from "./api/counterContext";
 
 export default function PosOrderScreen() {
   const navigate = useNavigate();
-  const [orderType, setOrderType] = useState("DINE_IN");
+  const [searchParams] = useSearchParams();
+
+  // Deep links from the Table View. `tableId` opens straight onto a table
+  // (its View button, and tapping a blank card); `orderType` opens the
+  // Delivery / Pick Up tabs. Read once on mount rather than tracked — this
+  // is an entry point, not a controlled prop, and re-reading it would fight
+  // the person the moment they picked a different table by hand.
+  // "DELIVERY" is mapped to "ONLINE" because that's this screen's internal
+  // name for the delivery tab — the server stores these as DELIVERY orders
+  // tagged with a platform, but the tab, the platform picker and the
+  // placement branch all key off "ONLINE". Without the mapping, a
+  // ?orderType=DELIVERY link set a value no tab matched, and placeOrder
+  // fell through to the dine-in path and asked for a table.
+  const initialOrderType = searchParams.get("orderType");
+  const [orderType, setOrderType] = useState(() => {
+    if (initialOrderType === "DELIVERY" || initialOrderType === "ONLINE")
+      return "ONLINE";
+    if (initialOrderType === "TAKEAWAY") return "TAKEAWAY";
+    return "DINE_IN";
+  });
 
   // Online Orders (Swiggy, Zomato, etc.) — the platform list is fetched
   // once on mount (not just when the ONLINE tab is active) so switching
   // to that tab doesn't show an empty dropdown for a beat while it loads.
   const [onlinePlatforms, setOnlinePlatforms] = useState([]);
-  const [selectedPlatformId, setSelectedPlatformId] = useState("");
+  // ?platformId= comes from the Table View's per-platform "New Swiggy" /
+  // "New Zomato" tiles, so the picker is already filled in on arrival.
+  const [selectedPlatformId, setSelectedPlatformId] = useState(
+    () => searchParams.get("platformId") || "",
+  );
 
   // Kitchen Branches — the physical kitchens this outlet has configured.
   // Order whose kitchen ticket should be printed. Dine-in and online set
@@ -77,6 +104,109 @@ export default function PosOrderScreen() {
   // TableStrip uses to highlight the active selection).
   const [selectedTable, setSelectedTable] = useState(null);
   const tableId = selectedTable?.id ?? null;
+
+  // Which floor tab TableStrip should open on, so a deep-linked table is
+  // visible in the strip rather than selected-but-offscreen under another
+  // floor. Null until the board resolves the table.
+  const [deepLinkFloorId, setDeepLinkFloorId] = useState(null);
+
+  // Resolve ?tableId= into the full table object TableStrip's onSelect would
+  // otherwise have handed over. The board is the same call TableStrip makes,
+  // so this costs one extra request on a deep link and nothing at all
+  // otherwise.
+  useEffect(() => {
+    const deepLinkTableId = searchParams.get("tableId");
+    if (!deepLinkTableId) return;
+
+    let cancelled = false;
+
+    getTablesBoard()
+      .then((board) => {
+        if (cancelled) return;
+        const table = (board || []).find((t) => t.id === deepLinkTableId);
+        if (!table) return;
+        setSelectedTable(table);
+        setDeepLinkFloorId(table.floorId || null);
+      })
+      // A stale link (table since deleted) or a failed board just means the
+      // screen opens with nothing selected, which is the normal POS state.
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only: see the note on initialOrderType above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // ==========================================
+  // THE ORDER ALREADY OPEN ON THIS TABLE
+  // ==========================================
+  //
+  // Selecting an occupied table used to start a blank ticket, so a second
+  // round became a second order on the same table and the guests got two
+  // bills. Now the open order is fetched and shown, and anything added
+  // joins it.
+  //
+  // The board's `table.order` is a summary (id, totals, kitchen status) with
+  // no line items, so it tells us WHICH order to load but not what's on it —
+  // hence the getOrder call rather than reading the board object directly.
+
+  const [existingOrder, setExistingOrder] = useState(null);
+  const [loadingExistingOrder, setLoadingExistingOrder] = useState(false);
+
+  // Bumped by placeOrder to re-pull the order after items are added, so the
+  // "Already ordered" list includes the round that was just sent without a
+  // manual refresh.
+  const [orderReloadKey, setOrderReloadKey] = useState(0);
+
+  // Set by ?orderId= — the Table View's Takeaway and Delivery cards link
+  // straight to an order rather than to a table.
+  const deepLinkOrderId = searchParams.get("orderId");
+
+  const existingOrderId = deepLinkOrderId || selectedTable?.order?.id || null;
+
+  useEffect(() => {
+    if (!existingOrderId) {
+      setExistingOrder(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingExistingOrder(true);
+
+    getOrder(existingOrderId)
+      .then((order) => {
+        if (cancelled) return;
+        setExistingOrder(order);
+
+        // A deep-linked takeaway or delivery order has to bring its own
+        // context with it — nothing else on this screen knows the order
+        // type, and the tab would otherwise sit on Dine In.
+        if (deepLinkOrderId && order) {
+          if (order.orderType === "TAKEAWAY") setOrderType("TAKEAWAY");
+          else if (order.orderType === "DELIVERY") {
+            setOrderType("ONLINE");
+            if (order.onlinePlatformId)
+              setSelectedPlatformId(order.onlinePlatformId);
+          }
+          if (order.kitchenBranchId)
+            setSelectedKitchenBranchId(order.kitchenBranchId);
+        }
+      })
+      // A closed or deleted order just means a blank ticket, which is the
+      // normal state of this screen.
+      .catch(() => {
+        if (!cancelled) setExistingOrder(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingExistingOrder(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [existingOrderId, deepLinkOrderId, orderReloadKey]);
+
   const [cart, setCart] = useState([]);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState(null);
@@ -189,6 +319,50 @@ export default function PosOrderScreen() {
     }));
 
     try {
+      // ==========================================
+      // ADDING TO AN ORDER THAT'S ALREADY OPEN
+      // ==========================================
+      //
+      // Checked before any of the order-type branches below, because it
+      // applies to all of them — a second round on a table, an item added
+      // to a takeaway before it's paid, a substitution on a delivery order.
+      // None of those should mint a new order.
+      //
+      // Two calls rather than one: addItemsToOrder returns the new
+      // OrderItem ids, and sendToKitchen needs exactly those ids so the
+      // KOT covers the new round only and not everything on the table
+      // again.
+      if (existingOrder) {
+        const { newItems } = await addItemsToOrder(existingOrder.id, items);
+        const newItemIds = (newItems || []).map((i) => i.id);
+
+        // An unpaid takeaway follows the same rule as a new one: the
+        // kitchen doesn't start on food nobody has paid for yet. Adding to
+        // it re-prices the order and hands back to Billing, which sends
+        // everything to the kitchen once payment clears.
+        const isUnpaidTakeaway =
+          existingOrder.orderType === "TAKEAWAY" &&
+          existingOrder.status !== "COMPLETED";
+
+        if (isUnpaidTakeaway) {
+          setCart([]);
+          navigate(`/billing?orderId=${existingOrder.id}`);
+          return;
+        }
+
+        if (newItemIds.length > 0) {
+          await sendToKitchen(existingOrder.id, newItemIds);
+          setPrintKotOrderId(existingOrder.id);
+        }
+
+        setLastOrder(existingOrder);
+        setShowSuccessToast(true);
+        setCart([]);
+        // Re-pull the order so "Already ordered" includes this round.
+        setOrderReloadKey((n) => n + 1);
+        return;
+      }
+
       if (orderType === "TAKEAWAY") {
         // Takeaway is NOT offline-capable (see offlineQueue.js's file
         // header) — billing needs live payment-gateway state, so this
@@ -332,12 +506,19 @@ export default function PosOrderScreen() {
 
       {orderType === "DINE_IN" && (
         <div className="border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
-          <TableStrip selectedTableId={tableId} onSelect={setSelectedTable} />
+          <TableStrip
+            selectedTableId={tableId}
+            initialFloorId={deepLinkFloorId}
+            onSelect={setSelectedTable}
+          />
         </div>
       )}
 
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 md:grid-cols-[1fr_360px]">
-        <div className="overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] p-4">
+        {/* No padding: the category rail runs the full height of this
+            panel, flush to its left edge. MenuBrowser pads its own item
+            grid instead. */}
+        <div className="min-h-0 overflow-hidden rounded-2xl border border-[#E7EAE1] bg-white dark:border-[#262B24] dark:bg-[#171C17]">
           <MenuBrowser onAddItem={addItem} />
         </div>
 
@@ -356,6 +537,8 @@ export default function PosOrderScreen() {
           kitchenBranches={kitchenBranches}
           selectedKitchenBranchId={selectedKitchenBranchId}
           onChangeKitchenBranch={setSelectedKitchenBranchId}
+          existingOrder={existingOrder}
+          loadingExistingOrder={loadingExistingOrder}
           onlinePlatforms={onlinePlatforms}
           selectedPlatformId={selectedPlatformId}
           onChangePlatform={setSelectedPlatformId}
