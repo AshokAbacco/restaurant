@@ -2,7 +2,8 @@
 // src/landing/sections/LiveRail.jsx
 // ==============================================
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 
 const RAIL_ITEMS = [
   {
@@ -57,6 +58,8 @@ const RAIL_ITEMS = [
 
 const LiveRail = () => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const refs = useRef([]);
 
   const now = useMemo(
     () =>
@@ -68,68 +71,85 @@ const LiveRail = () => {
     []
   );
 
+const handleMouseEnter = (i) => {
+  const rect = refs.current[i].getBoundingClientRect();
+
+  setTooltipPos({
+    x: rect.left + rect.width / 2, // ✅ relative to item
+    y: rect.top,
+  });
+
+  setHoveredIndex(i);
+};
+
   return (
-    <section
-      aria-label="What the system handles during a service"
-      className="relative z-30 border-y border-[#EAE5D6] bg-[#FBFAF5]"
-    >
-      <div className="mx-auto flex w-full max-w-8l flex-nowrap items-center gap-4 overflow-x-auto px-5 py-3.5 sm:px-8">
+    <section className="relative z-30 border-y border-[#EAE5D6] bg-[#FBFAF5]">
+      
+      {/* ✅ OUTER CONTAINER CENTERED */}
+      <div className="mx-auto w-full max-w-8xl px-5 py-3.5 sm:px-8">
         
-        {/* Live clock */}
-        <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#E3DEC9] bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#171C17] shadow-[0_1px_2px_rgba(23,28,23,0.04)]">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#3FA34D] opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#3FA34D]" />
+        {/* ✅ FLEX WRAPPER CENTER */}
+        <div className="flex items-center justify-center gap-4 overflow-x-auto">
+          
+          {/* Clock */}
+          <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#E3DEC9] bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#171C17]">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#3FA34D] opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#3FA34D]" />
+            </span>
+            {now}
           </span>
-          {now}
-        </span>
 
-        {/* Items */}
-        <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-x-5 gap-y-3">
-          {RAIL_ITEMS.map((item, i) => (
-            <div key={item.label} className="flex shrink-0 items-center gap-4">
-              
-              <div
-                className="relative flex items-center gap-2"
-                onMouseEnter={() => setHoveredIndex(i)}
-                onMouseLeave={() => setHoveredIndex(null)}
-                onFocus={() => setHoveredIndex(i)}
-                onBlur={() => setHoveredIndex(null)}
-                tabIndex={0}
-              >
-                <img
-                  src={item.img}
-                  alt={item.label}
-                  className="h-7 w-7 shrink-0 rounded-full object-cover"
-                />
+          {/* Items */}
+          <div className="flex flex-nowrap items-center justify-center gap-x-5">
+            {RAIL_ITEMS.map((item, i) => (
+              <div key={item.label} className="flex shrink-0 items-center gap-4">
+                
+                <div
+                  ref={(el) => (refs.current[i] = el)}
+                  className="flex items-center gap-2 cursor-pointer"
+                  onMouseEnter={() => handleMouseEnter(i)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                >
+                  <img
+                    src={item.img}
+                    alt={item.label}
+                    className="h-7 w-7 rounded-full object-cover"
+                  />
 
-                <span className="whitespace-nowrap text-[13.5px] font-semibold text-[#171C17]">
-                  {item.label}
-                </span>
+                  <span className="whitespace-nowrap text-[13.5px] font-semibold text-[#171C17]">
+                    {item.label}
+                  </span>
+                </div>
 
-                {/* ✅ FIXED TOOLTIP */}
-                {hoveredIndex === i && (
-                  <div
-                    role="tooltip"
-                    className="pointer-events-none absolute bottom-full left-1/2 z-[999] mb-3 w-max max-w-[220px] -translate-x-1/2 rounded-lg border border-[#E3DEC9] bg-white px-3 py-2 text-center text-[12px] font-medium leading-snug text-green-800 shadow-[0_4px_12px_rgba(23,28,23,0.18)]"
-                  >
-                    <span className="mr-1">{item.emoji}</span>
-                    {item.tooltip}
-
-                    {/* ✅ FIXED ARROW */}
-                    <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 rotate-45 bg-white border-r border-b border-[#E3DEC9]" />
-                  </div>
+                {/* Divider */}
+                {i < RAIL_ITEMS.length - 1 && (
+                  <span className="block h-4 w-px bg-[#EAE5D6]" />
                 )}
               </div>
-
-              {/* Divider */}
-              {i < RAIL_ITEMS.length - 1 && (
-                <span className="block h-4 w-px shrink-0 bg-[#EAE5D6]" />
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* ✅ TOOLTIP (TOP CENTER, PORTAL) */}
+      {hoveredIndex !== null &&
+        createPortal(
+          <div
+            className="fixed z-[9999] -translate-x-1/2 -translate-y-full rounded-lg border border-[#E3DEC9] bg-white px-3 py-2 text-[12px] font-medium text-green-800 shadow-[0_8px_20px_rgba(23,28,23,0.2)]"
+            style={{
+              left: tooltipPos.x,
+              top: tooltipPos.y - 10,
+            }}
+          >
+            <span className="mr-1">{RAIL_ITEMS[hoveredIndex].emoji}</span>
+            {RAIL_ITEMS[hoveredIndex].tooltip}
+
+            {/* Arrow */}
+            <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 rotate-45 bg-white border-r border-b border-[#E3DEC9]" />
+          </div>,
+          document.body
+        )}
     </section>
   );
 };

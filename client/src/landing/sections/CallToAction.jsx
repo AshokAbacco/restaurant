@@ -16,7 +16,7 @@ const CallToAction = () => {
       <div className="mx-auto w-full max-w-[1240px] px-5 py-20 sm:px-8 lg:py-28">
         <div
           ref={ref}
-          className="lp-reveal relative overflow-hidden rounded-[32px] bg-[#171C17] px-6 py-16 text-center sm:px-12"
+          className="lp-reveal relative overflow-hidden rounded-[32px] bg-[#3fa34d] px-6 py-16 text-center sm:px-12"
         >
           <div
             aria-hidden="true"
@@ -24,11 +24,11 @@ const CallToAction = () => {
           />
 
           <div className="relative mx-auto max-w-[34rem]">
-            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[#F3F5EE]">
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[#fff]">
               {CTA.title}
             </h2>
 
-            <p className="mx-auto mt-5 max-w-[30rem] text-[16.5px] leading-[1.7] text-[#9CA8A0]">
+            <p className="mx-auto mt-5 max-w-[30rem] text-[16.5px] leading-[1.7] text-gray-100">
               {CTA.body}
             </p>
 
