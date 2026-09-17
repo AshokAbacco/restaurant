@@ -20,7 +20,7 @@ import LandingLayout from "./landing/LandingLayout";
 import Home from "./landing/Home";
 import ComingSoon from "./landing/ComingSoon";
 import Pricing from "./landing/pages/Pricing";
-
+import ContactUs from "./landing/pages/ContactUs";
 // ==============================================
 // Auth
 // ==============================================
@@ -117,7 +117,7 @@ function App() {
 
           <Route path="/pricing" element={<Pricing />} />
 
-          <Route path="/contact" element={<ComingSoon title="Contact us" />} />
+          <Route path="/contact" element={<ContactUs />} />
         </Route>
 
         {/* ==========================================

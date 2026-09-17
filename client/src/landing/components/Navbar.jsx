@@ -17,8 +17,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { FiMenu, FiX } from "react-icons/fi";
 
 import { useAuth } from "../../auth/AuthContext";
-import { NAV_LINKS } from "../landing.config";
-import { useScrolledPast } from "../hooks/useLandingMotion";
+ import { useScrolledPast } from "../hooks/useLandingMotion";
 import Wordmark from "./Wordmark";
 
 const Navbar = () => {
@@ -76,6 +75,12 @@ const Navbar = () => {
   // RENDER
   // ==========================================
 
+  const NAV_LINKS = [
+  { label: "Home", to: "/" },
+ 
+  { label: "Pricing", to: "/pricing" },
+  { label: "Contact", to: "/contact" },
+];
   return (
     <header
       className={`sticky top-0 z-50 transition-colors duration-300 ${

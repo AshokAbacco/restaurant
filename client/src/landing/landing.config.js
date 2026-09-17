@@ -57,31 +57,6 @@ export const BRAND = {
   address: "Koramangala, Bengaluru 560034",
 };
 
-// ==============================================
-// NAVIGATION
-// ==============================================
-//
-// `to` is a router path. The About/Services/Pricing/Contact pages are
-// stubbed for now (see ComingSoon.jsx) rather than left out of the nav —
-// a link that silently bounces to /dashboard reads as a broken site.
-
-export const NAV_LINKS = [
-  { label: "Home", to: "/" },
-  { label: "About", to: "/about" },
-  { label: "Services", to: "/services" },
-  { label: "Pricing", to: "/pricing" },
-  { label: "Contact", to: "/contact" },
-];
-
-// ==============================================
-// HERO
-// ==============================================
-
-// The left column mirrors the reference layout element for element:
-// headline, the figure in the accent colour where the reference puts a
-// price, a short paragraph, two buttons, then Previous / Next. The
-// reference's "Stay Healthy / Stay Safe" corner becomes `corner`.
-
 export const HERO = {
   headline: ["Run the whole floor", "from one screen."],
   // Where the reference puts $24.00 in red. A trial length is the

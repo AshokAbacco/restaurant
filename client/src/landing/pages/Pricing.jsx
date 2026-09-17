@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 /* ------------------------------------------------------------------
    Abacco — Pricing (UI only, no backend)
@@ -8,6 +8,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
    demo mode (fake payment id) so the flow can be clicked through.
    For live payments you still need one backend call to create an
    order_id and one to verify the signature — see notes at the bottom.
+
+   Pricing model: per branch/outlet, not per user. A "Standard" plan
+   at ₹650/branch/month costs ₹1300/month for 2 branches, and so on.
+   Custom tier keeps the same feature list as Standard — clients who
+   want something extra just tell us in the message box below.
 ------------------------------------------------------------------- */
 
 const RAZORPAY_KEY = "rzp_test_XXXXXXXXXXXXXX";
@@ -15,10 +20,12 @@ const RAZORPAY_KEY = "rzp_test_XXXXXXXXXXXXXX";
 const inr = (n) => "₹" + new Intl.NumberFormat("en-IN").format(Math.round(n));
 
 const BASE_FEATURES = [
+  "Login Access: owner, manager, cashier, kitchen, waiter",
   "Orders, KOT and table map",
   "Billing with GST invoices",
-  "Works offline, syncs when you're back",
+  // "Works offline, syncs when you're back",
   "Menu and stock management",
+  "Employee management",
 ];
 
 const PLANS = {
@@ -29,7 +36,7 @@ const PLANS = {
     cta: "Start free trial",
     features: [
       ...BASE_FEATURES,
-      "1 outlet, up to 5 users",
+      "1 branch included",
       "Email support",
     ],
   },
@@ -41,13 +48,12 @@ const PLANS = {
     cycle: "month",
     tiers: {
       standard: { label: "Standard", mrp: 850, price: 650 },
-      custom: { label: "Custom", mrp: 1300, price: 1000 },
+      custom: { label: "Custom", mrp: 850, price: 650 },
     },
     features: [
       ...BASE_FEATURES,
       "Daily sales and item reports",
-      "Zomato / Swiggy order sync",
-      "Phone support, 9am–11pm",
+      "Phone support, Email 24/7",
     ],
   },
   yearly: {
@@ -56,30 +62,18 @@ const PLANS = {
     sub: "Pay once for twelve months and keep the lower rate.",
     cta: "Buy yearly plan",
     cycle: "year",
-    ribbon: "Cheapest per seat",
+    ribbon: "Cheapest per branch",
     tiers: {
       standard: { label: "Standard", mrp: 650, price: 550 },
-      custom: { label: "Custom", mrp: 1000, price: 800 },
+      custom: { label: "Custom", mrp: 650, price: 550 },
     },
     features: [
       ...BASE_FEATURES,
       "Daily sales and item reports",
-      "Zomato / Swiggy order sync",
-      "Phone support, 9am–11pm",
-      "Free onboarding and staff training",
+      "Phone support, Email 24/7",
     ],
   },
 };
-
-/* Add-ons shown only on the Custom tier */
-const MODULES = [
-  "Multi-outlet control",
-  "Recipe costing and wastage",
-  "Loyalty, CRM and campaigns",
-  "API and third-party integrations",
-  "Dedicated account manager",
-  "Priority 24×7 support",
-];
 
 const emptyForm = {
   restaurant: "",
@@ -88,34 +82,31 @@ const emptyForm = {
   phone: "",
   city: "",
   gstin: "",
-  outlets: "1",
   notes: "",
 };
 
 export default function Pricing() {
   const [tier, setTier] = useState({ monthly: "standard", yearly: "standard" });
-  const [seats, setSeats] = useState({ monthly: 10, yearly: 10 });
-  const [modules, setModules] = useState([]);
-  const [cart, setCart] = useState(null); // { planId, tierKey, seats, unit, total, cycle }
+  const [branches, setBranches] = useState({ monthly: 1, yearly: 1 });
+  const [extraNeeds, setExtraNeeds] = useState({ monthly: "", yearly: "" });
+  const [cart, setCart] = useState(null); // { planId, tierKey, branches, unit, total, cycle, extraNeeds }
 
   const priceOf = (planId) => {
     const plan = PLANS[planId];
     if (!plan.tiers) return { unit: 0, mrp: 0, total: 0 };
     const t = plan.tiers[tier[planId]];
-    const n = seats[planId];
+    const n = branches[planId];
     const months = planId === "yearly" ? 12 : 1;
     return { unit: t.price, mrp: t.mrp, total: t.price * n * months };
   };
 
-  const setSeatCount = (planId, v) => {
-    const n = Math.max(1, Math.min(500, Number(v) || 1));
-    setSeats((s) => ({ ...s, [planId]: n }));
+  const setBranchCount = (planId, v) => {
+    const n = Math.max(1, Math.min(50, Number(v) || 1));
+    setBranches((b) => ({ ...b, [planId]: n }));
   };
 
-  const toggleModule = (m) =>
-    setModules((list) =>
-      list.includes(m) ? list.filter((x) => x !== m) : [...list, m]
-    );
+  const setNeeds = (planId, v) =>
+    setExtraNeeds((x) => ({ ...x, [planId]: v }));
 
   const openCheckout = (planId) => {
     const plan = PLANS[planId];
@@ -125,11 +116,11 @@ export default function Pricing() {
         planName: plan.name,
         tierKey: null,
         tierLabel: "Free trial",
-        seats: 5,
+        branches: 1,
         unit: 0,
         total: 0,
         cycle: "30 days",
-        modules: [],
+        extraNeeds: "",
       });
       return;
     }
@@ -139,11 +130,11 @@ export default function Pricing() {
       planName: plan.name,
       tierKey: tier[planId],
       tierLabel: plan.tiers[tier[planId]].label,
-      seats: seats[planId],
+      branches: branches[planId],
       unit: p.unit,
       total: p.total,
       cycle: planId === "yearly" ? "year" : "month",
-      modules: tier[planId] === "custom" ? modules : [],
+      extraNeeds: tier[planId] === "custom" ? extraNeeds[planId].trim() : "",
     });
   };
 
@@ -154,14 +145,14 @@ export default function Pricing() {
       <header className="ab-head">
         <p className="ab-kicker">Pricing</p>
         <h1>
-          One price per user.
+          One price per branch.
           <br />
           Every outlet, every screen.
         </h1>
         <p className="ab-lede">
           Counter, kitchen display, captain app and back office are all in the
-          same licence. Start free for a month, then pick the cycle that suits
-          your cash flow.
+          same licence, for as many people on your team as you need. Start
+          free for a month, then pick the cycle that suits your cash flow.
         </p>
       </header>
 
@@ -178,7 +169,7 @@ export default function Pricing() {
             <span className="ab-per">for 30 days</span>
           </div>
           <p className="ab-total ab-total-quiet">
-            Up to 5 users, 1 outlet. Card details are not asked for.
+            1 branch included. Card details are not asked for.
           </p>
 
           <button className="ab-btn ab-btn-ghost" onClick={() => openCheckout("free")}>
@@ -193,11 +184,11 @@ export default function Pricing() {
           plan={PLANS.monthly}
           tierKey={tier.monthly}
           onTier={(k) => setTier((t) => ({ ...t, monthly: k }))}
-          seats={seats.monthly}
-          onSeats={(v) => setSeatCount("monthly", v)}
+          branches={branches.monthly}
+          onBranches={(v) => setBranchCount("monthly", v)}
           price={priceOf("monthly")}
-          modules={modules}
-          onModule={toggleModule}
+          needs={extraNeeds.monthly}
+          onNeeds={(v) => setNeeds("monthly", v)}
           onBuy={() => openCheckout("monthly")}
         />
 
@@ -207,18 +198,19 @@ export default function Pricing() {
           plan={PLANS.yearly}
           tierKey={tier.yearly}
           onTier={(k) => setTier((t) => ({ ...t, yearly: k }))}
-          seats={seats.yearly}
-          onSeats={(v) => setSeatCount("yearly", v)}
+          branches={branches.yearly}
+          onBranches={(v) => setBranchCount("yearly", v)}
           price={priceOf("yearly")}
-          modules={modules}
-          onModule={toggleModule}
+          needs={extraNeeds.yearly}
+          onNeeds={(v) => setNeeds("yearly", v)}
           onBuy={() => openCheckout("yearly")}
         />
       </section>
 
       <p className="ab-foot">
-        Prices are per user and exclude 18% GST. Hardware, printers and one-time
-        data migration are quoted separately.
+        Prices are per branch and exclude 18% GST. Every branch gets
+        unlimited users. Hardware, printers and one-time data migration are
+        quoted separately.
       </p>
 
       {cart && <CheckoutModal cart={cart} onClose={() => setCart(null)} />}
@@ -233,11 +225,11 @@ function PaidCard({
   featured,
   tierKey,
   onTier,
-  seats,
-  onSeats,
+  branches,
+  onBranches,
   price,
-  modules,
-  onModule,
+  needs,
+  onNeeds,
   onBuy,
 }) {
   const isCustom = tierKey === "custom";
@@ -269,46 +261,50 @@ function PaidCard({
       <div className="ab-price">
         <span className="ab-was">{inr(price.mrp)}</span>
         <span className="ab-amount">{inr(price.unit)}</span>
-        <span className="ab-per">per user / month</span>
+        <span className="ab-per">per branch / month</span>
       </div>
 
       <div className="ab-seats">
-        <label htmlFor={plan.id + "-seats"}>Users</label>
+        <label htmlFor={plan.id + "-branches"}>Branches</label>
         <div className="ab-stepper">
-          <button onClick={() => onSeats(seats - 1)} aria-label="Remove a user">
+          <button onClick={() => onBranches(branches - 1)} aria-label="Remove a branch">
             –
           </button>
           <input
-            id={plan.id + "-seats"}
-            value={seats}
+            id={plan.id + "-branches"}
+            value={branches}
             inputMode="numeric"
-            onChange={(e) => onSeats(e.target.value)}
+            onChange={(e) => onBranches(e.target.value)}
           />
-          <button onClick={() => onSeats(seats + 1)} aria-label="Add a user">
+          <button onClick={() => onBranches(branches + 1)} aria-label="Add a branch">
             +
           </button>
         </div>
       </div>
 
       {isCustom && (
-        <fieldset className="ab-modules">
-          <legend>Pick what you need</legend>
-          {MODULES.map((m) => (
-            <label key={m} className="ab-check">
-              <input
-                type="checkbox"
-                checked={modules.includes(m)}
-                onChange={() => onModule(m)}
-              />
-              <span>{m}</span>
-            </label>
-          ))}
-        </fieldset>
+        <div className="ab-needs">
+          <label htmlFor={plan.id + "-needs"}>
+            Need something beyond Standard?
+          </label>
+          <textarea
+            id={plan.id + "-needs"}
+            rows={3}
+            placeholder="Tell us what you need — e.g. loyalty program, a third-party integration, a dedicated account manager…"
+            value={needs}
+            onChange={(e) => onNeeds(e.target.value)}
+          />
+          <p className="ab-needs-hint">
+            Everything in Standard is already included. Go ahead and pay —
+            we'll email you to confirm what you asked for and take it from
+            there.
+          </p>
+        </div>
       )}
 
       <p className="ab-total">
-        <strong>{inr(price.total)}</strong> per {cycleWord} for {seats}{" "}
-        {seats === 1 ? "user" : "users"}
+        <strong>{inr(price.total)}</strong> per {cycleWord} for {branches}{" "}
+        {branches === 1 ? "branch" : "branches"}
         {plan.cycle === "year" && " (12 months paid together)"}
       </p>
 
@@ -319,22 +315,16 @@ function PaidCard({
         {plan.cta}
       </button>
 
-      <FeatureList items={plan.features} extra={isCustom ? modules : []} />
+      <FeatureList items={plan.features} />
     </article>
   );
 }
 
-function FeatureList({ items, extra = [] }) {
+function FeatureList({ items }) {
   return (
     <ul className="ab-features">
       {items.map((f) => (
         <li key={f}>
-          <Tick />
-          {f}
-        </li>
-      ))}
-      {extra.map((f) => (
-        <li key={f} className="ab-feature-added">
           <Tick />
           {f}
         </li>
@@ -370,6 +360,7 @@ function CheckoutModal({ cart, onClose }) {
   const boxRef = useRef(null);
 
   const isFree = cart.planId === "free";
+  const hasNeeds = cart.extraNeeds && cart.extraNeeds.length > 0;
   const gst = Math.round(cart.total * 0.18);
   const grand = cart.total + gst;
 
@@ -456,8 +447,9 @@ function CheckoutModal({ cart, onClose }) {
         restaurant: form.restaurant,
         plan: cart.planName,
         tier: cart.tierLabel,
-        users: String(cart.seats),
+        branches: String(cart.branches),
         gstin: form.gstin,
+        extra_needs: cart.extraNeeds || "",
       },
       theme: { color: "#1FA84F" },
       handler: (res) => {
@@ -495,14 +487,14 @@ function CheckoutModal({ cart, onClose }) {
             <p className="ab-modal-plan">{cart.planName}</p>
             <p className="ab-modal-meta">
               {isFree
-                ? "30 days free · up to 5 users"
+                ? "30 days free · 1 branch"
                 : cart.tierLabel +
                   " · " +
-                  cart.seats +
-                  (cart.seats === 1 ? " user" : " users") +
+                  cart.branches +
+                  (cart.branches === 1 ? " branch" : " branches") +
                   " · " +
                   inr(cart.unit) +
-                  " per user / month"}
+                  " per branch / month"}
             </p>
           </div>
           <button className="ab-x" onClick={onClose} aria-label="Close checkout">
@@ -557,12 +549,6 @@ function CheckoutModal({ cart, onClose }) {
                 placeholder="29ABCDE1234F1Z5"
               />
               <Field
-                label="Outlets"
-                value={form.outlets}
-                onChange={set("outlets")}
-                placeholder="1"
-              />
-              <Field
                 wide
                 label="Anything we should know?"
                 value={form.notes}
@@ -594,15 +580,13 @@ function CheckoutModal({ cart, onClose }) {
               <Row
                 k={cart.planName + " · " + cart.tierLabel}
                 v={
-                  cart.seats +
+                  cart.branches +
                   " × " +
                   inr(cart.unit) +
                   (cart.cycle === "year" ? " × 12 months" : "")
                 }
               />
-              {cart.modules.length > 0 && (
-                <Row k="Add-ons" v={cart.modules.join(", ")} />
-              )}
+              {hasNeeds && <Row k="Extra features requested" v={cart.extraNeeds} />}
               <Row k="Subtotal" v={inr(cart.total)} />
               <Row k="GST 18%" v={inr(gst)} />
               <Row k="Payable now" v={inr(grand)} strong />
@@ -643,6 +627,12 @@ function CheckoutModal({ cart, onClose }) {
                 ? "Login details for " + form.email + " are on their way. Someone from onboarding will call " + form.phone + " today to set up your menu."
                 : "An invoice is on its way to " + form.email + ". Onboarding will call " + form.phone + " to move your menu and stock in."}
             </p>
+            {hasNeeds && (
+              <p className="ab-done-copy">
+                We've also got your note about what extra you need — expect a
+                follow-up email so you can confirm exactly what to add.
+              </p>
+            )}
             {!isFree && (
               <p className="ab-ref">
                 Payment reference <code>{paymentId}</code>
@@ -743,10 +733,14 @@ function Styles() {
 }
 .ab-stepper input:focus-visible{outline:2px solid var(--green);outline-offset:-2px}
 
-.ab-modules{border:1px dashed var(--line);border-radius:14px;padding:14px 16px;margin:0 0 18px}
-.ab-modules legend{padding:0 6px;font-size:13px;font-weight:600;color:var(--muted)}
-.ab-check{display:flex;gap:9px;align-items:center;font-size:14px;padding:4px 0;cursor:pointer}
-.ab-check input{width:16px;height:16px;accent-color:var(--green)}
+.ab-needs{border:1px dashed var(--line);border-radius:14px;padding:14px 16px;margin:0 0 18px}
+.ab-needs label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px}
+.ab-needs textarea{
+  width:100%;resize:vertical;min-height:64px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:10px;font:inherit;font-size:14px;background:#FCFDF9;
+}
+.ab-needs textarea:focus{outline:2px solid var(--green);outline-offset:-1px;background:#fff}
+.ab-needs-hint{margin:8px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted)}
 
 .ab-total{margin:0 0 20px;font-size:14.5px;color:var(--muted)}
 .ab-total strong{color:var(--ink);font-size:16px}
@@ -771,7 +765,6 @@ function Styles() {
 
 .ab-features{list-style:none;margin:26px 0 0;padding:22px 0 0;border-top:1px solid var(--line)}
 .ab-features li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;line-height:1.45;padding:7px 0}
-.ab-feature-added{color:var(--green-dark);font-weight:600}
 .ab-tick{width:18px;height:18px;flex:none;margin-top:1px;color:var(--green)}
 
 .ab-foot{max-width:1160px;margin:34px auto 0;font-size:13.5px;color:var(--muted)}
@@ -834,12 +827,3 @@ function Styles() {
     `}</style>
   );
 }
-
-/* ------------------------------------------------------------------
-   When you add the backend later, only two things change:
-   1. POST /api/orders  -> returns { order_id }. Pass it as order_id in
-      the Razorpay options object above (amount then comes from the order).
-   2. POST /api/verify  -> send razorpay_payment_id, razorpay_order_id and
-      razorpay_signature from the handler, activate the licence on success.
-   The form data in `form` is the payload for step 1.
-------------------------------------------------------------------- */

@@ -21,6 +21,7 @@ import MenuOrdering from "./sections/MenuOrdering";
 import TableFloor from "./sections/TableFloor";
 import Modules from "./sections/Modules";
 import CallToAction from "./sections/CallToAction";
+import KitchenOrders from "./pages/Kitchenorders";
 
 const Home = () => {
   // Set here rather than in index.html, which the admin app shares.
@@ -35,6 +36,7 @@ const Home = () => {
       <ServiceStory />
       <MenuOrdering />
       <TableFloor />
+      <KitchenOrders />
       <Modules />
       <CallToAction />
     </>
