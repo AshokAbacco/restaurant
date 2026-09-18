@@ -96,9 +96,9 @@ const TableFloor = () => {
     <section
       id="tables"
       className="relative border-b border-[#e0e4d8] bg-cover bg-center"
-      style={{
-        backgroundImage: "url('/images/table.png')",
-      }}
+      // style={{
+      //   backgroundImage: "url('/images/table.png')",
+      // }}
     >
 
       <div className="mx-auto grid w-full max-w-[1240px] grid-cols-1 items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:gap-20 lg:py-28">

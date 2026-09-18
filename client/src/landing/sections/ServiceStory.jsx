@@ -2,7 +2,7 @@
 // src/landing/sections/ServiceStory.jsx
 // ==============================================
 //
-// "How it works" — single-viewport layout with richer motion.
+// "How it works" — content-height layout with richer motion.
 //
 // Motion & hover in this version
 // - Photo frame tilts gently in 3D toward the cursor, with a soft light
@@ -19,6 +19,19 @@
 // - Everything uses one easing curve for a consistent feel, and all of it
 //   switches off under prefers-reduced-motion (tilt is also skipped on
 //   touch screens).
+//
+// Layout notes (responsive fix)
+// - Previously the section forced `lg:min-h-[calc(100svh-6rem)]` with
+//   `items-center`, so on any screen where the content was shorter than
+//   the viewport it got vertically centered inside a full-viewport box —
+//   producing the large empty bands above/below the content seen at
+//   1440px, 1024px and 2560px. The section now simply sizes to its
+//   content with normal, breakpoint-scaled padding.
+// - The photo frame's height was `min(calc(100svh-12rem), 640px)` — tied
+//   to viewport *height*, which shifts with browser chrome/zoom/devtools
+//   and caused the frame (and therefore the whole row) to jump around.
+//   It's now sized from viewport *width* via `clamp()`, which is stable
+//   and predictable across devices.
 //
 // Reads the same STORY object from landing.config — no config changes.
 
@@ -159,7 +172,12 @@ const ServiceStory = () => {
         className="pointer-events-none absolute -right-32 top-10 h-[320px] w-[320px] rounded-full bg-[#F2C94C]/[0.10] blur-3xl"
       />
 
-      <div className="ss-root relative mx-auto flex w-full max-w-[1240px] items-center px-5 py-16 sm:px-8 lg:min-h-[calc(100svh-6rem)] lg:py-10">
+      {/*
+        Content-driven container: no forced viewport-height min-height and
+        no vertical centering of the whole row within a tall box. Padding
+        scales gently across breakpoints instead.
+      */}
+      <div className="ss-root relative mx-auto w-full max-w-[1240px] px-5 py-12 sm:px-8 sm:py-16 lg:py-20 xl:py-24">
         <div
           className="grid w-full grid-cols-1 items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)] lg:gap-16"
           onMouseEnter={() => setPaused(true)}
@@ -180,7 +198,7 @@ const ServiceStory = () => {
           >
             <div
               ref={tiltRef}
-              className="ss-tilt group relative aspect-[4/3] w-full overflow-hidden rounded-[24px] bg-[#EEEBE0] shadow-[0_2px_4px_rgba(23,28,23,0.04),0_30px_60px_-30px_rgba(23,28,23,0.35)] ring-1 ring-[#171C17]/5 hover:shadow-[0_2px_4px_rgba(23,28,23,0.05),0_40px_80px_-30px_rgba(23,28,23,0.45)] lg:aspect-auto lg:h-[min(calc(100svh-12rem),640px)] lg:min-h-[460px]"
+              className="ss-tilt group relative aspect-[4/3] w-full overflow-hidden rounded-[24px] bg-[#EEEBE0] shadow-[0_2px_4px_rgba(23,28,23,0.04),0_30px_60px_-30px_rgba(23,28,23,0.35)] ring-1 ring-[#171C17]/5 hover:shadow-[0_2px_4px_rgba(23,28,23,0.05),0_40px_80px_-30px_rgba(23,28,23,0.45)] lg:aspect-auto lg:h-[clamp(420px,34vw,600px)]"
             >
               {steps.map((step, index) => {
                 const isActive = index === active;

@@ -2437,3 +2437,61 @@ model AuditLog {
   @@index([outletId])
   @@map("audit_logs")
 }
+
+// ==============================================
+// PRICING / SIGNUP PAYMENTS (server/src/pricing/)
+// ==============================================
+// One row per checkout attempt from the public Pricing page, created
+// BEFORE the restaurant has an Organization/Outlet/Owner — this is what
+// funds a signup, not what's billed after one exists. Deliberately has no
+// outletId/organizationId: no tenant exists yet when the row is written.
+// Free-trial selections are written straight to PAID with amount 0 and no
+// Razorpay order, so this table also doubles as the trial-signup log.
+enum PricingPaymentStatus {
+  CREATED // Razorpay order created, checkout not yet completed
+  PAID // signature verified (or webhook payment.captured), or a free trial
+  FAILED // Razorpay order/payment failed before a signature was produced
+  VERIFICATION_FAILED // checkout returned a payment id/signature that didn't verify
+}
+
+model PricingPayment {
+  id String @id @default(uuid())
+
+  // ---- What was selected on the Pricing page ----
+  planId       String // "free" | "monthly" | "yearly"
+  tierKey      String? // "standard" | "custom" (null for the free plan)
+  tierLabel    String?
+  billingCycle String // "trial" | "month" | "year"
+  branches     Int     @default(1)
+
+  // ---- Amounts, always server-computed (see pricing.plans.js), never
+  // trusted from the client — in whole rupees, not paise ----
+  unitAmount Int @default(0)
+  subtotal   Int @default(0)
+  gst        Int @default(0)
+  amount     Int @default(0) // subtotal + gst; what Razorpay was asked to collect
+
+  // ---- Contact/billing details collected on the checkout form ----
+  restaurantName String?
+  contactName    String?
+  email          String?
+  phone          String?
+  city           String?
+  gstin          String?
+  notes          String?
+  extraNeeds     String?
+
+  // ---- Razorpay linkage ----
+  razorpayOrderId   String? @unique
+  razorpayPaymentId String? @unique
+  razorpaySignature String?
+
+  status PricingPaymentStatus @default(CREATED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@map("pricing_payments")
+}

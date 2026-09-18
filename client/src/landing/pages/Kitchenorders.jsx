@@ -37,10 +37,15 @@ const ORDER_ITEMS = [
 
 export default function KitchenOrders() {
   return (
-    <section className="bg-[#FAF9F5] px-6 py-20 sm:px-10 lg:px-16">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-14 lg:grid-cols-2 lg:gap-20">
-        {/* Left: copy */}
-        <div>
+   <section
+        className="relative px-6 py-20 sm:px-10 lg:px-16 bg-cover bg-center"
+        style={{ backgroundImage: "url('/images/image.png')" }}
+      >
+        {/* Overlay (VERY IMPORTANT) */}
+        <div className="absolute inset-0 bg-[#FAF9F5]/50 backdrop-blur-[1px]" />
+
+        <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-14 lg:grid-cols-2 lg:gap-20">
+          <div>
           <span className="text-sm font-medium text-emerald-700">Kitchen orders</span>
           <h2 className="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
             One tap, one order,

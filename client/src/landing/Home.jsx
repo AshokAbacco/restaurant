@@ -22,6 +22,7 @@ import TableFloor from "./sections/TableFloor";
 import Modules from "./sections/Modules";
 import CallToAction from "./sections/CallToAction";
 import KitchenOrders from "./pages/Kitchenorders";
+import BillingPayments from "./pages/Billingpayments";
 
 const Home = () => {
   // Set here rather than in index.html, which the admin app shares.
@@ -37,6 +38,7 @@ const Home = () => {
       <MenuOrdering />
       <TableFloor />
       <KitchenOrders />
+      <BillingPayments/>
       <Modules />
       <CallToAction />
     </>
