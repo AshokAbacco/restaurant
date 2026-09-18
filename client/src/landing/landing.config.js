@@ -355,11 +355,11 @@ export const MODULES = {
       title: "Expenses",
       body: "Daily purchases, vendor payments and petty cash logged against the outlet they belong to.",
     },
-    {
-      icon: "wifi",
-      title: "Works offline",
-      body: "Service doesn't stop when the connection does. Orders and bills queue on the device and sync when it's back.",
-    },
+    // {
+    //   icon: "wifi",
+    //   title: "Works offline",
+    //   body: "Service doesn't stop when the connection does. Orders and bills queue on the device and sync when it's back.",
+    // },
     {
       icon: "layers",
       title: "Multiple outlets",

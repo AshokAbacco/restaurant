@@ -1,21 +1,18 @@
+
+
+
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  createPricingOrder,
+  verifyPricingPayment,
+} from "./pricingApi.js";
 
-/* ------------------------------------------------------------------
-   Abacco — Pricing (UI only, no backend)
-
-   Razorpay: replace RAZORPAY_KEY with your publishable key id.
-   While the key is still the placeholder below, the Pay button runs in
-   demo mode (fake payment id) so the flow can be clicked through.
-   For live payments you still need one backend call to create an
-   order_id and one to verify the signature — see notes at the bottom.
-
-   Pricing model: per branch/outlet, not per user. A "Standard" plan
-   at ₹650/branch/month costs ₹1300/month for 2 branches, and so on.
-   Custom tier keeps the same feature list as Standard — clients who
-   want something extra just tell us in the message box below.
-------------------------------------------------------------------- */
-
-const RAZORPAY_KEY = "rzp_test_XXXXXXXXXXXXXX";
+// The Key ID is meant to be public (it identifies the account to Razorpay's
+// checkout widget, and is embedded in every Checkout.js call by design) —
+// unlike the Key Secret, which stays server-only and is never sent to the
+// browser. Set it in the frontend's .env as VITE_RAZORPAY_KEY_ID.
+const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
 const inr = (n) => "₹" + new Intl.NumberFormat("en-IN").format(Math.round(n));
 
@@ -351,12 +348,14 @@ function Tick() {
 /* ================= checkout modal ================= */
 
 function CheckoutModal({ cart, onClose }) {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1 details · 2 review+pay · 3 done
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [paying, setPaying] = useState(false);
   const [failure, setFailure] = useState("");
   const [paymentId, setPaymentId] = useState("");
+  const [paymentRecordId, setPaymentRecordId] = useState("");
   const boxRef = useRef(null);
 
   const isFree = cart.planId === "free";
@@ -395,13 +394,41 @@ function CheckoutModal({ cart, onClose }) {
     return Object.keys(e).length === 0;
   };
 
-  const next = () => {
+  const buildContact = () => ({
+    restaurant: form.restaurant.trim(),
+    name: form.name.trim(),
+    email: form.email.trim(),
+    phone: form.phone.replace(/\D/g, ""),
+    city: form.city.trim(),
+    gstin: form.gstin.trim(),
+    notes: form.notes.trim(),
+    extraNeeds: cart.extraNeeds || "",
+  });
+
+  const next = async () => {
     if (!validate()) return;
+
     if (isFree) {
-      setPaymentId("trial");
-      setStep(3);
+      setFailure("");
+      setPaying(true);
+      try {
+        const result = await createPricingOrder({
+          planId: cart.planId.toLowerCase(),   // ✅ FIX
+          tierKey: cart.tierKey.toLowerCase(), // ✅ FIX
+          branches: cart.branches,
+          contact: buildContact(),
+        });
+        setPaymentRecordId(result.paymentRecordId);
+        setPaymentId("trial");
+        setStep(3);
+      } catch (err) {
+        setFailure(err.message || "Could not start the free trial. Try again.");
+      } finally {
+        setPaying(false);
+      }
       return;
     }
+
     setStep(2);
   };
 
@@ -418,26 +445,49 @@ function CheckoutModal({ cart, onClose }) {
   const pay = async () => {
     setFailure("");
     setPaying(true);
-    const ready = await loadRazorpay();
-    const demo = !ready || RAZORPAY_KEY.includes("XXXX");
 
-    if (demo) {
-      // No key / no backend yet: show the rest of the flow anyway.
-      setTimeout(() => {
-        setPaymentId("pay_demo_" + Math.random().toString(36).slice(2, 12));
-        setPaying(false);
-        setStep(3);
-      }, 1100);
+    const ready = await loadRazorpay();
+    if (!ready) {
+      setPaying(false);
+      setFailure("Could not load Razorpay. Check your connection and try again.");
       return;
     }
 
+    // 1. Ask the backend for a real order — the amount charged is always
+    //    computed server-side from planId/tierKey/branches, never taken
+    //    from `grand` here, so nothing typed into devtools can change what
+    //    gets billed.
+    let order;
+    try {
+      order = await createPricingOrder({
+        planId: cart.planId.toLowerCase(),   // ✅ FIX
+        tierKey: cart.tierKey.toLowerCase(), // ✅ FIX
+        branches: cart.branches,
+        contact: buildContact(),
+      });
+    }catch (err) {
+      console.log("❌ FULL ERROR:", err);   // 👈 ADD THIS
+      console.log("❌ RESPONSE:", err?.response?.data); // 👈 ADD THIS
+
+      setPaying(false);
+      setFailure(
+        err?.response?.data?.message || 
+        err.message || 
+        "Could not start checkout. Try again."
+      );
+      return;
+    }
+
+    setPaymentRecordId(order.paymentRecordId);
+
+    // 2. Open Razorpay Checkout against that order.
     const rzp = new window.Razorpay({
-      key: RAZORPAY_KEY,
-      amount: grand * 100, // paise
-      currency: "INR",
+      key: order.keyId || RAZORPAY_KEY,
+      amount: order.amount, // paise, as returned by the backend
+      currency: order.currency || "INR",
+      order_id: order.orderId,
       name: "Abacco",
       description: cart.planName + " · " + cart.tierLabel,
-      // order_id: "<from your server>",
       prefill: {
         name: form.name,
         email: form.email,
@@ -452,10 +502,27 @@ function CheckoutModal({ cart, onClose }) {
         extra_needs: cart.extraNeeds || "",
       },
       theme: { color: "#1FA84F" },
-      handler: (res) => {
-        setPaymentId(res.razorpay_payment_id);
-        setPaying(false);
-        setStep(3);
+      // 3. On success, verify the signature with the backend — the
+      //    payment is only treated as real once /verify-payment confirms
+      //    it, not the moment this callback fires.
+      handler: async (res) => {
+        try {
+          const verification = await verifyPricingPayment({
+            razorpay_order_id: res.razorpay_order_id,
+            razorpay_payment_id: res.razorpay_payment_id,
+            razorpay_signature: res.razorpay_signature,
+          });
+          setPaymentId(verification.razorpayPaymentId);
+          setPaymentRecordId(verification.paymentRecordId);
+          setPaying(false);
+          setStep(3);
+        } catch (err) {
+          setPaying(false);
+          setFailure(
+            err.message ||
+              "Payment went through but verification failed. Contact support with your payment id before retrying.",
+          );
+        }
       },
       modal: { ondismiss: () => setPaying(false) },
     });
@@ -468,6 +535,29 @@ function CheckoutModal({ cart, onClose }) {
     });
 
     rzp.open();
+  };
+
+  // Step 3 "Done": for a paid plan this is a genuine, verified payment; for
+  // the free plan it's the trial signup record. Either way, hand off to
+  // Register with enough context to prefill/link the account being created.
+  const goToRegister = () => {
+    const params = new URLSearchParams({
+      paymentId: paymentRecordId || "",
+      plan: cart.planId,
+    });
+    navigate(`/register?${params.toString()}`, {
+      state: {
+        paymentRecordId,
+        planId: cart.planId,
+        prefill: {
+          restaurantName: form.restaurant,
+          fullName: form.name,
+          email: form.email,
+          phone: form.phone,
+          address: form.city,
+        },
+      },
+    });
   };
 
   return (
@@ -518,7 +608,7 @@ function CheckoutModal({ cart, onClose }) {
                 value={form.name}
                 onChange={set("name")}
                 error={errors.name}
-                placeholder="Rasul Abacco"
+                placeholder="Ramesh Kumar"
               />
               <Field
                 label="Email"
@@ -557,12 +647,22 @@ function CheckoutModal({ cart, onClose }) {
               />
             </div>
 
+            {failure && <p className="ab-error-banner">{failure}</p>}
+
             <div className="ab-modal-foot">
               <span className="ab-foot-amount">
                 {isFree ? "Nothing to pay today" : inr(grand) + " including GST"}
               </span>
-              <button className="ab-btn ab-btn-dark ab-btn-inline" onClick={next}>
-                {isFree ? "Start free trial" : "Continue to payment"}
+              <button
+                className="ab-btn ab-btn-dark ab-btn-inline"
+                onClick={next}
+                disabled={paying}
+              >
+                {isFree
+                  ? paying
+                    ? "Starting trial…"
+                    : "Start free trial"
+                  : "Continue to payment"}
               </button>
             </div>
           </div>
@@ -638,8 +738,11 @@ function CheckoutModal({ cart, onClose }) {
                 Payment reference <code>{paymentId}</code>
               </p>
             )}
-            <button className="ab-btn ab-btn-dark ab-btn-inline" onClick={onClose}>
-              Done
+            <button
+              className="ab-btn ab-btn-dark ab-btn-inline"
+              onClick={goToRegister}
+            >
+              Continue to registration
             </button>
           </div>
         )}
