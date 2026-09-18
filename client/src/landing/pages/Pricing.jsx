@@ -518,7 +518,7 @@ function CheckoutModal({ cart, onClose }) {
                 value={form.name}
                 onChange={set("name")}
                 error={errors.name}
-                placeholder="Rasul Abacco"
+                placeholder="Ramesh Kumar"
               />
               <Field
                 label="Email"

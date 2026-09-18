@@ -93,7 +93,14 @@ const TableFloor = () => {
   const artRef = useReveal();
 
   return (
-    <section id="tables" className="border-b border-[#e0e4d8] bg-white/50">
+    <section
+      id="tables"
+      className="relative border-b border-[#e0e4d8] bg-cover bg-center"
+      style={{
+        backgroundImage: "url('/images/table.png')",
+      }}
+    >
+
       <div className="mx-auto grid w-full max-w-[1240px] grid-cols-1 items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:gap-20 lg:py-28">
         <div ref={artRef} className="lp-reveal lg:order-1 lg:pr-6">
           <FloorPlan
@@ -129,7 +136,7 @@ const TableFloor = () => {
                   {point.title}
                 </dt>
 
-                <dd className="mt-1.5 max-w-[34rem] text-[14.5px] leading-[1.65] text-[#6B7280] sm:mt-0">
+                <dd className="mt-1.5 max-w-[34rem] text-[14.5px] leading-[1.65] text-black-900 sm:mt-0">
                   {point.body}
                 </dd>
               </div>

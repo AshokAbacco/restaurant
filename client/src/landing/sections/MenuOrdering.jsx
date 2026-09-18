@@ -96,7 +96,12 @@ const MenuOrdering = () => {
   const artRef = useReveal();
 
   return (
-    <section id="menu" className="border-b border-[#e0e4d8]">
+    <section id="menu"   className="relative border-b border-[#e0e4d8] bg-cover bg-center"
+        style={{
+          backgroundImage: "url('/images/Menu.png')",
+        }}
+      
+    >
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20 lg:py-28">
         <div ref={copyRef} className="lp-reveal">
           <p className="text-[13.5px] font-semibold text-[#3FA34D]">
