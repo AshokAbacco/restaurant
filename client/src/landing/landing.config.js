@@ -326,6 +326,11 @@ export const MODULES = {
     "Everything a floor manager opens in a day, under one login and one set of numbers.",
   items: [
     {
+      icon: "ticket",
+      title: "Orders and kitchen display",
+      body: "Tickets that fire to the right station, with modifiers and notes attached. Each item is marked ready as it leaves the pass, so the floor knows what to pick up without asking.",
+    },
+    {
       icon: "printer",
       title: "Billing and GST",
       body: "Tax-compliant invoices, split bills, discounts and rounding, printed on the thermal printer you already have.",

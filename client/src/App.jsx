@@ -21,6 +21,7 @@ import Home from "./landing/Home";
 import ComingSoon from "./landing/ComingSoon";
 import Pricing from "./landing/pages/Pricing";
 import ContactUs from "./landing/pages/ContactUs";
+import GlowCursor from "@/components/GlowCursor";
 // ==============================================
 // Auth
 // ==============================================
@@ -90,8 +91,24 @@ function App() {
     // The outer boundary covers the shells — auth layout, admin layout,
     // kiosk. Nothing inside the public site suspends, so a first-time
     // visitor never sees this fallback at all.
+    <>
+<GlowCursor
+  style={{
+    position: "fixed",
+    inset: 0,
+    zIndex: 9999,
+    pointerEvents: "none",
+    width: "100vw",
+    height: "100vh",
+  }}
+  blendMode="normal"
+  color="#09a743"
+  secondaryColor="#3fa34d"
+/>
     <Suspense fallback={<RouteFallback />}>
+     
       <Routes>
+          
         {/* ==========================================
           PUBLIC SITE
           (Navbar + Footer, no login required)
@@ -219,6 +236,7 @@ function App() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>
+    </>
   );
 }
 

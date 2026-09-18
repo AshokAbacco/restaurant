@@ -605,3 +605,32 @@
     transform: none;
   }
 }
+
+/* Continuous animated gradient border for the order screen miniature */
+.lp-gradient-border {
+  position: relative;
+  padding: 2px;
+  background: linear-gradient(
+    120deg,
+    #3fa34d 0%,
+    #cfe8d6 25%,
+    #3fa34d 50%,
+    #a7d7b5 75%,
+    #3fa34d 100%
+  );
+  background-size: 300% 300%;
+  animation: lp-border-flow 6s ease infinite;
+}
+
+@keyframes lp-border-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+

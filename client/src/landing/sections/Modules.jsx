@@ -11,12 +11,14 @@ import {
   FiTrendingUp,
   FiUsers,
   FiWifi,
+  FiClipboard , 
 } from "react-icons/fi";
 
 import { MODULES } from "../landing.config";
 import { useReveal } from "../hooks/useLandingMotion";
 
 const ICONS = {
+  ticket: FiClipboard ,
   printer: FiPrinter,
   box: FiBox,
   users: FiUsers,
