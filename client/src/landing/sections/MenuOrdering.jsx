@@ -20,71 +20,73 @@ import { useReveal } from "../hooks/useLandingMotion";
 // ==============================================
 
 const OrderScreen = ({ ticket }) => (
-  <figure className="overflow-hidden rounded-[26px] border border-[#e0e4d8] bg-white shadow-[0_36px_80px_-52px_rgba(23,28,23,0.7)]">
-    <div className="flex items-center justify-between border-b border-[#e0e4d8] bg-[#F3F5EE] px-5 py-3.5">
-      <span className="lp-title text-[15px] text-[#171C17]">
-        {ticket.heading}
-      </span>
+  <div className="lp-gradient-border rounded-[28px]">
+    <figure className="overflow-hidden rounded-[26px] bg-white shadow-[0_36px_80px_-52px_rgba(23,28,23,0.7)]">
+      <div className="flex items-center justify-between border-b border-[#e0e4d8] bg-[#F3F5EE] px-5 py-3.5">
+        <span className="lp-title text-[15px] text-[#171C17]">
+          {ticket.heading}
+        </span>
 
-      <span className="rounded-full bg-white px-2.5 py-1 text-[11.5px] font-medium text-[#6B7280]">
-        Dine in
-      </span>
-    </div>
+        <span className="rounded-full bg-white px-2.5 py-1 text-[11.5px] font-medium text-[#6B7280]">
+          Dine in
+        </span>
+      </div>
 
-    <ul className="divide-y divide-[#eef1e8]">
-      {ticket.lines.map((line) => (
-        <li key={line.name} className="flex items-start gap-3 px-5 py-3.5">
-          <span className="lp-nums mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-[#3FA34D]/10 text-[12.5px] font-bold text-[#3FA34D]">
-            {line.qty}
-          </span>
-
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[14.5px] font-medium text-[#1F2937]">
-              {line.name}
+      <ul className="divide-y divide-[#eef1e8]">
+        {ticket.lines.map((line) => (
+          <li key={line.name} className="flex items-start gap-3 px-5 py-3.5">
+            <span className="lp-nums mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-[#3FA34D]/10 text-[12.5px] font-bold text-[#3FA34D]">
+              {line.qty}
             </span>
 
-            {line.note && (
-              <span className="mt-0.5 block text-[12.5px] text-[#8a5a07]">
-                {line.note}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[14.5px] font-medium text-[#1F2937]">
+                {line.name}
               </span>
-            )}
-          </span>
 
-          <span className="lp-nums shrink-0 text-[14px] font-semibold text-[#171C17]">
-            {line.price}
-          </span>
-        </li>
-      ))}
-    </ul>
+              {line.note && (
+                <span className="mt-0.5 block text-[12.5px] text-[#8a5a07]">
+                  {line.note}
+                </span>
+              )}
+            </span>
 
-    <div className="flex items-center justify-between border-t border-[#e0e4d8] px-5 py-4">
-      <span className="text-[13px] text-[#6B7280]">Total</span>
+            <span className="lp-nums shrink-0 text-[14px] font-semibold text-[#171C17]">
+              {line.price}
+            </span>
+          </li>
+        ))}
+      </ul>
 
-      <span className="lp-nums lp-title text-[19px] text-[#171C17]">
-        {ticket.total}
-      </span>
-    </div>
+      <div className="flex items-center justify-between border-t border-[#e0e4d8] px-5 py-4">
+        <span className="text-[13px] text-[#6B7280]">Total</span>
 
-    {/* Not real buttons: this is a picture of a screen, and a keyboard
-        user tabbing through a marketing page shouldn't land on controls
-        that do nothing. */}
-    <div
-      aria-hidden="true"
-      className="grid grid-cols-2 gap-2 border-t border-[#e0e4d8] bg-[#F3F5EE] p-3"
-    >
-      <span className="rounded-xl bg-white py-2.5 text-center text-[13.5px] font-semibold text-[#171C17]">
-        Save
-      </span>
+        <span className="lp-nums lp-title text-[19px] text-[#171C17]">
+          {ticket.total}
+        </span>
+      </div>
 
-      <span className="rounded-xl bg-[#3FA34D] py-2.5 text-center text-[13.5px] font-semibold text-white">
-        Send to kitchen
-      </span>
-    </div>
+      {/* Not real buttons: this is a picture of a screen, and a keyboard
+          user tabbing through a marketing page shouldn't land on controls
+          that do nothing. */}
+      <div
+        aria-hidden="true"
+        className="grid grid-cols-2 gap-2 border-t border-[#e0e4d8] bg-[#F3F5EE] p-3"
+      >
+        <span className="rounded-xl bg-white py-2.5 text-center text-[13.5px] font-semibold text-[#171C17]">
+          Save
+        </span>
 
-    <figcaption className="border-t border-[#e0e4d8] px-5 py-3 text-[12.5px] text-[#6B7280]">
-      The order screen a waiter sees at the table.
-    </figcaption>
-  </figure>
+        <span className="rounded-xl bg-[#3FA34D] py-2.5 text-center text-[13.5px] font-semibold text-white">
+          Send to kitchen
+        </span>
+      </div>
+
+      <figcaption className="border-t border-[#e0e4d8] px-5 py-3 text-[12.5px] text-[#6B7280]">
+        The order screen a waiter sees at the table.
+      </figcaption>
+    </figure>
+  </div>
 );
 
 // ==============================================
