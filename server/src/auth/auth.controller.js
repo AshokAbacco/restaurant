@@ -52,6 +52,7 @@ export const registerHandler = async (req, res) => {
     success: true,
     message: result.message,
     owner: result.owner,
+    plan: result.plan,
   });
 };
 

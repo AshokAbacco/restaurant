@@ -1,25 +1,5 @@
 // ==============================================
 // src/settings/branches/BranchesSettings.jsx
-// ==============================================
-// Owner-facing management for the organization's outlets (branches).
-//
-// These are the same records that appear on the login "Choose an outlet"
-// screen and in the header OutletSwitcher — both read
-// resolveAccessibleOutlets() in auth.service.js, which returns every
-// isActive outlet in the organization for OWNER/ADMIN. So anything created
-// here shows up in both places on the next login/refresh.
-//
-// Backed by /api/stores (server/src/stores/) — already built; this page is
-// just the UI for it. Note the role split enforced there:
-//   GET/PUT  -> OWNER, ADMIN, MANAGER   (mount-level guard in index.js)
-//   POST/DEL -> OWNER only              (extra requireRole in stores.routes.js)
-// so the Add/Delete controls are hidden for non-owners rather than letting
-// them click through to a 403.
-//
-// This supersedes the old Expenses -> Stores page, which sat next to
-// suppliers and purchase orders where "Stores" reads as storerooms rather
-// than branches, and which had no GSTIN field even though the backend
-// accepts one and invoices are per-outlet.
 
 import React, { useEffect, useState } from "react";
 import {
@@ -57,6 +37,12 @@ const BranchesSettings = () => {
   const currentOutletId = user?.outlet?.id;
 
   const [branches, setBranches] = useState([]);
+  // What the purchased plan allows vs what's in use. Comes from
+  // GET /api/stores/usage, which derives it from Organization.branchLimit
+  // (stamped at registration from the PricingPayment). Null until loaded —
+  // the Add button stays hidden until we actually know, so a slow response
+  // can't briefly offer an action the plan doesn't permit.
+  const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -71,12 +57,28 @@ const BranchesSettings = () => {
   async function load() {
     setLoading(true);
     setError("");
-    const { ok, data } = await apiRequest("/stores");
-    if (!ok) {
-      setError(data?.message || data?.error || "Failed to load branches.");
+
+    // Fired together rather than in sequence: the usage counter and the
+    // list are rendered in the same header row, and loading them one after
+    // the other makes that row visibly reflow.
+    const [listRes, usageRes] = await Promise.all([
+      apiRequest("/stores"),
+      apiRequest("/stores/usage"),
+    ]);
+
+    if (!listRes.ok) {
+      setError(
+        listRes.data?.message || listRes.data?.error || "Failed to load branches.",
+      );
     } else {
-      setBranches(Array.isArray(data) ? data : []);
+      setBranches(Array.isArray(listRes.data) ? listRes.data : []);
     }
+
+    // A failed usage lookup is not worth blocking the page for — the list
+    // still renders, and the server enforces the limit regardless of what
+    // this component believes. Add Branch just stays hidden until it works.
+    setUsage(usageRes.ok ? usageRes.data : null);
+
     setLoading(false);
   }
 
@@ -155,6 +157,10 @@ const BranchesSettings = () => {
       setFormError(
         data?.message || data?.error || "Couldn't save that branch.",
       );
+      // A 403 for BRANCH_LIMIT_REACHED carries the current usage with it,
+      // so the counter corrects itself from the same response instead of
+      // needing another round trip.
+      if (data?.usage) setUsage(data.usage);
       return;
     }
 
@@ -192,6 +198,7 @@ const BranchesSettings = () => {
     });
     if (!ok) {
       setError(data?.message || data?.error || "Couldn't restore that branch.");
+      if (data?.usage) setUsage(data.usage);
       return;
     }
     setNotice(`"${branch.name}" restored. It's back in the outlet picker.`);
@@ -263,19 +270,59 @@ const BranchesSettings = () => {
           </div>
         )}
 
+        {isOwner && usage && !usage.canAddMore && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-5 py-4 text-amber-800 dark:text-amber-300">
+            <FiAlertCircle className="mt-0.5 shrink-0" />
+            <span>
+              You&apos;re using all{" "}
+              <strong>
+                {usage.limit} branch{usage.limit === 1 ? "" : "es"}
+              </strong>{" "}
+              included in your plan. To add another, upgrade your plan — or
+              deactivate a branch you no longer operate to free up its slot.
+            </span>
+          </div>
+        )}
+
         <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-              {branches.length} branch{branches.length === 1 ? "" : "es"}
-            </h2>
-            {isOwner && !isFormOpen && (
-              <button
-                onClick={startCreate}
-                className="flex items-center gap-2 rounded-lg bg-emerald-600 dark:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 dark:hover:bg-emerald-600"
-              >
-                <FiPlus /> Add Branch
-              </button>
-            )}
+            <div>
+              <h2 className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                {branches.length} branch{branches.length === 1 ? "" : "es"}
+              </h2>
+              {usage && (
+                // Counts ACTIVE branches only, matching what the server
+                // enforces — a deactivated branch still shows in the list
+                // below but doesn't hold a plan slot.
+                <p className="mt-0.5 text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+                  {usage.used} of {usage.limit} included in your plan in use
+                </p>
+              )}
+            </div>
+
+            {isOwner &&
+              !isFormOpen &&
+              (usage?.canAddMore ? (
+                <button
+                  onClick={startCreate}
+                  className="flex items-center gap-2 rounded-lg bg-emerald-600 dark:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 dark:hover:bg-emerald-600"
+                >
+                  <FiPlus /> Add Branch
+                </button>
+              ) : usage ? (
+                // Rendered as a disabled control rather than removed: a
+                // button that silently vanishes reads as a bug, whereas a
+                // greyed-out one with a reason explains itself.
+                <button
+                  disabled
+                  title={`Your plan includes ${usage.limit} branch${
+                    usage.limit === 1 ? "" : "es"
+                  }.`}
+                  className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-gray-200 dark:bg-[#262B24] px-4 py-2 text-sm font-semibold text-gray-500 dark:text-[#6B7280]"
+                >
+                  <FiPlus /> Plan limit reached
+                </button>
+              ) : null)}
           </div>
 
           {editingId === "new" && (

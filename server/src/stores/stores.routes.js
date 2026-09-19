@@ -5,6 +5,10 @@ import { requireRole } from "../auth/auth.middleware.js";
 const router = Router();
 
 router.get("/", storeController.getAllStores);
+// MUST stay above "/:id" — Express matches in registration order, so the
+// other way round this request is read as "fetch the outlet whose id is
+// 'usage'" and 404s.
+router.get("/usage", storeController.getBranchUsage);
 router.get("/:id", storeController.getStoreById);
 // Creating/deactivating an outlet is a bigger action than day-to-day
 // management (the outer /api/stores mount already allows OWNER/ADMIN/

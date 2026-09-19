@@ -327,8 +327,8 @@ export const MODULES = {
   items: [
     {
       icon: "ticket",
-      title: "Orders and kitchen display",
-      body: "Tickets that fire to the right station, with modifiers and notes attached. Each item is marked ready as it leaves the pass, so the floor knows what to pick up without asking.",
+      title: "Orders and kitchen",
+      body: "Tickets that fire to the right station, with modifiers and notes attached. Each item is marked ready as it leaves the pass",
     },
     {
       icon: "printer",

@@ -1,6 +1,33 @@
 // ==============================================
 // server/src/pricing/pricing.service.js
 // ==============================================
+//
+// WRITE-ON-SUCCESS RULE
+// ---------------------
+// A PricingPayment row is written ONLY when money has actually changed
+// hands: a Razorpay signature that verifies, a payment.captured webhook, or
+// a zero-amount free trial. A checkout that is cancelled, dismissed,
+// abandoned or declined leaves NO row behind.
+//
+// That is a deliberate reversal of how this module used to work. The old
+// flow created the row up front with status CREATED and patched it to
+// PAID/FAILED afterwards, which meant the table filled up with rows for
+// people who never paid — and, worse, handed out a real paymentRecordId to
+// the browser BEFORE payment, which the Register page then accepted as
+// proof of purchase.
+//
+// The consequence of not writing early is that the selection (plan, tier,
+// branch count) and the billing contact have nowhere on our side to live
+// between "order created" and "payment captured". They are therefore
+// stashed in the Razorpay order's own `notes`, and read back out of it with
+// orders.fetch() at capture time. Razorpay is the system of record for that
+// window, which is appropriate: it is also the only party that knows
+// whether the payment happened.
+//
+// The amount is NEVER read back from notes — it is always recomputed from
+// planId/tierKey/branches through priceQuote(), so a tampered note could at
+// worst misdescribe an order, never change what was charged or what
+// entitlement is granted.
 
 import crypto from "crypto";
 import prisma from "../../prisma/client.js";
@@ -11,14 +38,23 @@ import razorpay, {
 } from "../config/razorpay.js";
 import { priceQuote } from "./pricing.plans.js";
 
+// Razorpay caps each note value at 256 chars and allows at most 15 keys.
+// Exceeding either makes the whole orders.create call fail, which would
+// present to the user as "couldn't start checkout" — so clamp rather than
+// risk it. We use 11 keys; the free headroom is intentional.
+const NOTE_MAX = 250;
+const note = (value) => String(value ?? "").slice(0, NOTE_MAX);
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_PATTERN = /^[6-9]\d{9}$/;
+
 // ==============================================
 // POST /api/pricing/create-order
 // ==============================================
-// Creates the PricingPayment row first (status CREATED) so that even if
-// Razorpay's API call fails, or the user never completes checkout, there is
-// a durable record of the attempt with the server-computed amount tied to
-// it. The Free plan short-circuits: no Razorpay order is needed, the row is
-// written straight to PAID.
+// Paid plans: creates a Razorpay order and NOTHING in our database.
+// Free plan: there is no payment to wait for, so the row is written here
+// and is immediately PAID with amount 0 — this table doubles as the
+// trial-signup log.
 export const createOrder = async ({
   planId,
   tierKey,
@@ -43,20 +79,31 @@ export const createOrder = async ({
     extraNeeds = "",
   } = contact;
 
-  if (!quote.isFree) {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-      return { success: false, status: 400, message: "A valid email is required." };
-    }
-    if (!phone || !/^[6-9]\d{9}$/.test(String(phone).replace(/\D/g, ""))) {
-      return { success: false, status: 400, message: "A valid 10-digit mobile number is required." };
-    }
+  // Required for both flows now, not just paid ones: the Register page
+  // prefills itself from these, so a signup with no email or phone recorded
+  // would strand the user on a half-empty form with fields they can't edit.
+  if (!email || !EMAIL_PATTERN.test(email)) {
+    return { success: false, status: 400, message: "A valid email is required." };
+  }
+  if (!phone || !PHONE_PATTERN.test(String(phone).replace(/\D/g, ""))) {
+    return {
+      success: false,
+      status: 400,
+      message: "A valid 10-digit mobile number is required.",
+    };
+  }
+  if (!restaurant.trim()) {
+    return { success: false, status: 400, message: "Restaurant name is required." };
+  }
+  if (!name.trim()) {
+    return { success: false, status: 400, message: "Your name is required." };
   }
 
-  // ---- Free plan: no payment, no Razorpay order ----
-  if (planId === "free" || quote.total === 0) {
+  // ---- Free plan: no payment, no Razorpay order, record it now ----
+  if (quote.isFree) {
     const record = await prisma.pricingPayment.create({
       data: {
-        planId,
+        planId: quote.planId,
         tierKey: quote.tierKey,
         tierLabel: quote.tierLabel,
         billingCycle: quote.cycle,
@@ -81,10 +128,11 @@ export const createOrder = async ({
       success: true,
       isFree: true,
       paymentRecordId: record.id,
+      branches: record.branches,
     };
   }
 
-  // ---- Paid plans: create a real Razorpay order ----
+  // ---- Paid plans ----
   if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
     return {
       success: false,
@@ -93,47 +141,34 @@ export const createOrder = async ({
     };
   }
 
-  const record = await prisma.pricingPayment.create({
-    data: {
-      planId,
-      tierKey: quote.tierKey,
-      tierLabel: quote.tierLabel,
-      billingCycle: quote.cycle,
-      branches: quote.branches,
-      unitAmount: quote.unit,
-      subtotal: quote.subtotal,
-      gst: quote.gst,
-      amount: quote.total,
-      restaurantName: restaurant,
-      contactName: name,
-      email,
-      phone,
-      city,
-      gstin,
-      notes,
-      extraNeeds,
-      status: "CREATED",
-    },
-  });
-
   let order;
   try {
     order = await razorpay.orders.create({
       amount: quote.total * 100, // paise
       currency: "INR",
-      receipt: record.id,
+      // Receipt is capped at 40 chars by Razorpay. There is no local row to
+      // point at any more, so this is just a readable correlation id for
+      // the Razorpay dashboard.
+      receipt: `abacco_${crypto.randomBytes(12).toString("hex")}`,
       notes: {
-        pricingPaymentId: record.id,
-        plan: quote.planName,
-        tier: quote.tierLabel,
-        branches: String(quote.branches),
+        // The selection — everything needed to re-derive the price and the
+        // branch entitlement at capture time.
+        planId: note(quote.planId),
+        tierKey: note(quote.tierKey),
+        branches: note(quote.branches),
+        // The billing contact — everything the Register page prefills from.
+        restaurant: note(restaurant),
+        name: note(name),
+        email: note(email),
+        phone: note(String(phone).replace(/\D/g, "")),
+        city: note(city),
+        gstin: note(gstin),
+        customerNotes: note(notes),
+        extraNeeds: note(extraNeeds),
       },
     });
   } catch (err) {
-    await prisma.pricingPayment.update({
-      where: { id: record.id },
-      data: { status: "FAILED" },
-    });
+    console.error("Razorpay order creation failed:", err);
     return {
       success: false,
       status: 502,
@@ -141,22 +176,107 @@ export const createOrder = async ({
     };
   }
 
-  const updated = await prisma.pricingPayment.update({
-    where: { id: record.id },
-    data: { razorpayOrderId: order.id },
-  });
-
+  // NOTE: no paymentRecordId is returned here, because no record exists
+  // yet. The client gets one only from verify-payment, once the payment is
+  // real. Anything that hands the browser an id before that point is
+  // handing it a forgeable proof of purchase.
   return {
     success: true,
     isFree: false,
-    paymentRecordId: updated.id,
     orderId: order.id,
     amount: order.amount, // paise, echoed back so the client doesn't recompute
     currency: order.currency,
     keyId: RAZORPAY_KEY_ID,
     planName: quote.planName,
     tierLabel: quote.tierLabel,
+    branches: quote.branches,
   };
+};
+
+// ==============================================
+// Shared persist step
+// ==============================================
+// Called from BOTH verifyPayment (browser came back with a signature) and
+// handleWebhook (Razorpay told us server-to-server). Whichever arrives
+// first writes the row; the other finds it and returns it unchanged.
+//
+// Idempotency rests on PricingPayment.razorpayOrderId being @unique: even
+// if the two paths race, the second create throws P2002 and is resolved by
+// re-reading the row rather than producing a duplicate.
+const persistPaidPayment = async (order, { paymentId, signature = null }) => {
+  const existing = await prisma.pricingPayment.findUnique({
+    where: { razorpayOrderId: order.id },
+  });
+  if (existing) return existing;
+
+  const n = order.notes || {};
+
+  // Re-derived, never read back as an amount. If the notes were somehow
+  // mangled, fall back to describing the order from what Razorpay itself
+  // holds rather than throwing away a real payment.
+  let quote;
+  try {
+    quote = priceQuote({
+      planId: n.planId,
+      tierKey: n.tierKey,
+      branches: n.branches,
+    });
+  } catch (err) {
+    console.error(
+      `Could not re-derive the quote for Razorpay order ${order.id}:`,
+      err.message,
+    );
+    quote = null;
+  }
+
+  // Sanity check: the order was created from this same function, so a
+  // mismatch means the notes no longer describe the order. Log loudly and
+  // record what was actually collected.
+  const paidRupees = Math.round(Number(order.amount) / 100);
+  if (quote && quote.total !== paidRupees) {
+    console.error(
+      `Amount mismatch on Razorpay order ${order.id}: notes re-derive to ₹${quote.total}, order collected ₹${paidRupees}. Recording the collected amount.`,
+    );
+  }
+
+  const data = {
+    planId: quote?.planId || n.planId || "unknown",
+    tierKey: quote?.tierKey ?? (n.tierKey || null),
+    tierLabel: quote?.tierLabel ?? null,
+    billingCycle: quote?.cycle || "month",
+    // The entitlement. Falls back to 1 rather than to an unvalidated note,
+    // so a corrupted note can never inflate a plan's branch allowance.
+    branches: quote?.branches ?? 1,
+    unitAmount: quote?.unit ?? 0,
+    subtotal: quote?.subtotal ?? paidRupees,
+    gst: quote?.gst ?? 0,
+    amount: paidRupees,
+    restaurantName: n.restaurant || null,
+    contactName: n.name || null,
+    email: n.email || null,
+    phone: n.phone || null,
+    city: n.city || null,
+    gstin: n.gstin || null,
+    notes: n.customerNotes || null,
+    extraNeeds: n.extraNeeds || null,
+    razorpayOrderId: order.id,
+    razorpayPaymentId: paymentId || null,
+    razorpaySignature: signature,
+    status: "PAID",
+  };
+
+  try {
+    return await prisma.pricingPayment.create({ data });
+  } catch (err) {
+    // Lost the race with the other path (verify vs webhook) — the row it
+    // wrote is just as good as the one we were about to write.
+    if (err.code === "P2002") {
+      return prisma.pricingPayment.findUnique({
+        where: { razorpayOrderId: order.id },
+      });
+    }
+    throw err;
+  }
 };
 
 // ==============================================
@@ -164,9 +284,9 @@ export const createOrder = async ({
 // ==============================================
 // Standard Razorpay checkout signature check:
 //   HMAC_SHA256(order_id + "|" + payment_id, key_secret) === signature
-// This is the only thing that actually proves the payment happened — the
-// `handler` callback firing on the frontend is not proof by itself, since
-// it runs in the browser and can be spoofed.
+// This is the only thing that proves the payment happened — the `handler`
+// callback firing in the browser is not proof by itself, since it runs on
+// the client and can be spoofed. A failed check writes nothing.
 export const verifyPayment = async ({
   razorpay_order_id,
   razorpay_payment_id,
@@ -176,12 +296,16 @@ export const verifyPayment = async ({
     return { success: false, status: 400, message: "Missing payment details." };
   }
 
-  const record = await prisma.pricingPayment.findUnique({
-    where: { razorpayOrderId: razorpay_order_id },
-  });
-
-  if (!record) {
-    return { success: false, status: 404, message: "No matching order found." };
+  // createHmac throws on an undefined key, which would surface as an
+  // unhandled 500 rather than a diagnosable message. Fail closed and say
+  // what's actually wrong.
+  if (!RAZORPAY_KEY_SECRET) {
+    console.error("RAZORPAY_KEY_SECRET is not set — cannot verify payments.");
+    return {
+      success: false,
+      status: 500,
+      message: "Payments are not configured on the server yet.",
+    };
   }
 
   const expectedSignature = crypto
@@ -197,52 +321,74 @@ export const verifyPayment = async ({
     );
 
   if (!isValid) {
-    await prisma.pricingPayment.update({
-      where: { id: record.id },
-      data: { status: "VERIFICATION_FAILED" },
-    });
-    return { success: false, status: 400, message: "Payment verification failed." };
+    // Nothing is recorded. There is no half-state to clean up precisely
+    // because nothing was written when the order was created.
+    console.warn(
+      `Signature verification failed for Razorpay order ${razorpay_order_id}.`,
+    );
+    return {
+      success: false,
+      status: 400,
+      message: "Payment verification failed.",
+    };
   }
 
-  const updated = await prisma.pricingPayment.update({
-    where: { id: record.id },
-    data: {
-      status: "PAID",
-      razorpayPaymentId: razorpay_payment_id,
-      razorpaySignature: razorpay_signature,
-    },
+  // The signature proves the order/payment pair is genuine. Fetch the order
+  // to recover the selection and contact details we stashed in its notes.
+  let order;
+  try {
+    order = await razorpay.orders.fetch(razorpay_order_id);
+  } catch (err) {
+    console.error(`Could not fetch Razorpay order ${razorpay_order_id}:`, err);
+    return {
+      success: false,
+      status: 502,
+      // The money IS taken at this point, so don't imply otherwise — the
+      // webhook will normally pick this up within seconds anyway.
+      message:
+        "Your payment went through, but we couldn't finish setting up your account. Please contact support with your payment id.",
+    };
+  }
+
+  const record = await persistPaidPayment(order, {
+    paymentId: razorpay_payment_id,
+    signature: razorpay_signature,
   });
 
   return {
     success: true,
-    paymentRecordId: updated.id,
+    paymentRecordId: record.id,
     razorpayPaymentId: razorpay_payment_id,
-    planId: updated.planId,
-    email: updated.email,
-    contactName: updated.contactName,
-    restaurantName: updated.restaurantName,
+    planId: record.planId,
+    branches: record.branches,
+    email: record.email,
+    contactName: record.contactName,
+    restaurantName: record.restaurantName,
   };
 };
 
 // ==============================================
 // POST /api/pricing/webhook  (Razorpay server-to-server webhook)
 // ==============================================
-// Belt-and-braces alongside verifyPayment above: verifyPayment covers the
-// happy path where the browser comes back with a signature, but a closed
-// tab, a network drop, or a payment that settles asynchronously (e.g. some
-// UPI flows) means the browser may never call /verify-payment at all. The
-// webhook is Razorpay telling the server directly, independent of whether
-// the client-side flow completed.
+// Belt-and-braces alongside verifyPayment: that covers the happy path where
+// the browser comes back with a signature, but a closed tab, a network
+// drop, or a payment that settles asynchronously (some UPI flows) means the
+// browser may never call /verify-payment at all. This is Razorpay telling
+// the server directly, independent of the client.
 //
-// IMPORTANT: this handler expects the RAW request body (a Buffer), not the
-// parsed JSON — see index.js, which mounts this route with express.raw()
-// BEFORE the global express.json() middleware, because the signature is
-// computed over the exact raw bytes Razorpay sent.
+// payment.failed deliberately writes NOTHING — a failed payment leaves no
+// trace in PricingPayment by design.
+//
+// IMPORTANT: expects the RAW request body (a Buffer), not parsed JSON — see
+// index.js, which mounts this route with express.raw() BEFORE the global
+// express.json(), because the signature covers the exact bytes sent.
 export const handleWebhook = async (rawBody, signatureHeader) => {
   if (!RAZORPAY_WEBHOOK_SECRET) {
-    // Webhook secret not configured — accept nothing rather than skip
-    // verification silently.
-    return { success: false, status: 500, message: "Webhook secret not configured." };
+    return {
+      success: false,
+      status: 500,
+      message: "Webhook secret not configured.",
+    };
   }
 
   const expectedSignature = crypto
@@ -268,49 +414,68 @@ export const handleWebhook = async (rawBody, signatureHeader) => {
     return { success: false, status: 400, message: "Malformed webhook payload." };
   }
 
-  const payload = event?.payload?.payment?.entity;
-  const orderId = payload?.order_id;
+  // Only a captured payment creates anything. payment.failed, refunds and
+  // disputes are acknowledged so Razorpay stops retrying, and ignored.
+  if (event.event !== "payment.captured") {
+    return { success: true, ignored: true };
+  }
+
+  const payment = event?.payload?.payment?.entity;
+  const orderId = payment?.order_id;
   if (!orderId) {
-    // Event type we don't care about (e.g. refund/dispute events) — ack it
-    // so Razorpay doesn't retry, but do nothing.
     return { success: true, ignored: true };
   }
 
-  const record = await prisma.pricingPayment.findUnique({
-    where: { razorpayOrderId: orderId },
-  });
-  if (!record) {
-    return { success: true, ignored: true };
+  let order;
+  try {
+    order = await razorpay.orders.fetch(orderId);
+  } catch (err) {
+    console.error(`Webhook could not fetch Razorpay order ${orderId}:`, err);
+    // 500 so Razorpay retries — the payment is real and we want the row.
+    return {
+      success: false,
+      status: 500,
+      message: "Could not fetch the order for this payment.",
+    };
   }
 
-  if (event.event === "payment.captured" && record.status !== "PAID") {
-    await prisma.pricingPayment.update({
-      where: { id: record.id },
-      data: {
-        status: "PAID",
-        razorpayPaymentId: payload.id,
-      },
-    });
-  } else if (event.event === "payment.failed") {
-    await prisma.pricingPayment.update({
-      where: { id: record.id },
-      data: { status: record.status === "PAID" ? "PAID" : "FAILED" },
-    });
-  }
+  await persistPaidPayment(order, { paymentId: payment.id });
 
   return { success: true };
 };
 
 // ==============================================
-// GET /api/pricing/payments/:id  (used by the Register page to confirm a
-// payment before letting the flow proceed there)
+// GET /api/pricing/payments/:id
 // ==============================================
+// Feeds the Register page: it prefills every Restaurant Details field from
+// this, leaving the user only a password to set.
+//
+// Returns 404 for anything that isn't a completed payment, so a cancelled
+// checkout can't be walked past. `alreadyUsed` lets the Register page say
+// "this payment already has an account" instead of letting someone fill in
+// the whole form and only then hit a 409.
+//
+// NOTE: this is an unauthenticated lookup by UUID — it has to be, since the
+// account it will create doesn't exist yet. The id is a v4 UUID handed only
+// to the payer's own browser, so it is unguessable in practice, but it is
+// worth knowing that possession of the id is the only thing gating these
+// contact details. Registration additionally requires the submitted email
+// to match the paid email (see auth.service.js), so a leaked id alone can't
+// be used to register someone else's restaurant.
 export const getPaymentRecord = async (id) => {
   if (!id) return { success: false, status: 400, message: "Missing payment id." };
 
-  const record = await prisma.pricingPayment.findUnique({ where: { id } });
-  if (!record) {
-    return { success: false, status: 404, message: "Payment record not found." };
+  const record = await prisma.pricingPayment.findUnique({
+    where: { id },
+    include: { owner: { select: { id: true } } },
+  });
+
+  if (!record || record.status !== "PAID") {
+    return {
+      success: false,
+      status: 404,
+      message: "We couldn't find a completed payment for this reference.",
+    };
   }
 
   return {
@@ -319,13 +484,19 @@ export const getPaymentRecord = async (id) => {
       id: record.id,
       planId: record.planId,
       tierLabel: record.tierLabel,
+      billingCycle: record.billingCycle,
+      // What the Branches page will enforce once they're registered.
       branches: record.branches,
       amount: record.amount,
       status: record.status,
+      // ---- Register page prefill ----
       restaurantName: record.restaurantName,
       contactName: record.contactName,
       email: record.email,
       phone: record.phone,
+      city: record.city,
+      gstin: record.gstin,
+      alreadyUsed: Boolean(record.owner),
     },
   };
 };

@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { FiMenu, FiSearch, FiSun, FiMoon, FiPlus } from "react-icons/fi";
+import { FiMenu, FiSearch, FiSun, FiMoon, FiPlus, FiSettings, FiBookOpen } from "react-icons/fi";
 
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -209,28 +209,47 @@ const Header = ({ onMenuClick }) => {
 
         {/* ================= RIGHT ================= */}
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle light / dark theme"
-            title={
-              theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-            }
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E7EAE1] bg-[#F3F5EE] transition-colors hover:border-[#3FA34D]/40 dark:border-[#262B24] dark:bg-[#171C17] dark:hover:border-[#43B75A]/40"
-          >
-            {theme === "dark" ? (
-              <FiSun size={16} className="text-[#FFA94D]" />
-            ) : (
-              <FiMoon size={16} className="text-[#3FA34D]" />
-            )}
-          </button>
+        {/* ================= RIGHT ================= */}
 
-          <OutletSwitcher />
+      <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={() => navigate("/menu")}
+          aria-label="Menu"
+          title="Menu"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E7EAE1] bg-[#F3F5EE] transition-colors hover:border-[#3FA34D]/40 dark:border-[#262B24] dark:bg-[#171C17] dark:hover:border-[#43B75A]/40"
+        >
+          <FiBookOpen size={16} className="text-[#1F2937] dark:text-white" />
+        </button>
 
-          <OfflineIndicator />
+        <button
+          type="button"
+          onClick={() => navigate("/settings")}
+          aria-label="Settings"
+          title="Settings"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E7EAE1] bg-[#F3F5EE] transition-colors hover:border-[#3FA34D]/40 dark:border-[#262B24] dark:bg-[#171C17] dark:hover:border-[#43B75A]/40"
+        >
+          <FiSettings size={16} className="text-[#1F2937] dark:text-white" />
+        </button>
 
-          <ProfileMenu user={user} />
-        </div>
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle light / dark theme"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E7EAE1] bg-[#F3F5EE] transition-colors hover:border-[#3FA34D]/40 dark:border-[#262B24] dark:bg-[#171C17] dark:hover:border-[#43B75A]/40"
+        >
+          {theme === "dark" ? (
+            <FiSun size={16} className="text-[#FFA94D]" />
+          ) : (
+            <FiMoon size={16} className="text-[#3FA34D]" />
+          )}
+        </button>
+
+        <OutletSwitcher />
+        <OfflineIndicator />
+        <ProfileMenu user={user} />
+      </div>
+       
       </div>
 
       {/* ================= LOOKUPS (below md) ================= */}

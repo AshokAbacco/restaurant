@@ -22,6 +22,7 @@ import ComingSoon from "./landing/ComingSoon";
 import Pricing from "./landing/pages/Pricing";
 import ContactUs from "./landing/pages/ContactUs";
 import GlowCursor from "@/components/GlowCursor";
+import ScrollToTop from "./components/ScrollToTop";
 // ==============================================
 // Auth
 // ==============================================
@@ -92,19 +93,20 @@ function App() {
     // kiosk. Nothing inside the public site suspends, so a first-time
     // visitor never sees this fallback at all.
     <>
-<GlowCursor
-  style={{
-    position: "fixed",
-    inset: 0,
-    zIndex: 9999,
-    pointerEvents: "none",
-    width: "100vw",
-    height: "100vh",
-  }}
-  blendMode="normal"
-  color="#09a743"
-  secondaryColor="#3fa34d"
-/>
+    <GlowCursor
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        pointerEvents: "none",
+        width: "100vw",
+        height: "100vh",
+      }}
+      blendMode="normal"
+      color="#09a743"
+      secondaryColor="#3fa34d"
+    />
+    <ScrollToTop />
     <Suspense fallback={<RouteFallback />}>
      
       <Routes>

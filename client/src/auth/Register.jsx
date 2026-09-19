@@ -11,8 +11,14 @@
 // scroll. Palette, dark-mode tokens, and the toast are kept identical to
 // Login.jsx so the two public pages still read as one product.
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import authService from "./authService";
 import { useTheme } from "../context/ThemeContext";
 import {
   FiEye,
@@ -31,6 +37,7 @@ import {
   FiMoon,
   FiAlertCircle,
   FiX,
+  FiCreditCard,
 } from "react-icons/fi";
 import { FaUtensils, FaUniversity } from "react-icons/fa";
 
@@ -250,22 +257,39 @@ function Field({
   error,
   hint = null,
   trailing = null,
+  // Set when the value came from a completed payment and can't be edited
+  // here. Renders a small "From your payment" tag next to the label and
+  // tints the shell, so a greyed-out input reads as "we already know this"
+  // rather than "this form is broken".
+  locked = false,
   children,
 }) {
   return (
     <div>
       <label
         htmlFor={name}
-        className="mb-1.5 block text-[13px] font-bold text-[#1C2620] dark:text-white"
+        className="mb-1.5 flex items-center gap-2 text-[13px] font-bold text-[#1C2620] dark:text-white"
       >
         {label}
+        {locked && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#E9F8EE] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#1C9457] dark:bg-[#1D2B20] dark:text-[#59C97A]">
+            <FiCheckCircle size={10} />
+            From your payment
+          </span>
+        )}
       </label>
 
       <div
-        className={`flex items-stretch overflow-hidden rounded-xl border bg-white transition-colors dark:bg-[#1D231D] ${
+        className={`flex items-stretch overflow-hidden rounded-xl border transition-colors ${
+          locked
+            ? "border-[#DCE7DF] bg-[#F7FAF8] dark:border-[#262B24] dark:bg-[#151A16]"
+            : "bg-white dark:bg-[#1D231D]"
+        } ${
           error
             ? "border-[#D64545]"
-            : "border-[#E4E0D2] focus-within:border-[#22B368] dark:border-[#262B24] dark:focus-within:border-[#59C97A]"
+            : locked
+              ? ""
+              : "border-[#E4E0D2] focus-within:border-[#22B368] dark:border-[#262B24] dark:focus-within:border-[#59C97A]"
         }`}
       >
         <span
@@ -329,10 +353,111 @@ const Register = () => {
   const [registeredEmail, setRegisteredEmail] = useState("");
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const { register } = useAuth();
 
   const { theme, toggleTheme } = useTheme();
+
+  // ==========================
+  // PRICING PAYMENT
+  // ==========================
+  // The id arrives in the query string (?paymentId=...) with router state
+  // as a secondary source. Query string wins because it survives a refresh
+  // and a copy-pasted link; state does not, and a paying customer who hits
+  // F5 must not lose their purchase.
+  const paymentId =
+    searchParams.get("paymentId") || location.state?.paymentRecordId || "";
+
+  // The verified, server-side copy of the payment. Everything shown in the
+  // Restaurant Details column comes from here once it loads — the prefill
+  // handed over in router state is only used to paint the fields
+  // immediately, and is overwritten the moment the fetch returns. Router
+  // state is client-controlled, so it's a rendering convenience, never
+  // something to submit on.
+  const [payment, setPayment] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(Boolean(paymentId));
+  const [paymentError, setPaymentError] = useState("");
+
+  // Optimistic paint from router state, replaced by the fetch below.
+  useEffect(() => {
+    const prefill = location.state?.prefill;
+    if (!prefill) return;
+    setFormData((prev) => ({
+      ...prev,
+      restaurantName: prefill.restaurantName || prev.restaurantName,
+      fullName: prefill.fullName || prev.fullName,
+      email: prefill.email || prev.email,
+      phone: prefill.phone || prev.phone,
+      address: prefill.address || prev.address,
+    }));
+    // location.state never changes for a given mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!paymentId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      setPaymentLoading(true);
+      const result = await authService.fetchPricingPayment(paymentId);
+      if (cancelled) return;
+
+      if (!result.success) {
+        setPaymentError(result.message);
+        setPaymentLoading(false);
+        return;
+      }
+
+      // Already claimed by an account — say so here rather than letting
+      // them set a password and only then hit a 409 from the server.
+      if (result.payment.alreadyUsed) {
+        setPaymentError(
+          "An account has already been created with this payment. Please sign in instead.",
+        );
+        setPayment(result.payment);
+        setPaymentLoading(false);
+        return;
+      }
+
+      setPayment(result.payment);
+      setFormData((prev) => ({
+        ...prev,
+        restaurantName: result.payment.restaurantName || "",
+        fullName: result.payment.contactName || "",
+        email: result.payment.email || "",
+        phone: result.payment.phone || "",
+        // City is the only location captured at checkout, so it seeds the
+        // Address field. Left editable when the payment had no city, since
+        // Address is required and an empty locked field would be a dead end.
+        address: result.payment.city || "",
+      }));
+      setErrors({});
+      setPaymentLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [paymentId]);
+
+  // Which fields are filled from the payment and therefore not editable
+  // here. Changing the email would break the email-match check the server
+  // runs against the payment, and changing the rest would mean the account
+  // doesn't describe what was actually bought — both are better prevented
+  // than explained after the fact. Address is only locked when the payment
+  // actually carried a city.
+  const isPaidSignup = Boolean(payment) && !payment.alreadyUsed;
+  const lockedFields = {
+    restaurantName: isPaidSignup && Boolean(payment.restaurantName),
+    fullName: isPaidSignup && Boolean(payment.contactName),
+    email: isPaidSignup && Boolean(payment.email),
+    phone: isPaidSignup && Boolean(payment.phone),
+    address: isPaidSignup && Boolean(payment.city),
+  };
 
   // ==========================
   // HANDLE INPUT CHANGE
@@ -385,8 +510,9 @@ const Register = () => {
 
     if (!formData.password) {
       newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+    } else if (formData.password.length < 6) {
+      // Mirrors registerSchema in server/src/auth/auth.validation.js.
+      newErrors.password = "Password must be at least 6 characters";
     }
 
     if (formData.confirmPassword !== formData.password) {
@@ -411,6 +537,20 @@ const Register = () => {
   const handleRegister = async (e) => {
     e.preventDefault();
 
+    // A payment id that didn't resolve (cancelled, failed, already used,
+    // mistyped) must not produce an account. Without this the form would
+    // happily submit and create a free-tier, 1-branch account for someone
+    // who just paid for three.
+    if (paymentId && (paymentLoading || paymentError || !payment)) {
+      setToast({
+        message:
+          paymentError ||
+          "We're still confirming your payment. Give it a moment and try again.",
+        tone: "error",
+      });
+      return;
+    }
+
     if (!validateForm()) return;
 
     setLoading(true);
@@ -420,6 +560,12 @@ const Register = () => {
       // confirmPassword is stripped here — it's a UI-only field and the
       // backend schema doesn't accept it.
       const { confirmPassword, ...payload } = formData;
+
+      // Ties the new account to the checkout that paid for it. The server
+      // re-reads the payment from this id and takes the branch allowance
+      // from it — nothing about the entitlement is sent from here, because
+      // anything sent from here can be edited in devtools.
+      if (paymentId) payload.pricingPaymentId = paymentId;
 
       const result = await register(payload);
 
@@ -564,6 +710,65 @@ const Register = () => {
             </div>
           </div>
 
+          {/* ============ PAYMENT BANNER ============ */}
+          {/* Only rendered when the visitor arrived from checkout. A direct
+              /register visit is still a perfectly valid way to sign up — it
+              just gets the 1-branch default — so there's nothing to show. */}
+          {!registeredEmail && paymentId && (
+            <div className="mt-6">
+              {paymentLoading ? (
+                <div className="flex items-center gap-3 rounded-2xl border border-[#EDEFE7] bg-[#F7FAF8] px-5 py-4 dark:border-[#262B24] dark:bg-[#151A16]">
+                  <svg
+                    className="h-4 w-4 shrink-0 animate-spin text-[#22B368] dark:text-[#59C97A]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                    <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  <p className="text-sm text-[#5B6B5F] dark:text-[#9FB0A3]">
+                    Confirming your payment…
+                  </p>
+                </div>
+              ) : paymentError ? (
+                <div className="flex items-start gap-3 rounded-2xl border border-[#E7B4B0] bg-[#FDF3F2] px-5 py-4 dark:border-[#5A2A26] dark:bg-[#2A1D1B]">
+                  <FiAlertCircle className="mt-0.5 shrink-0 text-lg text-[#C0392B] dark:text-[#E5786A]" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[#C0392B] dark:text-[#E5786A]">
+                      We couldn&apos;t confirm that payment
+                    </p>
+                    <p className="mt-1 text-[13px] leading-5 text-[#5B6B5F] dark:text-[#9FB0A3]">
+                      {paymentError} If you were charged, contact support with
+                      your payment reference and we&apos;ll finish the setup
+                      for you.
+                    </p>
+                  </div>
+                </div>
+              ) : payment ? (
+                <div className="flex items-start gap-3 rounded-2xl border border-[#B7E3C6] bg-[#F2FBF5] px-5 py-4 dark:border-[#2A5A3C] dark:bg-[#132118]">
+                  <FiCreditCard className="mt-0.5 shrink-0 text-lg text-[#22B368] dark:text-[#59C97A]" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[#1C9457] dark:text-[#59C97A]">
+                      {payment.amount > 0
+                        ? "Payment confirmed"
+                        : "Free trial confirmed"}
+                      {payment.tierLabel ? ` · ${payment.tierLabel}` : ""}
+                    </p>
+                    <p className="mt-1 text-[13px] leading-5 text-[#5B6B5F] dark:text-[#9FB0A3]">
+                      Your plan includes{" "}
+                      <span className="font-bold text-[#1C2620] dark:text-white">
+                        {payment.branches}{" "}
+                        {payment.branches === 1 ? "branch" : "branches"}
+                      </span>
+                      . We&apos;ve filled in your restaurant details from the
+                      payment — just choose a password to finish.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {registeredEmail ? (
             // ==========================
             // SUCCESS PANEL
@@ -614,6 +819,7 @@ const Register = () => {
                       name="restaurantName"
                       icon={<FiHome />}
                       error={errors.restaurantName}
+                      locked={lockedFields.restaurantName}
                     >
                       <input
                         id="restaurantName"
@@ -623,7 +829,12 @@ const Register = () => {
                         value={formData.restaurantName}
                         onChange={handleChange}
                         placeholder="Enter restaurant name"
-                        className={inputClasses}
+                        readOnly={lockedFields.restaurantName}
+                        className={`${inputClasses} ${
+                          lockedFields.restaurantName
+                            ? "cursor-not-allowed text-[#5B6B5F] dark:text-[#9FB0A3]"
+                            : ""
+                        }`}
                       />
                     </Field>
 
@@ -632,6 +843,7 @@ const Register = () => {
                       name="fullName"
                       icon={<FiUser />}
                       error={errors.fullName}
+                      locked={lockedFields.fullName}
                     >
                       <input
                         id="fullName"
@@ -641,7 +853,12 @@ const Register = () => {
                         value={formData.fullName}
                         onChange={handleChange}
                         placeholder="Enter full name"
-                        className={inputClasses}
+                        readOnly={lockedFields.fullName}
+                        className={`${inputClasses} ${
+                          lockedFields.fullName
+                            ? "cursor-not-allowed text-[#5B6B5F] dark:text-[#9FB0A3]"
+                            : ""
+                        }`}
                       />
                     </Field>
 
@@ -650,6 +867,7 @@ const Register = () => {
                       name="phone"
                       icon={<FiPhone />}
                       error={errors.phone}
+                      locked={lockedFields.phone}
                     >
                       <input
                         id="phone"
@@ -659,7 +877,12 @@ const Register = () => {
                         value={formData.phone}
                         onChange={handleChange}
                         placeholder="Enter phone number"
-                        className={inputClasses}
+                        readOnly={lockedFields.phone}
+                        className={`${inputClasses} ${
+                          lockedFields.phone
+                            ? "cursor-not-allowed text-[#5B6B5F] dark:text-[#9FB0A3]"
+                            : ""
+                        }`}
                       />
                     </Field>
 
@@ -668,6 +891,7 @@ const Register = () => {
                       name="email"
                       icon={<FiMail />}
                       error={errors.email}
+                      locked={lockedFields.email}
                     >
                       <input
                         id="email"
@@ -677,7 +901,12 @@ const Register = () => {
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="Enter email address"
-                        className={inputClasses}
+                        readOnly={lockedFields.email}
+                        className={`${inputClasses} ${
+                          lockedFields.email
+                            ? "cursor-not-allowed text-[#5B6B5F] dark:text-[#9FB0A3]"
+                            : ""
+                        }`}
                       />
                     </Field>
 
@@ -686,6 +915,7 @@ const Register = () => {
                       name="address"
                       icon={<FiMapPin />}
                       error={errors.address}
+                      locked={lockedFields.address}
                     >
                       <input
                         id="address"
@@ -695,7 +925,12 @@ const Register = () => {
                         value={formData.address}
                         onChange={handleChange}
                         placeholder="Enter full address"
-                        className={inputClasses}
+                        readOnly={lockedFields.address}
+                        className={`${inputClasses} ${
+                          lockedFields.address
+                            ? "cursor-not-allowed text-[#5B6B5F] dark:text-[#9FB0A3]"
+                            : ""
+                        }`}
                       />
                     </Field>
                   </div>
@@ -712,7 +947,7 @@ const Register = () => {
                       name="password"
                       icon={<FiLock />}
                       error={errors.password}
-                      hint="At least 8 characters"
+                      hint="At least 6 characters"
                       trailing={
                         <button
                           type="button"

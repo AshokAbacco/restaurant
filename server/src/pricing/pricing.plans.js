@@ -62,10 +62,17 @@ export const priceQuote = ({ planId, tierKey, branches }) => {
     return {
       planId,
       planName: plan.name,
+      // FIX: this flag was read by pricing.service.js (`if (!quote.isFree)`)
+      // but never actually returned, so it was always undefined and the
+      // paid-plan email/phone checks ran against the free plan too.
+      isFree: true,
       tierKey: null,
       tierLabel: "Free trial",
       cycle: "trial",
+      // A free trial is one branch, full stop — an unchecked `branches`
+      // value here would hand out a 5-branch entitlement for ₹0.
       branches: 1,
+      months: 1,
       unit: 0,
       subtotal: 0,
       gst: 0,
@@ -86,13 +93,35 @@ export const priceQuote = ({ planId, tierKey, branches }) => {
   return {
     planId,
     planName: plan.name,
+    isFree: false,
     tierKey,
     tierLabel: tier.label,
     cycle: plan.cycle,
     branches: n,
+    months: plan.months,
     unit: tier.price,
     subtotal,
     gst,
     total,
   };
+};
+
+/**
+ * When a plan bought today runs out. Used to stamp
+ * Organization.planExpiresAt at registration so the Subscription screen has
+ * a real date to show instead of a hardcoded one.
+ *
+ * The free plan is 30 days; paid plans run for the number of months the
+ * plan covers (1 for monthly, 12 for yearly).
+ */
+export const planExpiryFrom = (quote, startedAt = new Date()) => {
+  const expiry = new Date(startedAt);
+
+  if (quote.isFree) {
+    expiry.setDate(expiry.getDate() + 30);
+    return expiry;
+  }
+
+  expiry.setMonth(expiry.getMonth() + (quote.months || 1));
+  return expiry;
 };
