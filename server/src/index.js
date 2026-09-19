@@ -10,6 +10,8 @@ import { requireOutletContext } from "./middleware/tenantContext.js";
 import pricingRoutes from "./pricing/pricing.routes.js";
 import { webhookHandler as razorpayWebhookHandler } from "./pricing/pricing.controller.js";
 
+import contactRoutes from "./contact/contact.routes.js";
+
 import menuRoutes from "./menu/menu.routes.js";
 import inventoryRoutes from "./inventory/inventory.routes.js";
 import expensesRoutes from "./expenses/expenses.routes.js";
@@ -36,13 +38,7 @@ app.use(
   }),
 );
 
-// ==============================================
-// RAZORPAY WEBHOOK — must be mounted BEFORE express.json() below.
-// Razorpay's webhook signature is computed over the exact raw request
-// bytes; once express.json() has parsed/re-serialized the body those bytes
-// are gone, so this one route gets express.raw() instead and everything
-// else keeps the normal JSON parser.
-// ==============================================
+
 app.post(
   "/api/pricing/webhook",
   express.raw({ type: "application/json" }),
@@ -61,14 +57,9 @@ app.get("/", (req, res) => {
 // ==============================================
 app.use("/api/auth", authRoutes);
 
-// ==============================================
-// PRICING / SIGNUP PAYMENTS
-// Public, like /api/auth/register — this is the pre-signup checkout flow
-// on the marketing site's Pricing page, run before any account exists.
-// (The webhook sub-route is mounted separately above, ahead of
-// express.json().)
-// ==============================================
 app.use("/api/pricing", pricingRoutes);
+
+app.use("/api/contact", contactRoutes);
 
 // ==============================================
 // PROTECTED MODULES

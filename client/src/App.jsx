@@ -15,7 +15,7 @@ import {
 // ==============================================
 // Public site
 // ==============================================
-
+import { useLocation } from "react-router-dom";
 import LandingLayout from "./landing/LandingLayout";
 import Home from "./landing/Home";
 import ComingSoon from "./landing/ComingSoon";
@@ -92,6 +92,7 @@ function App() {
     // The outer boundary covers the shells — auth layout, admin layout,
     // kiosk. Nothing inside the public site suspends, so a first-time
     // visitor never sees this fallback at all.
+    
     <>
     <GlowCursor
       style={{
@@ -113,18 +114,7 @@ function App() {
           
         {/* ==========================================
           PUBLIC SITE
-          (Navbar + Footer, no login required)
-
-          These sit above the auth routes because "/" is now the
-          marketing homepage rather than a redirect into the app. A
-          logged-in visitor still sees it — the navbar swaps its buttons
-          for a link to the dashboard rather than the page bouncing,
-          because a customer who wants to re-read the pricing page
-          shouldn't be thrown into the POS.
-
-          About / Services / Pricing / Contact are stubbed for now. See
-          ComingSoon.jsx for why they're routed at all rather than left
-          to the catch-all.
+           
       ========================================== */}
 
         <Route element={<LandingLayout />}>

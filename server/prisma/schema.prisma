@@ -2481,10 +2481,19 @@ model PricingPayment {
   contactName    String?
   email          String?
   phone          String?
+  address        String? // full postal address from the checkout form; `city` predates it and is kept for existing rows
   city           String?
   gstin          String?
   notes          String?
   extraNeeds     String?
+
+  // ---- Invoice (see src/pricing/invoice.service.js) ----
+  // invoiceSentAt doubles as the idempotency lock: /verify-payment and the
+  // Razorpay webhook both try to send, and the one that claims this field
+  // first is the one that does. invoiceUrl points at the PDF in R2.
+  invoiceNumber String?   @unique
+  invoiceUrl    String?
+  invoiceSentAt DateTime?
 
   // ---- Razorpay linkage ----
   razorpayOrderId   String? @unique
@@ -2500,4 +2509,31 @@ model PricingPayment {
   @@index([email])
   @@index([status])
   @@map("pricing_payments")
+}
+
+// ==============================================
+// PUBLIC CONTACT FORM (server/src/contact/)
+// ==============================================
+// One row per submission from the marketing site's Contact page. Like
+// PricingPayment above, this is deliberately tenant-less — there is no
+// Organization/Outlet yet when a prospect fills the form, so there's no
+// outletId to hang it off. `address` is the only nullable field: the form
+// marks it optional (flip it to `String` + make it required in
+// contact.controller.js if you'd rather force it).
+model ContactSubmission {
+  id String @id @default(uuid())
+
+  restaurantName String
+  fullName       String
+  email          String
+  phone          String
+  address        String?
+  message        String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([createdAt])
+  @@map("contact_submissions")
 }

@@ -52,9 +52,9 @@ import cake from "./images/cake.png";
 export const BRAND = {
   name: "Abacco",
   tag: "Restaurant ERP",
-  email: "hello@abacco.com",
+  email: "info@abaccotech.com",
   phone: "+91 80 4718 2200",
-  address: "Koramangala, Bengaluru 560034",
+  address: "Vidyaranyapura, Bengaluru, Karnataka 560097",
 };
 
 export const HERO = {

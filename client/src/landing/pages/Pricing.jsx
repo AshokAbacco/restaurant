@@ -74,6 +74,7 @@ const emptyForm = {
   name: "",
   email: "",
   phone: "",
+  address: "",
   city: "",
   gstin: "",
   notes: "",
@@ -385,6 +386,7 @@ function CheckoutModal({ cart, onClose }) {
       e.email = "Check the email address.";
     if (!/^[6-9]\d{9}$/.test(form.phone.replace(/\D/g, "")))
       e.phone = "Enter a 10-digit mobile number.";
+    if (!form.address.trim()) e.address = "We need an address for the invoice.";
     if (form.gstin && !/^[0-9A-Z]{15}$/.test(form.gstin.toUpperCase()))
       e.gstin = "A GSTIN is 15 characters.";
     setErrors(e);
@@ -396,6 +398,9 @@ function CheckoutModal({ cart, onClose }) {
     name: form.name.trim(),
     email: form.email.trim(),
     phone: form.phone.replace(/\D/g, ""),
+    // Goes onto the invoice PDF and both invoice emails, so it's collected
+    // here rather than left to the Register page.
+    address: form.address.trim(),
     city: form.city.trim(),
     gstin: form.gstin.trim(),
     notes: form.notes.trim(),
@@ -566,9 +571,9 @@ function CheckoutModal({ cart, onClose }) {
           fullName: form.name,
           email: form.email,
           phone: form.phone,
-          // City is what the Register page's Address field is seeded from —
-          // it's the only location we collected at checkout.
-          address: form.city,
+          // The checkout now collects a full billing address (it goes on
+          // the invoice); city remains the fallback for older flows.
+          address: form.address || form.city,
         },
       },
     });
@@ -615,7 +620,7 @@ function CheckoutModal({ cart, onClose }) {
                 value={form.restaurant}
                 onChange={set("restaurant")}
                 error={errors.restaurant}
-                placeholder="Anand Bhavan, Indiranagar"
+                placeholder="Biryani restaurant"
               />
               <Field
                 label="Your name"
@@ -638,6 +643,14 @@ function CheckoutModal({ cart, onClose }) {
                 onChange={set("phone")}
                 error={errors.phone}
                 placeholder="98765 43210"
+              />
+              <Field
+                wide
+                label="Billing address"
+                value={form.address}
+                onChange={set("address")}
+                error={errors.address}
+                placeholder="12 MG Road, Indiranagar, Bengaluru 560038"
               />
               <Field
                 label="City"
@@ -739,7 +752,7 @@ function CheckoutModal({ cart, onClose }) {
             <p className="ab-done-copy">
               {isFree
                 ? "Login details for " + form.email + " are on their way. Someone from onboarding will call " + form.phone + " today to set up your menu."
-                : "An invoice is on its way to " + form.email + ". Onboarding will call " + form.phone + " to move your menu and stock in."}
+                : "Your invoice and PDF receipt are on their way to " + form.email + ". Onboarding will call " + form.phone + " to move your menu and stock in."}
             </p>
             {hasNeeds && (
               <p className="ab-done-copy">

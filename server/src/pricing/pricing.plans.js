@@ -16,11 +16,23 @@
 
 export const GST_RATE = 0.18; // 18%
 
+// Mirrors BASE_FEATURES in pricing.jsx. Used on the invoice PDF's "What's
+// included" block, so the customer gets a written record of the
+// entitlement they paid for. Keep in sync with the frontend copy.
+const BASE_FEATURES = [
+  "Login Access: owner, manager, cashier, kitchen, waiter",
+  "Orders, KOT and table map",
+  "Billing with GST invoices",
+  "Menu and stock management",
+  "Employee management",
+];
+
 export const PLANS = {
   free: {
     id: "free",
     name: "Free One Month",
     isFree: true,
+    features: [...BASE_FEATURES, "1 branch included", "Email support"],
   },
   monthly: {
     id: "monthly",
@@ -31,6 +43,11 @@ export const PLANS = {
       standard: { label: "Standard", price: 650 },
       custom: { label: "Custom", price: 650 },
     },
+    features: [
+      ...BASE_FEATURES,
+      "Daily sales and item reports",
+      "Phone support, Email 24/7",
+    ],
   },
   yearly: {
     id: "yearly",
@@ -41,8 +58,16 @@ export const PLANS = {
       standard: { label: "Standard", price: 550 },
       custom: { label: "Custom", price: 550 },
     },
+    features: [
+      ...BASE_FEATURES,
+      "Daily sales and item reports",
+      "Phone support, Email 24/7",
+    ],
   },
 };
+
+/** Feature list for a plan id, for the invoice PDF. Never throws. */
+export const planFeatures = (planId) => PLANS[planId]?.features || [];
 
 /**
  * Recomputes the payable amount server-side from raw selection inputs.
