@@ -62,6 +62,7 @@ const COMPANY = {
   name: "Restaurant Billing By Abacco",
   tagline: "Restaurant ERP",
   email: "info@abaccotech.com",
+  site : "www.restaurantsbilling.com",
 };
 
 export const inr = (rupees) =>
