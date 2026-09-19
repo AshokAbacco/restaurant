@@ -37,6 +37,7 @@ import razorpay, {
   RAZORPAY_WEBHOOK_SECRET,
 } from "../config/razorpay.js";
 import { priceQuote } from "./pricing.plans.js";
+import { sendInvoiceForPayment } from "./invoice.service.js";
 
 // Razorpay caps each note value at 256 chars and allows at most 15 keys.
 // Exceeding either makes the whole orders.create call fail, which would
@@ -73,6 +74,7 @@ export const createOrder = async ({
     name = "",
     email = "",
     phone = "",
+    address = "",
     city = "",
     gstin = "",
     notes = "",
@@ -116,6 +118,7 @@ export const createOrder = async ({
         contactName: name,
         email,
         phone,
+        address,
         city,
         gstin,
         notes,
@@ -161,6 +164,7 @@ export const createOrder = async ({
         name: note(name),
         email: note(email),
         phone: note(String(phone).replace(/\D/g, "")),
+        address: note(address),
         city: note(city),
         gstin: note(gstin),
         customerNotes: note(notes),
@@ -255,6 +259,7 @@ const persistPaidPayment = async (order, { paymentId, signature = null }) => {
     contactName: n.name || null,
     email: n.email || null,
     phone: n.phone || null,
+    address: n.address || null,
     city: n.city || null,
     gstin: n.gstin || null,
     notes: n.customerNotes || null,
@@ -355,6 +360,16 @@ export const verifyPayment = async ({
     signature: razorpay_signature,
   });
 
+  // Invoice + emails. Deliberately NOT awaited: the PDF build, the R2
+  // upload and two SMTP round-trips would otherwise hold the browser on
+  // the "verifying payment" spinner for several seconds, and none of it
+  // affects whether the payment is valid. It is also safe to fire from
+  // both this path and the webhook — sendInvoiceForPayment claims the
+  // send atomically, so only one of them actually sends.
+  sendInvoiceForPayment(record).catch((err) =>
+    console.error(`[invoice] dispatch failed for payment ${record.id}:`, err),
+  );
+
   return {
     success: true,
     paymentRecordId: record.id,
@@ -439,7 +454,20 @@ export const handleWebhook = async (rawBody, signatureHeader) => {
     };
   }
 
-  await persistPaidPayment(order, { paymentId: payment.id });
+  const record = await persistPaidPayment(order, { paymentId: payment.id });
+
+  // The safety net for when the browser never came back (closed tab,
+  // dropped network, async UPI settlement) — in that case this is the only
+  // path that will ever send the invoice. Awaited here, unlike in
+  // verifyPayment, because nobody is waiting on a spinner and Razorpay is
+  // happy to wait a few seconds for the 200. Failures are logged rather
+  // than returned as a 5xx: the row is already safely written, and the
+  // claim has been released so a retry can re-send.
+  try {
+    await sendInvoiceForPayment(record);
+  } catch (err) {
+    console.error(`[invoice] webhook dispatch failed for ${record?.id}:`, err);
+  }
 
   return { success: true };
 };
@@ -494,8 +522,13 @@ export const getPaymentRecord = async (id) => {
       contactName: record.contactName,
       email: record.email,
       phone: record.phone,
+      address: record.address,
       city: record.city,
       gstin: record.gstin,
+      // Link to the PDF in R2, so the success screen / Register page can
+      // offer "Download invoice" without re-generating anything.
+      invoiceNumber: record.invoiceNumber,
+      invoiceUrl: record.invoiceUrl,
       alreadyUsed: Boolean(record.owner),
     },
   };
