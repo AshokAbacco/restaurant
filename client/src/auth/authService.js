@@ -40,6 +40,40 @@ const register = async (payload) => {
 };
 
 // ==============================================
+// PRICING PAYMENT LOOKUP (Register page prefill)
+// Goes through apiRequest — and therefore through apiClient's BASE_URL —
+// rather than reusing landing/pages/pricingApi.js, which has a different
+// fallback base URL ("" vs "http://localhost:5001/api"). Two base URLs for
+// the same backend is exactly the kind of thing that works in dev and
+// silently 404s in one place after deploy.
+//
+// Returns the completed payment behind `paymentId`, or a failure. Anything
+// that isn't a PAID record 404s server-side (see pricing.service.js's
+// getPaymentRecord), so a cancelled checkout can't be walked past.
+// ==============================================
+
+const fetchPricingPayment = async (paymentId) => {
+  const { ok, data } = await apiRequest(
+    `/pricing/payments/${encodeURIComponent(paymentId)}`,
+    { method: "GET" },
+    // The Register page is public — there's no session to refresh, and
+    // attempting one would fire a pointless 401 on every visit.
+    { skipRefresh: true },
+  );
+
+  if (!ok || !data?.success) {
+    return {
+      success: false,
+      message:
+        data?.message ||
+        "We couldn't find a completed payment for this reference.",
+    };
+  }
+
+  return { success: true, payment: data.payment };
+};
+
+// ==============================================
 // LOGIN
 // FEATURE (multi-tenancy): the backend now supports two shapes here.
 // Most logins (single-outlet staff) get the old shape straight back:
@@ -344,6 +378,7 @@ const resetPassword = async (token, password) => {
 
 const authService = {
   register,
+  fetchPricingPayment,
   login,
   selectOutlet,
   switchOutlet,

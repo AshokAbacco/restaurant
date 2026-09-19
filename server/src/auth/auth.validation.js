@@ -57,12 +57,23 @@ export const registerSchema = z.object({
       "Phone number can only contain digits, spaces, and + ( ) -",
     ),
   email: z.string().trim().email("Enter a valid email address."),
-  password: z.string().min(8, "Password must be at least 8 characters."),
+  // Minimum 6, matching the hint on the Register form. Keep this in step
+  // with resetPasswordSchema and changePasswordSchema below — if signup
+  // allows 6 but a reset demands 8, anyone who signed up with a 6-character
+  // password is told their own password is invalid the first time they try
+  // to change it.
+  password: z.string().min(6, "Password must be at least 6 characters."),
   address: z
     .string()
     .trim()
     .min(5, "Address must be at least 5 characters.")
     .max(300, "Address is too long."),
+  // The completed checkout this signup is being created from. Optional so
+  // that direct signups (and existing tests/seeds) still work — those get
+  // Organization.branchLimit's default of 1. When present it must name a
+  // PAID PricingPayment that no other Owner has claimed, and whose email
+  // matches the one above; auth.service.js enforces all three.
+  pricingPaymentId: z.string().trim().min(1).optional().nullable(),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -88,12 +99,14 @@ export const switchOutletSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required."),
-  password: z.string().min(8, "Password must be at least 8 characters."),
+  // 6, to stay consistent with registerSchema above.
+  password: z.string().min(6, "Password must be at least 6 characters."),
 });
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required."),
-  newPassword: z.string().min(8, "New password must be at least 8 characters."),
+  // 6, to stay consistent with registerSchema above.
+  newPassword: z.string().min(6, "New password must be at least 6 characters."),
 });
 
 // Matches auth.service.js's EDITABLE_EMPLOYEE_FIELDS allow-list exactly —

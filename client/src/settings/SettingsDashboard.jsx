@@ -49,15 +49,7 @@ const SETTINGS = [
     color: "bg-[#2563EB] dark:bg-[#60A5FA]",
     path: "/settings/branches",
   },
-  {
-    id: 2,
-    title: "Users & Roles",
-    description:
-      "Create staff accounts, assign roles, and manage user permissions across your restaurant.",
-    icon: FiUsers,
-    color: "bg-[#9333EA] dark:bg-[#C084FC]",
-    path: "/settings/users",
-  },
+
   {
     id: 3,
     title: "Self Order Kiosk",
@@ -121,24 +113,24 @@ const SETTINGS = [
     color: "bg-[#D97706] dark:bg-[#FCD34D]",
     path: "/settings/printer",
   },
-  {
-    id: 8,
-    title: "Notifications",
-    description:
-      "Enable SMS, WhatsApp, email alerts, and push notifications for orders and important restaurant events.",
-    icon: FiBell,
-    color: "bg-[#4F46E5] dark:bg-[#818CF8]",
-    path: "/settings/notifications",
-  },
-  {
-    id: 9,
-    title: "Appearance",
-    description:
-      "Customize your dashboard theme, color scheme, logo placement, and visual branding throughout the system.",
-    icon: FiImage,
-    color: "bg-[#0891B2] dark:bg-[#06B6D4]",
-    path: "/settings/appearance",
-  },
+  // {
+  //   id: 8,
+  //   title: "Notifications",
+  //   description:
+  //     "Enable SMS, WhatsApp, email alerts, and push notifications for orders and important restaurant events.",
+  //   icon: FiBell,
+  //   color: "bg-[#4F46E5] dark:bg-[#818CF8]",
+  //   path: "/settings/notifications",
+  // },
+  // {
+  //   id: 9,
+  //   title: "Appearance",
+  //   description:
+  //     "Customize your dashboard theme, color scheme, logo placement, and visual branding throughout the system.",
+  //   icon: FiImage,
+  //   color: "bg-[#0891B2] dark:bg-[#06B6D4]",
+  //   path: "/settings/appearance",
+  // },
   {
     id: 10,
     title: "Backup & Restore",

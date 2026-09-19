@@ -15,6 +15,7 @@ import {
   RESET_TOKEN_TTL_MS,
 } from "./jwt.utils.js";
 import { sendPasswordResetEmail } from "./email.service.js";
+import { planExpiryFrom } from "../pricing/pricing.plans.js";
 
 const SALT_ROUNDS = 12;
 const MAX_FAILED_ATTEMPTS = 15;
@@ -213,6 +214,7 @@ const usernameFromEmail = (email) => {
 
 export const registerOwner = async (payload = {}) => {
   const { restaurantName, fullName, phone, password, address } = payload;
+  const pricingPaymentId = payload.pricingPaymentId || null;
 
   // Normalized once here and reused for all three places it's written
   // (Owner.email, UserAccount.email, Organization.ownerEmail) so a signup
@@ -250,12 +252,91 @@ export const registerOwner = async (payload = {}) => {
     };
   }
 
+  // ==========================================================
+  // Resolve what this signup is entitled to.
+  // ==========================================================
+  // Defaults describe a plain, unpaid signup: one branch, no plan, no
+  // expiry. Anything more has to be proved by a real completed payment.
+  let entitlement = { planId: null, branchLimit: 1, planExpiresAt: null };
+  let payment = null;
+
+  if (pricingPaymentId) {
+    payment = await prisma.pricingPayment.findUnique({
+      where: { id: pricingPaymentId },
+      include: { owner: { select: { id: true } } },
+    });
+
+    if (!payment) {
+      return {
+        success: false,
+        status: 404,
+        message: "We couldn't find that payment. Please contact support.",
+      };
+    }
+
+    // Cancelled and failed checkouts never produce a row at all now (see
+    // pricing.service.js), so this mainly catches rows left over from the
+    // older create-first flow being replayed.
+    if (payment.status !== "PAID") {
+      return {
+        success: false,
+        status: 402,
+        message:
+          "That payment hasn't completed, so an account can't be created from it yet.",
+      };
+    }
+
+    // The @unique on Owner.pricingPaymentId is the real guarantee; this
+    // check exists to give a useful message instead of a raw P2002.
+    if (payment.owner) {
+      return {
+        success: false,
+        status: 409,
+        message:
+          "An account has already been created with this payment. Try logging in instead.",
+      };
+    }
+
+    // Binds the payment to the person who made it. Without this, anyone
+    // holding a payment id could register a different restaurant against
+    // someone else's purchase — the Register page locks the email field,
+    // but a locked input is a UI convenience, not a control.
+    if ((payment.email || "").trim().toLowerCase() !== email) {
+      return {
+        success: false,
+        status: 403,
+        message:
+          "This payment was made with a different email address. Register with the email you paid with.",
+      };
+    }
+
+    entitlement = {
+      planId: payment.planId,
+      // THE branch entitlement. Everything the Branches page enforces
+      // traces back to this one assignment.
+      branchLimit: Math.max(1, payment.branches || 1),
+      planExpiresAt: planExpiryFrom(
+        {
+          isFree: payment.planId === "free",
+          months: payment.billingCycle === "year" ? 12 : 1,
+        },
+        payment.createdAt,
+      ),
+    };
+  }
+
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
   try {
     const created = await prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
-        data: { name: restaurantName, ownerEmail: email },
+        data: {
+          name: restaurantName,
+          ownerEmail: email,
+          planId: entitlement.planId,
+          branchLimit: entitlement.branchLimit,
+          planExpiresAt: entitlement.planExpiresAt,
+        },
       });
 
       // First outlet is seeded from the restaurant's own details — a
@@ -313,6 +394,10 @@ export const registerOwner = async (payload = {}) => {
           organizationId: organization.id,
           outletId: outlet.id,
           userAccountId: userAccount.id,
+          // Inside the transaction so the link and the account are created
+          // atomically: a payment can never end up marked as consumed by an
+          // account that failed to be created, or vice versa.
+          pricingPaymentId: payment ? payment.id : null,
         },
       });
 
@@ -335,6 +420,14 @@ export const registerOwner = async (payload = {}) => {
         address: created.owner.address,
         organizationId: created.organization.id,
         outletId: created.outlet.id,
+      },
+      // Lets the Register page's success panel say what they actually
+      // bought ("Monthly plan · up to 3 branches") rather than a generic
+      // "account created".
+      plan: {
+        planId: created.organization.planId,
+        branchLimit: created.organization.branchLimit,
+        expiresAt: created.organization.planExpiresAt,
       },
     };
   } catch (err) {

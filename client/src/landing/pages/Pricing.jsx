@@ -1,6 +1,3 @@
-
-
-
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -413,11 +410,15 @@ function CheckoutModal({ cart, onClose }) {
       setPaying(true);
       try {
         const result = await createPricingOrder({
-          planId: cart.planId.toLowerCase(),   // ✅ FIX
-          tierKey: cart.tierKey.toLowerCase(), // ✅ FIX
+          // FIX: cart.tierKey is null for the free plan (see openCheckout),
+          // so the old cart.tierKey.toLowerCase() threw a TypeError and the
+          // free trial never started at all.
+          planId: cart.planId.toLowerCase(),
+          tierKey: cart.tierKey ? cart.tierKey.toLowerCase() : null,
           branches: cart.branches,
           contact: buildContact(),
         });
+        // A free trial has nothing to verify, so this IS the record id.
         setPaymentRecordId(result.paymentRecordId);
         setPaymentId("trial");
         setStep(3);
@@ -460,8 +461,8 @@ function CheckoutModal({ cart, onClose }) {
     let order;
     try {
       order = await createPricingOrder({
-        planId: cart.planId.toLowerCase(),   // ✅ FIX
-        tierKey: cart.tierKey.toLowerCase(), // ✅ FIX
+        planId: cart.planId.toLowerCase(),
+        tierKey: cart.tierKey ? cart.tierKey.toLowerCase() : null,
         branches: cart.branches,
         contact: buildContact(),
       });
@@ -478,7 +479,11 @@ function CheckoutModal({ cart, onClose }) {
       return;
     }
 
-    setPaymentRecordId(order.paymentRecordId);
+    // NOTE: deliberately no setPaymentRecordId(...) here. The backend no
+    // longer writes a PricingPayment row at order-creation time, so there
+    // is no record id to hold yet — and that's the point: an id handed over
+    // before payment is a forgeable proof of purchase. It arrives from
+    // verify-payment below, once the payment is real.
 
     // 2. Open Razorpay Checkout against that order.
     const rzp = new window.Razorpay({
@@ -541,6 +546,13 @@ function CheckoutModal({ cart, onClose }) {
   // the free plan it's the trial signup record. Either way, hand off to
   // Register with enough context to prefill/link the account being created.
   const goToRegister = () => {
+    // paymentId travels in the QUERY STRING, not only in router state:
+    // state is lost the moment the user refreshes the Register page or
+    // opens the link in a new tab, and losing it would strand a paying
+    // customer on a form that can't be submitted. Register.jsx re-fetches
+    // the payment from this id and treats the server's copy as
+    // authoritative — the prefill below is only there to paint the fields
+    // instantly while that request is in flight.
     const params = new URLSearchParams({
       paymentId: paymentRecordId || "",
       plan: cart.planId,
@@ -554,6 +566,8 @@ function CheckoutModal({ cart, onClose }) {
           fullName: form.name,
           email: form.email,
           phone: form.phone,
+          // City is what the Register page's Address field is seeded from —
+          // it's the only location we collected at checkout.
           address: form.city,
         },
       },
@@ -741,6 +755,11 @@ function CheckoutModal({ cart, onClose }) {
             <button
               className="ab-btn ab-btn-dark ab-btn-inline"
               onClick={goToRegister}
+              // Step 3 is only reached after a verified payment or a free
+              // trial, both of which set this — but sending someone to
+              // /register with an empty paymentId would silently downgrade
+              // them to a 1-branch account, so refuse rather than guess.
+              disabled={!paymentRecordId}
             >
               Continue to registration
             </button>

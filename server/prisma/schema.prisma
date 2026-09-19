@@ -545,38 +545,28 @@ model ExpenseCategory {
 // ─────────────────────────────────────────────
 // MULTI-TENANCY — ORGANIZATION / OUTLET
 // ─────────────────────────────────────────────
-// Organization = the brand/owner account (one signup = one Organization).
-// Outlet = a physical restaurant branch under an Organization. Everywhere
-// else in this schema, "outletId" is what used to be the free-text
-// `store String @default("Main Store")` convention -- that field has been
-// removed from every model below in favor of this real relation.
+
 model Organization {
   id         String  @id @default(uuid())
   name       String
   ownerEmail String  @unique
   isActive   Boolean @default(true)
 
+  planId        String? // "free" | "monthly" | "yearly"
+  branchLimit   Int       @default(1)
+  planExpiresAt DateTime? // null = no expiry recorded (e.g. seeded orgs)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   outlets      Outlet[]
   userAccounts UserAccount[]
-  // Back-relation for the Owner row created at self-signup (see Owner
-  // below). Optional because organizations created any other way (seeds,
-  // the backfill script, an outlet added later by an existing owner) have
-  // no signup record attached.
-  owner        Owner?
+
+  owner Owner?
 
   @@map("organizations")
 }
 
-// Lets each outlet relabel/recolor the system order statuses for display
-// purposes (e.g. "PREPARING" -> "Cooking 👨‍🍳") without touching the actual
-// OrderStatus state machine that drives KDS/billing logic — systemStatus
-// is always one of the real enum values; customLabel/color are purely
-// cosmetic. One row per system status per outlet (an outlet either has a
-// customization for a given status, or the frontend falls back to the
-// plain enum value — see settings.service.js).
 model OrderStatusLabel {
   id       String @id @default(uuid())
   outletId String
@@ -1290,6 +1280,21 @@ model Owner {
   // account doesn't leave an orphaned signup row behind.
   userAccountId  String       @unique
   userAccount    UserAccount  @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+
+  // ---- The checkout that paid for this account ----
+  // One PricingPayment funds exactly one Owner, hence @unique: it stops the
+  // same payment id being replayed to register a second restaurant, which
+  // is the whole reason this is a real FK and not just a copied-in string.
+  //
+  // Optional because not every Owner row comes from the Pricing page —
+  // seeds, the backfill script, and any account created before this flow
+  // existed have no payment to point at. Those fall back to
+  // Organization.branchLimit's default of 1.
+  //
+  // onDelete: SetNull rather than Cascade — deleting a payment record must
+  // never take a live restaurant's account down with it.
+  pricingPaymentId String?         @unique
+  pricingPayment   PricingPayment? @relation(fields: [pricingPaymentId], references: [id], onDelete: SetNull)
 
   isActive Boolean @default(true)
 
@@ -2486,7 +2491,8 @@ model PricingPayment {
   razorpayPaymentId String? @unique
   razorpaySignature String?
 
-  status PricingPaymentStatus @default(CREATED)
+  status PricingPaymentStatus @default(PAID)
+  owner  Owner?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
