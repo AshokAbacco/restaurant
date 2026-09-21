@@ -2,31 +2,53 @@
 // src/landing/components/Footer.jsx
 // ==============================================
 //
-// Dark, on the app's own canvas colour, so the page closes on the same
-// surface the product runs on.
-//
-// The photograph sits under a heavy scrim rather than behind plain text.
-// A footer is the one place on the page where a picture can be large and
-// quiet at the same time: nothing here needs to be read quickly, but the
-// phone number still has to be legible at a glance, which is why the
-// scrim is opaque enough to kill the image's contrast entirely.
-//
-// The contact details are real text rather than a form. Someone deciding
-// whether to trust a till system with their evening's takings wants to
-// see a phone number, and an owner reading this at 11pm wants to call in
-// the morning, not fill in three fields.
 
 import { Link } from "react-router-dom";
 
-import {
-  BRAND,
-  FOOTER_COLUMNS,
-  FOOTER_LEGAL,
-} from "../landing.config";
 import Wordmark from "./Wordmark";
 
 // public/images/small-img.png  ->  /images/small-img.png
 const BG_IMAGE = "/images/small-img.png";
+
+// ------------------------------------------------
+// Content (manual data)
+// ------------------------------------------------
+
+const BRAND = {
+  name: "Abacco Technolog",
+  email: "info@abaccotech.com",
+  phone: "+91 80 4718 2200",
+  address: "Vidyaranyapura, Bengaluru, Karnataka 560097",
+};
+
+// Update the `to` paths to match your router.
+const FOOTER_COLUMNS = [
+  {
+    heading: "Company",
+    links: [
+      { label: "Home", to: "/" },
+      { label: "Pricing", to: "/pricing" },
+      { label: "Contact", to: "/contact" },
+    ],
+  },
+  {
+    heading: "Support",
+    links: [
+      { label: "Sign in", to: "/login" },
+      { label: "Create an account", to: "/pricing" },
+      { label: "Help centre", to: "/help" },
+    ],
+  },
+];
+
+const FOOTER_LEGAL = [
+  { label: "Privacy", to: "/privacy" },
+  { label: "Terms", to: "/terms" },
+];
+
+// ------------------------------------------------
+// Component
+// ------------------------------------------------
 
 const Footer = () => (
   <footer className="relative isolate overflow-hidden bg-[#171C17] text-[#9CA8A0]">
@@ -76,24 +98,6 @@ const Footer = () => (
             back office. Built for independent restaurants and small
             chains in India.
           </p>
-
-          <address className="mt-6 space-y-1.5 text-[14px] not-italic">
-            <a
-              href={`mailto:${BRAND.email}`}
-              className="block transition-colors hover:text-[#F3F5EE]"
-            >
-              {BRAND.email}
-            </a>
-
-            <a
-              href={`tel:${BRAND.phone.replace(/\s/g, "")}`}
-              className="lp-nums block transition-colors hover:text-[#F3F5EE]"
-            >
-              {BRAND.phone}
-            </a>
-
-            <span className="block">{BRAND.address}</span>
-          </address>
         </div>
 
         {/* ==========================================
@@ -120,6 +124,34 @@ const Footer = () => (
             </ul>
           </nav>
         ))}
+
+        {/* ==========================================
+            CONTACT US — sits beside Support
+        ========================================== */}
+
+        <div className="col-span-2 sm:col-span-1">
+          <h2 className="text-[13px] font-semibold text-[#F3F5EE]">
+            Contact us
+          </h2>
+
+          <address className="mt-4 space-y-2.5 text-[14px] not-italic">
+            <a
+              href={`mailto:${BRAND.email}`}
+              className="block break-words transition-colors hover:text-[#F3F5EE]"
+            >
+              {BRAND.email}
+            </a>
+
+            <a
+              href={`tel:${BRAND.phone.replace(/\s/g, "")}`}
+              className="lp-nums block transition-colors hover:text-[#F3F5EE]"
+            >
+              {BRAND.phone}
+            </a>
+
+            <span className="block">{BRAND.address}</span>
+          </address>
+        </div>
       </div>
 
       {/* ==========================================
