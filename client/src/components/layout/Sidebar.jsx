@@ -185,6 +185,11 @@ const Sidebar = ({ open, onClose }) => {
       path: "/payments",
       icon: <FiCreditCard />,
     },
+    {
+      name: "CRM",
+      path: "/crm",
+      icon: <FiCreditCard />,
+    },
 
     {
       name: "Inventory",

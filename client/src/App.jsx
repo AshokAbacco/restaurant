@@ -81,7 +81,7 @@ const CounterSummaryRoutes = lazy(
 const ProfitLossRoutes = lazy(() => import("./profitLoss/profitLossRoutes"));
 const InventoryRoutes = lazy(() => import("./inventory/inventoryRoutes"));
 const EmployeesRoutes = lazy(() => import("./employees/employeesRoutes"));
-
+const CrmRoutes = lazy(() => import("./CRM/Crm"));
 // ==============================================
 // APP
 // ==============================================
@@ -170,6 +170,7 @@ function App() {
               <Route path="/kitchen/*" element={<KitchenRoutes />} />
               <Route path="/billing/*" element={<BillingRoutes />} />
               <Route path="/payments/*" element={<PaymentRoutes />} />
+              <Route path="/crm/*" element={<CrmRoutes />} />
 
               {/* Reports */}
               <Route path="/reports/*" element={<ReportsRoutes />} />
@@ -199,18 +200,7 @@ function App() {
           </Route>
         </Route>
 
-        {/* ==========================================
-          DEFAULT ROUTE
-
-          "/" used to redirect to /dashboard. It renders the public
-          homepage now, so the redirect is gone — the route above owns
-          it. Staff land on the dashboard from the sign-in flow, which
-          is unchanged.
-      ========================================== */}
-
-        {/* ==========================================
-          NOT FOUND
-      ========================================== */}
+        
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

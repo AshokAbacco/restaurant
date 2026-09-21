@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createPricingOrder,
@@ -12,6 +12,149 @@ import {
 const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
 const inr = (n) => "₹" + new Intl.NumberFormat("en-IN").format(Math.round(n));
+
+/* ================= currency (display only) =================
+   Plan prices are defined in INR and Razorpay still bills in INR. Picking
+   another country only changes how the prices are SHOWN on the cards, using
+   an approximate rate: FALLBACK_RATES below (units of currency per 1 INR),
+   refreshed from a free public rates API on load when it is reachable.
+   The first POPULAR_COUNT countries are what the dropdown lists before
+   anyone types in the search box. */
+const POPULAR_COUNT = 10;
+const STORE_KEY = "ab_pricing_country";
+
+const COUNTRIES = [
+  ["India", "IN", "INR"],
+  ["United States", "US", "USD"],
+  ["United Kingdom", "GB", "GBP"],
+  ["United Arab Emirates", "AE", "AED"],
+  ["Canada", "CA", "CAD"],
+  ["Australia", "AU", "AUD"],
+  ["Singapore", "SG", "SGD"],
+  ["Germany", "DE", "EUR"],
+  ["Saudi Arabia", "SA", "SAR"],
+  ["Qatar", "QA", "QAR"],
+  // --- only reachable through search ---
+  ["Kuwait", "KW", "KWD"],
+  ["Bahrain", "BH", "BHD"],
+  ["Oman", "OM", "OMR"],
+  ["Malaysia", "MY", "MYR"],
+  ["Thailand", "TH", "THB"],
+  ["Indonesia", "ID", "IDR"],
+  ["Philippines", "PH", "PHP"],
+  ["Vietnam", "VN", "VND"],
+  ["Japan", "JP", "JPY"],
+  ["South Korea", "KR", "KRW"],
+  ["China", "CN", "CNY"],
+  ["Hong Kong", "HK", "HKD"],
+  ["Sri Lanka", "LK", "LKR"],
+  ["Nepal", "NP", "NPR"],
+  ["Bangladesh", "BD", "BDT"],
+  ["Pakistan", "PK", "PKR"],
+  ["France", "FR", "EUR"],
+  ["Italy", "IT", "EUR"],
+  ["Spain", "ES", "EUR"],
+  ["Netherlands", "NL", "EUR"],
+  ["Ireland", "IE", "EUR"],
+  ["Switzerland", "CH", "CHF"],
+  ["Sweden", "SE", "SEK"],
+  ["Norway", "NO", "NOK"],
+  ["Denmark", "DK", "DKK"],
+  ["Poland", "PL", "PLN"],
+  ["Turkey", "TR", "TRY"],
+  ["Israel", "IL", "ILS"],
+  ["Egypt", "EG", "EGP"],
+  ["South Africa", "ZA", "ZAR"],
+  ["Nigeria", "NG", "NGN"],
+  ["Kenya", "KE", "KES"],
+  ["New Zealand", "NZ", "NZD"],
+  ["Brazil", "BR", "BRL"],
+  ["Mexico", "MX", "MXN"],
+].map(([name, code, currency]) => ({ name, code, currency }));
+
+const COUNTRY_BY_CODE = Object.fromEntries(COUNTRIES.map((c) => [c.code, c]));
+
+// Units of each currency per 1 INR. Approximate; only used until (or
+// unless) the live rates load.
+const FALLBACK_RATES = {
+  INR: 1, USD: 0.0114, GBP: 0.0085, EUR: 0.0097, AED: 0.0417, CAD: 0.0159,
+  AUD: 0.0175, SGD: 0.0147, SAR: 0.0426, QAR: 0.0414, KWD: 0.0035,
+  BHD: 0.00428, OMR: 0.00437, MYR: 0.0477, THB: 0.375, IDR: 186, PHP: 0.65,
+  VND: 300, JPY: 1.7, KRW: 15.9, CNY: 0.0807, HKD: 0.0886, LKR: 3.4,
+  NPR: 1.59, BDT: 1.39, PKR: 3.2, CHF: 0.0091, SEK: 0.107, NOK: 0.119,
+  DKK: 0.0727, PLN: 0.0432, TRY: 0.466, ILS: 0.0415, EGP: 0.55, ZAR: 0.2,
+  NGN: 17, KES: 1.47, NZD: 0.0193, BRL: 0.0625, MXN: 0.216,
+};
+
+const ZERO_DECIMAL = new Set(["JPY", "KRW", "VND", "IDR"]);
+
+// Best guess at where the visitor is. Timezone wins for India because many
+// Indian browsers are set to en-US, which would otherwise show USD. Anything
+// the visitor picks themselves is remembered and takes priority.
+function detectCountry() {
+  try {
+    const saved = localStorage.getItem(STORE_KEY);
+    if (saved && COUNTRY_BY_CODE[saved]) return saved;
+  } catch {
+    /* storage blocked — carry on */
+  }
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    if (tz === "Asia/Kolkata" || tz === "Asia/Calcutta") return "IN";
+    const langs = navigator.languages?.length
+      ? navigator.languages
+      : [navigator.language];
+    for (const l of langs) {
+      const region = new Intl.Locale(l).region;
+      if (region && COUNTRY_BY_CODE[region]) return region;
+    }
+  } catch {
+    /* fall through to the default */
+  }
+  return "IN";
+}
+
+function makeMoney(currency, rates) {
+  if (currency === "INR") return inr;
+  const rate = rates[currency] || FALLBACK_RATES[currency];
+  return (n) => {
+    const v = n * rate;
+    const digits = v === 0 || v >= 100 || ZERO_DECIMAL.has(currency) ? 0 : 2;
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(v);
+  };
+}
+
+function currencySymbol(code) {
+  try {
+    return (
+      new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: code,
+        currencyDisplay: "narrowSymbol",
+      })
+        .formatToParts(0)
+        .find((p) => p.type === "currency")?.value || code
+    );
+  } catch {
+    return code;
+  }
+}
+
+let currencyNames;
+function currencyName(code) {
+  try {
+    currencyNames =
+      currencyNames || new Intl.DisplayNames(["en"], { type: "currency" });
+    return currencyNames.of(code) || code;
+  } catch {
+    return code;
+  }
+}
 
 const BASE_FEATURES = [
   "Login Access: owner, manager, cashier, kitchen, waiter",
@@ -86,6 +229,40 @@ export default function Pricing() {
   const [extraNeeds, setExtraNeeds] = useState({ monthly: "", yearly: "" });
   const [cart, setCart] = useState(null); // { planId, tierKey, branches, unit, total, cycle, extraNeeds }
 
+  const [country, setCountry] = useState(detectCountry);
+  const [rates, setRates] = useState(FALLBACK_RATES);
+  const currency = COUNTRY_BY_CODE[country].currency;
+  const rate = rates[currency] || FALLBACK_RATES[currency];
+  const money = useMemo(() => makeMoney(currency, rates), [currency, rates]);
+
+  const pickCountry = (code) => {
+    setCountry(code);
+    try {
+      localStorage.setItem(STORE_KEY, code);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Refresh the approximate rates. If this fails (offline, blocked), the
+  // built-in fallback rates simply stay in use.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch("https://open.er-api.com/v6/latest/INR", { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        if (!d || !d.rates) return;
+        const live = {};
+        for (const code of Object.keys(FALLBACK_RATES)) {
+          const v = Number(d.rates[code]);
+          if (Number.isFinite(v) && v > 0) live[code] = v;
+        }
+        setRates((prev) => ({ ...prev, ...live }));
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, []);
+
   const priceOf = (planId) => {
     const plan = PLANS[planId];
     if (!plan.tiers) return { unit: 0, mrp: 0, total: 0 };
@@ -151,6 +328,18 @@ export default function Pricing() {
         </p>
       </header>
 
+      <div className="ab-cur">
+        <span className="ab-cur-label">Currency</span>
+        <CurrencyPicker country={country} onPick={pickCountry} />
+        {currency !== "INR" && (
+          <span className="ab-cur-rate">
+            1 {currency} ≈ ₹
+            {(1 / rate).toLocaleString("en-IN", { maximumFractionDigits: 2 })}.
+            Approximate. You are billed in INR.
+          </span>
+        )}
+      </div>
+
       <section className="ab-grid">
         {/* ---------------- Free ---------------- */}
         <article className="ab-card">
@@ -160,7 +349,7 @@ export default function Pricing() {
           </div>
 
           <div className="ab-price">
-            <span className="ab-amount">₹0</span>
+            <span className="ab-amount">{money(0)}</span>
             <span className="ab-per">for 30 days</span>
           </div>
           <p className="ab-total ab-total-quiet">
@@ -184,6 +373,7 @@ export default function Pricing() {
           price={priceOf("monthly")}
           needs={extraNeeds.monthly}
           onNeeds={(v) => setNeeds("monthly", v)}
+          money={money}
           onBuy={() => openCheckout("monthly")}
         />
 
@@ -198,6 +388,7 @@ export default function Pricing() {
           price={priceOf("yearly")}
           needs={extraNeeds.yearly}
           onNeeds={(v) => setNeeds("yearly", v)}
+          money={money}
           onBuy={() => openCheckout("yearly")}
         />
       </section>
@@ -206,10 +397,151 @@ export default function Pricing() {
         Prices are per branch and exclude 18% GST. Every branch gets
         unlimited users. Hardware, printers and one-time data migration are
         quoted separately.
+        {currency !== "INR" &&
+          " Amounts in " + currency + " are approximate. Orders are billed in INR."}
       </p>
 
-      {cart && <CheckoutModal cart={cart} onClose={() => setCart(null)} />}
+      {cart && (
+        <CheckoutModal
+          cart={cart}
+          money={money}
+          currency={currency}
+          onClose={() => setCart(null)}
+        />
+      )}
     </main>
+  );
+}
+
+/* ================= currency picker ================= */
+
+function CurrencyPicker({ country, onPick }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const wrapRef = useRef(null);
+  const inputRef = useRef(null);
+  const current = COUNTRY_BY_CODE[country];
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    inputRef.current?.focus();
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const query = q.trim().toLowerCase();
+  const results = query
+    ? COUNTRIES.filter(
+        (c) =>
+          c.name.toLowerCase().includes(query) ||
+          c.currency.toLowerCase().includes(query) ||
+          currencyName(c.currency).toLowerCase().includes(query),
+      )
+    : COUNTRIES.slice(0, POPULAR_COUNT);
+
+  const choose = (c) => {
+    onPick(c.code);
+    setOpen(false);
+    setQ("");
+  };
+
+  const chip = (code) => {
+    const sym = currencySymbol(code);
+    return (
+      <span className={"ab-cur-chip" + (sym.length > 2 ? " ab-cur-chip-sm" : "")}>
+        {sym}
+      </span>
+    );
+  };
+
+  return (
+    <div className="ab-cur-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className="ab-cur-btn"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {chip(current.currency)}
+        <span>
+          {current.name} · {current.currency}
+        </span>
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="ab-cur-caret">
+          <path
+            d="M5 8l5 5 5-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="ab-cur-pop">
+          <input
+            ref={inputRef}
+            className="ab-cur-search"
+            type="search"
+            value={q}
+            placeholder="Search country or currency"
+            aria-label="Search country or currency"
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && results[0]) {
+                e.preventDefault();
+                choose(results[0]);
+              }
+            }}
+          />
+
+          {results.length > 0 ? (
+            <ul className="ab-cur-list" role="listbox" aria-label="Country">
+              {results.map((c) => (
+                <li key={c.code} role="presentation">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={c.code === country}
+                    className={
+                      "ab-cur-opt" + (c.code === country ? " is-on" : "")
+                    }
+                    onClick={() => choose(c)}
+                  >
+                    {chip(c.currency)}
+                    <span>
+                      <span className="ab-cur-opt-name">{c.name}</span>
+                      <span className="ab-cur-opt-sub">
+                        {c.currency} · {currencyName(c.currency)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="ab-cur-empty">No country matches “{q.trim()}”.</p>
+          )}
+
+          {!query && (
+            <p className="ab-cur-more">
+              Showing {POPULAR_COUNT} of {COUNTRIES.length} countries. Type to
+              search the rest.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -225,10 +557,12 @@ function PaidCard({
   price,
   needs,
   onNeeds,
+  money,
   onBuy,
 }) {
   const isCustom = tierKey === "custom";
   const cycleWord = plan.cycle === "year" ? "year" : "month";
+  const amount = money(price.unit);
 
   return (
     <article className={"ab-card" + (featured ? " ab-card-featured" : "")}>
@@ -254,8 +588,12 @@ function PaidCard({
       </div>
 
       <div className="ab-price">
-        <span className="ab-was">{inr(price.mrp)}</span>
-        <span className="ab-amount">{inr(price.unit)}</span>
+        <span className="ab-was">{money(price.mrp)}</span>
+        <span
+          className={"ab-amount" + (amount.length > 8 ? " ab-amount-long" : "")}
+        >
+          {amount}
+        </span>
         <span className="ab-per">per branch / month</span>
       </div>
 
@@ -298,7 +636,7 @@ function PaidCard({
       )}
 
       <p className="ab-total">
-        <strong>{inr(price.total)}</strong> per {cycleWord} for {branches}{" "}
+        <strong>{money(price.total)}</strong> per {cycleWord} for {branches}{" "}
         {branches === 1 ? "branch" : "branches"}
         {plan.cycle === "year" && " (12 months paid together)"}
       </p>
@@ -345,7 +683,7 @@ function Tick() {
 
 /* ================= checkout modal ================= */
 
-function CheckoutModal({ cart, onClose }) {
+function CheckoutModal({ cart, money, currency, onClose }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1 details · 2 review+pay · 3 done
   const [form, setForm] = useState(emptyForm);
@@ -610,6 +948,13 @@ function CheckoutModal({ cart, onClose }) {
             ×
           </button>
         </div>
+
+        {!isFree && currency !== "INR" && step < 3 && (
+          <p className="ab-cur-note">
+            You'll be charged {inr(grand)} in INR, about {money(grand)} at
+            today's rate. Your card issuer sets the final exchange rate.
+          </p>
+        )}
 
         {step === 1 && (
           <div className="ab-modal-body">
@@ -957,6 +1302,49 @@ function Styles() {
 .ab-done-copy{margin:0 auto 16px;max-width:46ch;font-size:14.5px;line-height:1.55;color:var(--muted)}
 .ab-ref{font-size:13px;color:var(--muted);margin:0 0 22px}
 .ab-ref code{background:#F3F4EE;padding:3px 7px;border-radius:6px}
+
+/* currency picker */
+.ab-cur{max-width:1160px;margin:0 auto 26px;display:flex;align-items:center;flex-wrap:wrap;gap:12px 14px}
+.ab-cur-label{font-size:14px;font-weight:600}
+.ab-cur-rate{font-size:13px;color:var(--muted)}
+.ab-cur-wrap{position:relative}
+.ab-cur-btn{
+  display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border:1px solid var(--line);
+  background:#fff;border-radius:12px;font:inherit;font-size:14.5px;font-weight:600;color:var(--ink);cursor:pointer;
+}
+.ab-cur-btn:hover{border-color:#C9CCBC}
+.ab-cur-btn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.ab-cur-chip{
+  width:28px;height:28px;flex:none;border-radius:50%;background:#E8F6EC;color:var(--green-dark);
+  display:grid;place-items:center;font-size:13px;font-weight:700;
+}
+.ab-cur-chip-sm{font-size:10px;letter-spacing:-.02em}
+.ab-cur-caret{width:14px;height:14px;color:var(--muted)}
+.ab-cur-pop{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:30;width:min(340px,calc(100vw - 48px));
+  background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px;
+  box-shadow:0 24px 48px -20px rgba(18,20,16,.35);
+}
+.ab-cur-search{
+  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
+  font:inherit;font-size:14.5px;background:#FCFDF9;
+}
+.ab-cur-search:focus{outline:2px solid var(--green);outline-offset:-1px;background:#fff}
+.ab-cur-list{list-style:none;margin:8px 0 0;padding:0;max-height:320px;overflow:auto}
+.ab-cur-opt{
+  width:100%;display:flex;align-items:center;gap:10px;padding:8px;border:0;background:transparent;
+  border-radius:10px;font:inherit;text-align:left;cursor:pointer;color:var(--ink);
+}
+.ab-cur-opt:hover,.ab-cur-opt.is-on{background:#F3F4EE}
+.ab-cur-opt:focus-visible{outline:2px solid var(--green);outline-offset:-2px}
+.ab-cur-opt-name{display:block;font-size:14.5px;font-weight:600}
+.ab-cur-opt-sub{display:block;font-size:12.5px;color:var(--muted)}
+.ab-cur-empty,.ab-cur-more{margin:10px 4px 2px;font-size:13px;color:var(--muted)}
+.ab-cur-note{
+  margin:0;padding:11px 26px;background:#F7F8F3;border-bottom:1px solid var(--line);
+  font-size:13px;line-height:1.5;color:var(--muted);
+}
+.ab-amount-long{font-size:34px}
 
 @media(prefers-reduced-motion:reduce){.ab-pricing *{transition:none!important}}
     `}</style>
