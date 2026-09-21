@@ -334,59 +334,7 @@ const QRSettings = () => {
           </div>
         </Card>
 
-        {/* ======================================
-            QR DESIGN
-        ====================================== */}
-
-        <Card title="QR Design">
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* QR Color */}
-
-            <div>
-              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
-                QR Color
-              </label>
-
-              <input
-                type="color"
-                defaultValue="#000000"
-                className="w-20 h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg bg-white dark:bg-[#1D231C]"
-              />
-            </div>
-
-            {/* Background */}
-
-            <div>
-              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
-                Background Color
-              </label>
-
-              <input
-                type="color"
-                defaultValue="#FFFFFF"
-                className="w-20 h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg bg-white dark:bg-[#1D231C]"
-              />
-            </div>
-
-            {/* Logo */}
-
-            <div className="md:col-span-2">
-              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
-                Restaurant Logo (Center of QR)
-              </label>
-
-              <input
-                type="file"
-                accept="image/*"
-                className="w-full border border-[#E7EAE1] dark:border-[#262B24] rounded-lg p-3 bg-white dark:bg-[#1D231C] text-[#1F2937] dark:text-[#E4E9E2] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#F3F5EE] dark:file:bg-white/5 file:text-[#1F2937] dark:file:text-[#E4E9E2] transition-colors"
-              />
-
-              <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0] mt-2">
-                Optional logo displayed in the center of generated QR codes.
-              </p>
-            </div>
-          </div>
-        </Card>
+       
 
         {/* ======================================
             CUSTOMER ORDER OPTIONS
@@ -691,51 +639,8 @@ const QRSettings = () => {
           </div>
         </Card>
 
-        {/* ======================================
-            FOOTER
-        ====================================== */}
-
-        <div className="flex justify-end gap-4 mt-8 pb-10">
-          <button
-            className="
-              h-12
-              px-6
-              rounded-xl
-              border
-              border-[#E7EAE1]
-              dark:border-[#262B24]
-              text-[#1F2937]
-              dark:text-[#E4E9E2]
-              hover:bg-[#F3F5EE]
-              dark:hover:bg-white/5
-              transition-colors
-            "
-          >
-            Reset Settings
-          </button>
-
-          <button
-            onClick={handleSave}
-            className="
-              h-12
-              px-8
-              rounded-xl
-              bg-[#3FA34D]
-              dark:bg-[#43B75A]
-              hover:bg-[#358F42]
-              dark:hover:bg-[#3AA34E]
-              text-white
-              flex
-              items-center
-              gap-2
-              shadow-lg
-              transition-all
-            "
-          >
-            <FiSave />
-            Save QR Settings
-          </button>
-        </div>
+    
+        
       </div>
     </div>
   );

@@ -113,42 +113,7 @@ const SETTINGS = [
     color: "bg-[#D97706] dark:bg-[#FCD34D]",
     path: "/settings/printer",
   },
-  // {
-  //   id: 8,
-  //   title: "Notifications",
-  //   description:
-  //     "Enable SMS, WhatsApp, email alerts, and push notifications for orders and important restaurant events.",
-  //   icon: FiBell,
-  //   color: "bg-[#4F46E5] dark:bg-[#818CF8]",
-  //   path: "/settings/notifications",
-  // },
-  // {
-  //   id: 9,
-  //   title: "Appearance",
-  //   description:
-  //     "Customize your dashboard theme, color scheme, logo placement, and visual branding throughout the system.",
-  //   icon: FiImage,
-  //   color: "bg-[#0891B2] dark:bg-[#06B6D4]",
-  //   path: "/settings/appearance",
-  // },
-  {
-    id: 10,
-    title: "Backup & Restore",
-    description:
-      "Create data backups, restore from previous backups, and export your restaurant's critical information.",
-    icon: FiDatabase,
-    color: "bg-[#0369A1] dark:bg-[#0EA5E9]",
-    path: "/settings/backup",
-  },
-  {
-    id: 11,
-    title: "Subscription & System",
-    description:
-      "Manage your subscription plan, license details, system updates, and view system information.",
-    icon: FiCpu,
-    color: "bg-[#475569] dark:bg-[#94A3B8]",
-    path: "/settings/system",
-  },
+
 ];
 
 // ==============================================
