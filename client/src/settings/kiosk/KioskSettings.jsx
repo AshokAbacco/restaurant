@@ -385,43 +385,7 @@ const KioskSettings = () => {
           </div>
         </div>
 
-        {/* ======================================
-            DISPLAY SETTINGS
-        ====================================== */}
-
-        <div className="bg-white dark:bg-[#171C17] rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-8 text-[#1F2937] dark:text-[#E4E9E2]">Display Settings</h2>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
-                Success Screen Duration (Seconds)
-              </label>
-
-              <input
-                type="number"
-                min="3"
-                max="30"
-                defaultValue="8"
-                className="w-full h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg px-4 bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2]"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
-                Idle Screen Duration (Seconds)
-              </label>
-
-              <input
-                type="number"
-                min="10"
-                max="300"
-                defaultValue="60"
-                className="w-full h-12 border border-[#E7EAE1] dark:border-[#262B24] rounded-lg px-4 bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2]"
-              />
-            </div>
-          </div>
-        </div>
+       
 
         {/* ======================================
             BRANDING
@@ -441,15 +405,7 @@ const KioskSettings = () => {
               />
             </div>
 
-            <div>
-              <label className="block mb-3 font-medium text-[#1F2937] dark:text-[#E4E9E2]">Background Image</label>
-
-              <input
-                type="file"
-                accept="image/*"
-                className="w-full border border-[#E7EAE1] dark:border-[#262B24] rounded-lg p-3 bg-white dark:bg-[#1D231C] dark:text-[#E4E9E2]"
-              />
-            </div>
+           
           </div>
         </div>
 
