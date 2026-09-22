@@ -81,7 +81,7 @@ const CounterSummaryRoutes = lazy(
 const ProfitLossRoutes = lazy(() => import("./profitLoss/profitLossRoutes"));
 const InventoryRoutes = lazy(() => import("./inventory/inventoryRoutes"));
 const EmployeesRoutes = lazy(() => import("./employees/employeesRoutes"));
-const CrmRoutes = lazy(() => import("./crm/crmRoutes"));
+const CrmRoutes = lazy(() => import("./CRM/crmRoutes"));
 
 // ==============================================
 // APP
