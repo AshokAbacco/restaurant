@@ -8,9 +8,9 @@
 // which is what makes their CRM stats update — nothing else needs syncing.
 import { useEffect, useRef, useState } from "react";
 import { FiSearch, FiUserPlus, FiX, FiUser, FiAlertTriangle, FiBookmark } from "react-icons/fi";
-import { searchCustomers } from "../../crm/crmApi";
-import CustomerFormModal from "../../crm/components/CustomerFormModal";
-import { SegmentBadge, inr, relativeDays } from "../../crm/components/crmUI";
+import { searchCustomers } from "../../CRM/crmApi";
+import CustomerFormModal from "../../CRM/components/CustomerFormModal";
+import { SegmentBadge, inr, relativeDays } from "../../CRM/components/crmUI";
 
 export default function PosCustomerPanel({
   customer,
