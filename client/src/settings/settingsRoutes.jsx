@@ -31,6 +31,9 @@ import PaymentGateway from "./payment/PaymentGateway";
 // Tax
 import TaxBilling from "./tax/TaxBilling";
 
+// CRM
+import CrmSettings from "./crm/CrmSettings";
+
 // Order Status
 import OrderStatusSettings from "./order-status/OrderStatusSettings";
 import CountersSettings from "./counters/CountersSettings";
@@ -87,6 +90,9 @@ const SettingsRoutes = () => {
 
       {/* Tax */}
       <Route path="tax" element={<TaxBilling />} />
+
+      {/* CRM — the on/off switch that controls CRM across the POS */}
+      <Route path="crm" element={<CrmSettings />} />
 
       {/* Order Status */}
       <Route path="order-status" element={<OrderStatusSettings />} />

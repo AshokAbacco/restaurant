@@ -1,6 +1,7 @@
 // src/pos/components/OrderTicket.jsx
 import { useState } from "react";
 import AddOnPickerModal from "./AddOnPickerModal";
+import PosCustomerPanel from "./PosCustomerPanel";
 
 function lineAddOnTotal(item) {
   return (item.addOns || []).reduce((sum, a) => sum + Number(a.price) * a.quantity, 0);
@@ -30,6 +31,14 @@ export default function OrderTicket({
   // from "Send to Kitchen" to "Add to Order".
   existingOrder = null,
   loadingExistingOrder = false,
+  // CRM (Settings -> CRM). When crmEnabled is false none of this renders
+  // and the ticket behaves exactly as it did before CRM existed.
+  crmEnabled = false,
+  customer = null,
+  onChangeCustomer,
+  customerRequired = false,
+  showCustomerInsights = true,
+  linkingCustomer = false,
   cart,
   onIncrement,
   onDecrement,
@@ -62,6 +71,8 @@ export default function OrderTicket({
     (orderType !== "DINE_IN" || tableSelected) &&
     (orderType !== "ONLINE" || !!selectedPlatformId) &&
     (!kitchenRequired || !!selectedKitchenBranchId) &&
+    (!crmEnabled || !customerRequired || !!customer) &&
+    !linkingCustomer &&
     !placing;
 
   const [newPlatformName, setNewPlatformName] = useState("");
@@ -194,6 +205,23 @@ export default function OrderTicket({
           </div>
         )}
       </div>
+
+      {/* ============ CUSTOMER (CRM) ============ */}
+      {/* Its own strip under the header so the ticket's header layout is
+          untouched when CRM is off. On an order that's already placed,
+          picking a customer links them to that order straight away. */}
+      {crmEnabled && (
+        <div className="border-b border-dashed border-[#E7EAE1] px-4 pb-3 dark:border-[#262B24]">
+          <PosCustomerPanel
+            customer={customer}
+            onSelect={onChangeCustomer}
+            required={customerRequired}
+            showInsights={showCustomerInsights}
+            linking={linkingCustomer}
+            hint={existingOrder ? "links to this order" : undefined}
+          />
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {/* ============ ALREADY ON THIS ORDER ============ */}
@@ -345,6 +373,12 @@ export default function OrderTicket({
             <span>₹{total.toFixed(2)}</span>
           </div>
         </div>
+
+        {crmEnabled && customerRequired && !customer && cart.length > 0 && (
+          <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+            Select or add a customer to continue.
+          </p>
+        )}
 
         {error && (
           <p className="mt-2 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400">

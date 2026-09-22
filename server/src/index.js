@@ -28,6 +28,7 @@ import ReportsRoutes from "./reports/reports.routes.js";
 import profitLossRoutes from "./profitLoss/profitLoss.routes.js";
 import dashboardRoutes from "./dashboard/dashboard.routes.js";
 import printerProfilesRoutes from "./printer-profiles/printerProfiles.routes.js";
+import crmRoutes from "./crm/crm.routes.js";
 
 const app = express();
 console.log("🚀 USING UPDATED INDEX.JS - KIOSK WITHOUT STAFF AUTH");
@@ -173,6 +174,18 @@ app.use(
   requireAuth,
   requireOutletContext,
   dashboardRoutes,
+);
+
+// CRM — customer profiles, purchase history, groups, notes, follow-ups.
+// Same roles as the POS, because staff pick/add customers while taking an
+// order; crm.routes.js narrows destructive actions to managers and closes
+// everything except /config when Settings -> CRM is off.
+app.use(
+  "/api/crm",
+  requireAuth,
+  requireOutletContext,
+  requireRole("OWNER", "ADMIN", "MANAGER", "CASHIER", "WAITER"),
+  crmRoutes,
 );
 
 // Printer profiles — mount at /pos/ path to match frontend

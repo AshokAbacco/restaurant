@@ -22,4 +22,11 @@ router.delete(
   settingsController.resetOrderStatusLabel,
 );
 
+// Module settings — Settings -> CRM / Payment Gateway / Self Order Kiosk /
+// Tax & Billing. :section is one of crm | payment | kiosk | tax.
+router.get("/modules", settingsController.getAllModuleSettings);
+router.get("/modules/:section", settingsController.getModuleSettings);
+router.put("/modules/:section", settingsController.updateModuleSettings);
+router.delete("/modules/:section", settingsController.resetModuleSettings);
+
 export default router;

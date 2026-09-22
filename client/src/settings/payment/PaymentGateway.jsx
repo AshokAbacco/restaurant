@@ -2,7 +2,9 @@
 // src/settings/payment/PaymentGateway.jsx
 // ==============================================
 
-import React, { useState } from "react";
+import React from "react";
+import useModuleSettings from "../useModuleSettings";
+import SaveToast from "../SaveToast";
 import {
   FiCreditCard,
   FiSave,
@@ -13,12 +15,15 @@ import {
 const GATEWAYS = ["Razorpay", "Stripe", "Cashfree", "PhonePe", "Paytm"];
 
 const PaymentGateway = () => {
-  const [settings, setSettings] = useState({
+  const { settings, setSettings, loading, saving, message, save, reset } = useModuleSettings(
+    "payment",
+    {
     paymentEnabled: true,
     mode: "Test",
     gateway: "Razorpay",
     defaultPayment: "UPI",
-  });
+  },
+  );
 
   // ==========================================
   // HANDLE CHANGE
@@ -37,11 +42,8 @@ const PaymentGateway = () => {
   // SAVE
   // ==========================================
 
-  const handleSave = () => {
-    console.log(settings);
-
-    // Backend Integration Later
-  };
+  // Persists to /settings/modules/payment for the current outlet.
+  const handleSave = () => save();
 
   return (
     <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
@@ -69,6 +71,8 @@ const PaymentGateway = () => {
 
           <div className="flex gap-4">
             <button
+              onClick={reset}
+              disabled={saving || loading}
               className="h-12 px-6 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] border-gray-300 hover:bg-gray-100 dark:hover:bg-[#1D231C] flex items-center gap-2"
             >
               <FiRefreshCw />
@@ -77,6 +81,7 @@ const PaymentGateway = () => {
 
             <button
               onClick={handleSave}
+              disabled={saving || loading}
               className="h-12 px-8 rounded-xl bg-blue-600 dark:bg-[#60A5FA] hover:bg-blue-700 dark:hover:bg-[#3B82F6] text-white flex items-center gap-2"
             >
               <FiSave />
@@ -526,6 +531,7 @@ const PaymentGateway = () => {
 
           <button
             onClick={handleSave}
+              disabled={saving || loading}
             className="h-12 px-8 rounded-xl bg-blue-600 dark:bg-[#60A5FA] hover:bg-blue-700 dark:hover:bg-[#3B82F6] text-white flex items-center gap-2"
           >
             <FiSave />
@@ -533,6 +539,7 @@ const PaymentGateway = () => {
           </button>
         </div>
       </div>
+      <SaveToast message={message} />
     </div>
   );
 };
