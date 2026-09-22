@@ -1,4 +1,4 @@
-// src/crm/components/CrmTabs.jsx
+// src/CRM/components/CrmTabs.jsx
 import { NavLink } from "react-router-dom";
 
 const TABS = [
