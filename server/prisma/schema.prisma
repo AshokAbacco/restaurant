@@ -2030,14 +2030,6 @@ enum DuePaymentStatus {
   SETTLED
 }
 
-// Represents a physical POS terminal/billing station (e.g. "Counter 1",
-// "Captain", "Billing Station") — matches PetPooja's Counter Summary
-// report, which groups sales by which physical device processed them.
-// Deliberately a device-level identity, not a staff-level one: the same
-// physical terminal keeps its counter identity across shifts regardless
-// of who's logged into it, and one staff member's login can be used at
-// different counters at different times (see counter-selection on the
-// client — a per-browser choice, not part of the JWT).
 model BillingCounter {
   id       String @id @default(uuid())
   outletId String

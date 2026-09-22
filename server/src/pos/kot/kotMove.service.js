@@ -1,7 +1,6 @@
 // server/src/pos/kot/kotMove.service.js
 //
 // Phase 1.4 — Table-wise / KOT-wise / Item-wise "Move KOT/Items", matching
-// PetPooja's three-tab dialog on the Table View screen.
 //
 // DESIGN NOTE (the ambiguity the build plan flagged): "moving items" means
 // physically reassigning OrderItem rows (and, where possible, their

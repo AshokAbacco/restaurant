@@ -783,7 +783,7 @@ async function getDashboard(filters) {
 //
 // NOTE on payment-method columns: this system's PaymentMethod enum is
 // CASH/CARD/UPI/BANK_TRANSFER/CHEQUE/OTHER — there's no separate "Wallet"/
-// "Online Cash"/"Online Paid" distinction the way PetPooja's screen shows
+// "Online Cash"/"Online Paid" distinction the way screen shows
 // it. Rather than fake columns that don't correspond to real data, the
 // breakdown below uses the real enum values plus a separate "Due Payment"
 // column (sourced from DuePayment, Phase 1.2) for the amount still

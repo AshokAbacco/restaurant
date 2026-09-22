@@ -87,7 +87,7 @@ export default function OrderTicket({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] shadow-sm">
+    <div className="flex flex-col rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231D] shadow-sm">
       <div className="relative border-b border-dashed border-[#E7EAE1] dark:border-[#262B24] px-4 pb-3 pt-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[#6B7280] dark:text-[#9CA8A0]">
@@ -223,7 +223,7 @@ export default function OrderTicket({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div className="px-4 py-3">
         {/* ============ ALREADY ON THIS ORDER ============ */}
 
         {/* Read-only on purpose. These items are already cooking or eaten —

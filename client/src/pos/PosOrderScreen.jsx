@@ -607,13 +607,10 @@ export default function PosOrderScreen() {
         </div>
       )}
 
-      <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 md:grid-cols-[1fr_360px]">
-        {/* No padding: the category rail runs the full height of this
-            panel, flush to its left edge. MenuBrowser pads its own item
-            grid instead. */}
-        <div className="min-h-0 overflow-hidden rounded-2xl border border-[#E7EAE1] bg-white dark:border-[#262B24] dark:bg-[#171C17]">
-          <MenuBrowser onAddItem={addItem} />
-        </div>
+     <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 md:grid-cols-[1fr_360px] md:items-start">
+      <div className="min-h-0 overflow-hidden rounded-2xl border border-[#E7EAE1] bg-white dark:border-[#262B24] dark:bg-[#171C17] md:sticky md:top-4 md:h-[calc(100vh-140px)]">
+        <MenuBrowser onAddItem={addItem} />
+      </div>
 
         {printKotOrderId && (
           <KotPrintModal

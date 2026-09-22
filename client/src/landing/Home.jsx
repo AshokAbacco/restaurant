@@ -23,7 +23,8 @@ import Modules from "./sections/Modules";
 import CallToAction from "./sections/CallToAction";
 import KitchenOrders from "./pages/Kitchenorders";
 import BillingPayments from "./pages/Billingpayments";
-
+import Crm from "./pages/Crm";
+import Loyalty from "./pages/Loyalty";
 const Home = () => {
   // Set here rather than in index.html, which the admin app shares.
   useEffect(() => {
@@ -39,6 +40,8 @@ const Home = () => {
       <TableFloor />
       <KitchenOrders />
       <BillingPayments/>
+      <Crm />
+      <Loyalty />
       <Modules />
       <CallToAction />
     </>

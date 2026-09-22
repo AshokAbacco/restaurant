@@ -1015,7 +1015,7 @@ function CheckoutModal({ cart, money, currency, onClose }) {
                 label="Anything we should know?"
                 value={form.notes}
                 onChange={set("notes")}
-                placeholder="Two counters, one cloud kitchen, Petpooja data to migrate"
+                placeholder="Two counters, one cloud kitchen"
               />
             </div>
 

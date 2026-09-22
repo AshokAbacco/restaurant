@@ -83,13 +83,13 @@ const ProfileMenu = () => {
           {user?.name?.charAt(0) || "R"}
         </div>
 
-        <div className="hidden lg:block text-left">
+        {/* <div className="hidden lg:block text-left">
           <h4 className="font-semibold text-[#1F2937] dark:text-white leading-tight">
             {user?.name || "Restaurant User"}
           </h4>
 
           <p className="text-xs text-[#6B7280] dark:text-[#9CA8A0] leading-tight">{user?.role || "OWNER"}</p>
-        </div>
+        </div> */}
 
         <FiChevronDown
           className={`text-[#9CA3AF] dark:text-[#6B7280] transition-transform duration-300 ${
