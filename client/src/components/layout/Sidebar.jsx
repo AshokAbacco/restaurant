@@ -40,7 +40,7 @@ import { MdOutlineTableRestaurant } from "react-icons/md";
 import { useAuth } from "../../auth/AuthContext";
 import { useRestaurantProfile } from "../../context/RestaurantProfileContext";
 import BrandMark from "./BrandMark";
-import { useCrm } from "../../crm/CrmContext";
+import { useCrm } from "../../CRM/CrmContext";
 
 // Persisted across route-driven remounts of <Sidebar/>, so reopening the
 // drawer puts you back where you were in a 16-item menu rather than at the

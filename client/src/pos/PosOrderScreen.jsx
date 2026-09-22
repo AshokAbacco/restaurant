@@ -21,8 +21,8 @@ import {
 import { placeDineInOrder } from "../offline/offlineQueue";
 import { getSelectedCounterId } from "./api/counterContext";
 import { fetchWithOfflineFallback } from "../offline/offlineCache";
-import { useCrm } from "../crm/CrmContext";
-import { lookupCustomerByMobile, linkOrderCustomer } from "../crm/crmApi";
+import { useCrm } from "../CRM/CrmContext";
+import { lookupCustomerByMobile, linkOrderCustomer } from "../CRM/crmApi";
 
 export default function PosOrderScreen() {
   const navigate = useNavigate();
