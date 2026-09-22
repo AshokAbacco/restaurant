@@ -3,7 +3,9 @@
 // Updated with dark/light mode support, matching SettingsDashboard
 // ==============================================
 
-import React, { useState } from "react";
+import React from "react";
+import useModuleSettings from "../useModuleSettings";
+import SaveToast from "../SaveToast";
 import { FiPercent, FiSave, FiRefreshCw } from "react-icons/fi";
 
 const inputClass =
@@ -45,14 +47,17 @@ const StatBox = ({ label, value, valueClass = "" }) => (
 );
 
 const TaxBilling = () => {
-  const [settings, setSettings] = useState({
+  const { settings, setSettings, loading, saving, message, save, reset } = useModuleSettings(
+    "tax",
+    {
     gstEnabled: true,
     gstNumber: "",
     cgst: 9,
     sgst: 9,
     igst: 18,
     taxType: "Inclusive",
-  });
+  },
+  );
 
   // ==========================================
 
@@ -67,11 +72,8 @@ const TaxBilling = () => {
 
   // ==========================================
 
-  const handleSave = () => {
-    console.log(settings);
-
-    // Backend API Later
-  };
+  // Persists to /settings/modules/tax for the current outlet.
+  const handleSave = () => save();
 
   return (
     <div className="min-h-screen bg-[#F3F5EE] dark:bg-[#0F1410]">
@@ -98,13 +100,16 @@ const TaxBilling = () => {
           </div>
 
           <div className="flex gap-4">
-            <button className="h-12 px-6 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#1F2937] dark:text-[#E4E9E2] hover:bg-[#F3F5EE] dark:hover:bg-white/5 flex items-center gap-2 transition-colors">
+            <button
+              onClick={reset}
+              disabled={saving || loading} className="h-12 px-6 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#1F2937] dark:text-[#E4E9E2] hover:bg-[#F3F5EE] dark:hover:bg-white/5 flex items-center gap-2 transition-colors">
               <FiRefreshCw />
               Reset
             </button>
 
             <button
               onClick={handleSave}
+              disabled={saving || loading}
               className="h-12 px-8 rounded-xl bg-[#3FA34D] dark:bg-[#43B75A] hover:bg-[#358F42] dark:hover:bg-[#3AA34E] text-white flex items-center gap-2 shadow-lg transition-all"
             >
               <FiSave />
@@ -498,6 +503,7 @@ const TaxBilling = () => {
 
           <button
             onClick={handleSave}
+              disabled={saving || loading}
             className="
               h-12
               px-8
@@ -519,6 +525,7 @@ const TaxBilling = () => {
           </button>
         </div>
       </div>
+      <SaveToast message={message} />
     </div>
   );
 };

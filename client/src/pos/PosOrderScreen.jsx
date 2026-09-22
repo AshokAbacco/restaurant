@@ -21,6 +21,8 @@ import {
 import { placeDineInOrder } from "../offline/offlineQueue";
 import { getSelectedCounterId } from "./api/counterContext";
 import { fetchWithOfflineFallback } from "../offline/offlineCache";
+import { useCrm } from "../crm/CrmContext";
+import { lookupCustomerByMobile, linkOrderCustomer } from "../crm/crmApi";
 
 export default function PosOrderScreen() {
   const navigate = useNavigate();
@@ -213,6 +215,75 @@ export default function PosOrderScreen() {
     };
   }, [existingOrderId, deepLinkOrderId, orderReloadKey]);
 
+  // ==========================================
+  // CRM — CUSTOMER ON THIS ORDER
+  // ==========================================
+  //
+  // Everything here is inert unless Settings -> CRM is on: no panel is
+  // rendered, and no customerId is ever added to an order payload.
+  const { enabled: crmEnabled, config: crmConfig } = useCrm();
+  const [customer, setCustomer] = useState(null);
+  const [linkingCustomer, setLinkingCustomer] = useState(false);
+
+  // When an already-placed order is opened, show the customer it's linked
+  // to (with fresh stats), or an empty picker if it has none. Switching to
+  // a new blank ticket clears it.
+  const existingOrderKey = existingOrder?.id || null;
+  const existingOrderMobile = existingOrder?.customer?.mobile || null;
+  useEffect(() => {
+    if (!crmEnabled) {
+      setCustomer(null);
+      return undefined;
+    }
+    if (!existingOrderKey) {
+      setCustomer(null);
+      return undefined;
+    }
+    if (!existingOrderMobile) {
+      setCustomer(null);
+      return undefined;
+    }
+    let cancelled = false;
+    lookupCustomerByMobile(existingOrderMobile)
+      .then(({ customer: c }) => !cancelled && setCustomer(c || existingOrder.customer))
+      .catch(() => !cancelled && setCustomer(existingOrder.customer));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crmEnabled, existingOrderKey, existingOrderMobile]);
+
+  async function handleCustomerChange(next) {
+    // New ticket: just remember the choice; it goes on the order at placement.
+    if (!existingOrder) {
+      setCustomer(next);
+      return;
+    }
+    // Order already placed: link (or unlink) it now, so the customer's
+    // history includes this visit even if nothing else is added.
+    setLinkingCustomer(true);
+    setError(null);
+    try {
+      await linkOrderCustomer(existingOrder.id, next?.id ?? null);
+      setCustomer(next);
+      setExistingOrder((o) => (o ? { ...o, customerId: next?.id ?? null, customer: next } : o));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLinkingCustomer(false);
+    }
+  }
+
+  const customerRequired =
+    crmEnabled &&
+    !existingOrder &&
+    ((orderType === "TAKEAWAY" && !!crmConfig?.requireCustomerForTakeaway) ||
+      (orderType === "ONLINE" && !!crmConfig?.requireCustomerForDelivery));
+
+  // Only ever sent when CRM is on.
+  const crmCustomerFields = () =>
+    crmEnabled && customer?.id ? { customerId: customer.id } : {};
+
   const [cart, setCart] = useState([]);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState(null);
@@ -308,6 +379,11 @@ export default function PosOrderScreen() {
     if (submittingRef.current) return; // already in flight — ignore the extra click
     submittingRef.current = true;
     setError(null);
+    if (customerRequired && !customer) {
+      setError("Select or add a customer for this order.");
+      submittingRef.current = false;
+      return;
+    }
     setPlacing(true);
 
     const items = cart.map((i) => ({
@@ -389,9 +465,11 @@ export default function PosOrderScreen() {
           orderType,
           counterId: getSelectedCounterId(),
           kitchenBranchId: selectedKitchenBranchId || null,
+          ...crmCustomerFields(),
           items,
         });
         setCart([]);
+        setCustomer(null);
         navigate(`/billing?orderId=${order.id}`);
         return;
       }
@@ -415,6 +493,12 @@ export default function PosOrderScreen() {
           counterId: getSelectedCounterId(),
           onlinePlatformId: selectedPlatformId,
           kitchenBranchId: selectedKitchenBranchId || null,
+          ...crmCustomerFields(),
+          // Saves re-typing: the customer's saved address becomes the
+          // delivery address on the order.
+          ...(crmEnabled && customer?.address
+            ? { deliveryAddress: [customer.address, customer.city].filter(Boolean).join(", ") }
+            : {}),
           items,
         });
         // Online orders go straight to the kitchen, so the ticket prints now.
@@ -422,6 +506,7 @@ export default function PosOrderScreen() {
         setLastOrder(order);
         setShowSuccessToast(true);
         setCart([]);
+        setCustomer(null);
         setSelectedPlatformId("");
         return;
       }
@@ -458,6 +543,7 @@ export default function PosOrderScreen() {
           tableId,
           counterId: getSelectedCounterId(),
           kitchenBranchId: selectedKitchenBranchId || null,
+          ...crmCustomerFields(),
           items,
         },
         ticketMeta,
@@ -475,6 +561,7 @@ export default function PosOrderScreen() {
         setPrintKotOrderId(order.id);
       }
       setCart([]);
+      setCustomer(null);
       setSelectedTable(null);
     } catch (err) {
       setError(err.message);
@@ -545,6 +632,12 @@ export default function PosOrderScreen() {
           onChangeKitchenBranch={setSelectedKitchenBranchId}
           existingOrder={existingOrder}
           loadingExistingOrder={loadingExistingOrder}
+          crmEnabled={crmEnabled}
+          customer={customer}
+          onChangeCustomer={handleCustomerChange}
+          customerRequired={customerRequired}
+          showCustomerInsights={crmConfig?.showInsightsOnPos !== false}
+          linkingCustomer={linkingCustomer}
           onlinePlatforms={onlinePlatforms}
           selectedPlatformId={selectedPlatformId}
           onChangePlatform={setSelectedPlatformId}

@@ -718,6 +718,13 @@ model Outlet {
   cashDrawerTransactions CashDrawerTransaction[]
   onlinePlatforms        OnlinePlatform[]
   printerProfiles        PrinterProfile[]
+  customerTags           CustomerTag[]
+  customerNotes          CustomerNote[]
+  customerCommunications CustomerCommunication[]
+  customerFeedback       CustomerFeedback[]
+  customerReminders      CustomerReminder[]
+  customerHistory        CustomerHistory[]
+  outletSetting          OutletSetting?
   owner                  Owner?
 
   @@unique([organizationId, name])
@@ -1671,10 +1678,40 @@ model Customer {
   landmark      String?
   loyaltyPoints Int     @default(0)
 
+  // ── CRM profile (Settings -> CRM) ─────────────────────────────────────
+  // All optional, so every customer row created before CRM existed (POS,
+  // kiosk, due payments) stays valid without a backfill. Purchase stats —
+  // total orders, total spent, average bill, last visit, favourite items —
+  // are deliberately NOT stored here: they're computed from `orders` on
+  // every read (see crm.service.js), so the CRM can never drift from what
+  // the POS actually billed.
+  alternateMobile String?
+  city            String?
+  pincode         String?
+  gender          String?
+  // Stored as DATE-only: a birthday is a calendar day, not an instant, and
+  // a DateTime would shift it across midnight depending on server timezone.
+  birthday        DateTime?      @db.Date
+  anniversary     DateTime?      @db.Date
+  status          CustomerStatus @default(ACTIVE)
+  // Where the record came from — POS, KIOSK, CRM (added by hand), IMPORT.
+  source          String?        @default("POS")
+  // Credit the outlet is willing to extend on this customer's tab. Null =
+  // no limit recorded. Informational — billing doesn't block on it.
+  creditLimit     Decimal?       @db.Decimal(10, 2)
+  marketingOptIn  Boolean        @default(true)
+
   orders              Order[]
   loyaltyTransactions LoyaltyTransaction[]
   duePayments         DuePayment[]
   reservations        TableReservation[]
+
+  tagAssignments CustomerTagAssignment[]
+  notes          CustomerNote[]
+  communications CustomerCommunication[]
+  feedback       CustomerFeedback[]
+  reminders      CustomerReminder[]
+  history        CustomerHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1682,7 +1719,237 @@ model Customer {
   @@unique([outletId, mobile])
   @@index([mobile])
   @@index([outletId])
+  @@index([outletId, status])
   @@map("customers")
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+// ─────────────────────────────────────────────
+// CRM — CUSTOMER RELATIONSHIP MANAGEMENT
+// Every table carries outletId and every query filters on it, so one
+// restaurant can never read or write another restaurant's customers.
+// ─────────────────────────────────────────────
+
+// Customer groups / tags ("VIP", "Corporate", "Regular Lunch"). Defined once
+// per outlet and assigned to any number of customers.
+model CustomerTag {
+  id          String  @id @default(uuid())
+  outletId    String
+  outlet      Outlet  @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  name        String
+  color       String? @default("#3FA34D")
+  description String?
+
+  assignments CustomerTagAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([outletId, name])
+  @@index([outletId])
+  @@map("customer_tags")
+}
+
+model CustomerTagAssignment {
+  customerId String
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        CustomerTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  outletId   String
+
+  createdAt DateTime @default(now())
+
+  @@id([customerId, tagId])
+  @@index([tagId])
+  @@index([outletId])
+  @@map("customer_tag_assignments")
+}
+
+model CustomerNote {
+  id         String   @id @default(uuid())
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  note     String
+  isPinned Boolean @default(false)
+
+  // Name is snapshotted so the note still reads correctly after the staff
+  // account is removed.
+  createdById   String?
+  createdByName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+  @@index([customerId])
+  @@map("customer_notes")
+}
+
+enum CommunicationChannel {
+  CALL
+  SMS
+  WHATSAPP
+  EMAIL
+  IN_PERSON
+  OTHER
+}
+
+enum CommunicationDirection {
+  OUTBOUND
+  INBOUND
+}
+
+// A log of every conversation with the customer — calls, WhatsApp
+// messages, emails, in-person chats.
+model CustomerCommunication {
+  id         String   @id @default(uuid())
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  channel   CommunicationChannel
+  direction CommunicationDirection @default(OUTBOUND)
+  subject   String?
+  message   String
+  // e.g. "Interested", "No answer", "Booked table"
+  outcome   String?
+
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  @@index([outletId])
+  @@index([customerId])
+  @@map("customer_communications")
+}
+
+enum FeedbackType {
+  FEEDBACK
+  COMPLAINT
+  SUGGESTION
+  COMPLIMENT
+}
+
+enum FeedbackStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model CustomerFeedback {
+  id         String   @id @default(uuid())
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  // The visit this is about, when there is one.
+  orderId    String?
+  order      Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  type       FeedbackType   @default(FEEDBACK)
+  rating     Int? // 1-5
+  message    String
+  status     FeedbackStatus @default(OPEN)
+  resolution String?
+  resolvedAt DateTime?
+
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([outletId])
+  @@index([customerId])
+  @@index([outletId, status])
+  @@map("customer_feedback")
+}
+
+enum ReminderStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
+// Follow-up reminders ("Call Rahul about the anniversary booking").
+model CustomerReminder {
+  id         String   @id @default(uuid())
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  title       String
+  notes       String?
+  dueAt       DateTime
+  channel     CommunicationChannel?
+  status      ReminderStatus        @default(PENDING)
+  completedAt DateTime?
+
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([outletId])
+  @@index([customerId])
+  @@index([outletId, status, dueAt])
+  @@map("customer_reminders")
+}
+
+// Audit trail of changes to the customer record itself (created, edited,
+// tagged, status changed, order linked). Orders, notes, calls and feedback
+// have their own tables and are merged into the profile timeline at read
+// time rather than being copied here.
+model CustomerHistory {
+  id         String   @id @default(uuid())
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  action      String // CREATED, UPDATED, TAGS_CHANGED, STATUS_CHANGED, ORDER_LINKED, ORDER_UNLINKED ...
+  description String
+  meta        Json?
+
+  performedById   String?
+  performedByName String?
+  createdAt       DateTime @default(now())
+
+  @@index([outletId])
+  @@index([customerId, createdAt])
+  @@map("customer_history")
+}
+
+// Per-outlet module settings (Settings -> CRM / Payment Gateway / Self
+// Order Kiosk / Tax & Billing). One row per outlet, created lazily the
+// first time any of these pages is saved. JSON columns hold each page's
+// form so adding a field to a settings page never needs a migration;
+// crmEnabled is a real column because the POS checks it on every load.
+model OutletSetting {
+  id       String @id @default(uuid())
+  outletId String @unique
+  outlet   Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+
+  crmEnabled Boolean @default(false)
+  crm        Json?
+  payment    Json?
+  kiosk      Json?
+  taxBilling Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("outlet_settings")
 }
 
 model DeliveryPartner {
@@ -2010,6 +2277,7 @@ model Order {
   billSplits          BillSplit[]
   discountsApplied    OrderDiscount[]
   loyaltyTransactions LoyaltyTransaction[]
+  customerFeedback    CustomerFeedback[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2032,6 +2300,9 @@ model Order {
   @@index([counterId])
   // onlinePlatformId: the floor view's per-platform delivery grouping.
   @@index([onlinePlatformId])
+  // customerId: every CRM stat (orders, spend, last visit, favourites) is an
+  // aggregate over a customer's orders.
+  @@index([outletId, customerId])
   // Composites for the two filters that always travel together — every
   // report and board scopes by outlet AND then by status or date. A
   // composite serves those in one index lookup where two single-column

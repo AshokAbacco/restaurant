@@ -24,6 +24,7 @@ import {
   FiCpu,
   FiTag,
   FiMapPin,
+  FiUserCheck,
 } from "react-icons/fi";
 
 // ==============================================
@@ -85,6 +86,15 @@ const SETTINGS = [
     icon: FiFileText,
     color: "bg-[#DC2626] dark:bg-[#EF4444]",
     path: "/settings/tax",
+  },
+  {
+    id: 6.2,
+    title: "CRM",
+    description:
+      "Turn customer management on or off, choose how customers are segmented, and control customer selection on the POS.",
+    icon: FiUserCheck,
+    color: "bg-[#7C3AED] dark:bg-[#A78BFA]",
+    path: "/settings/crm",
   },
   {
     id: 6.5,

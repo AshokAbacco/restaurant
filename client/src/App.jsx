@@ -81,7 +81,8 @@ const CounterSummaryRoutes = lazy(
 const ProfitLossRoutes = lazy(() => import("./profitLoss/profitLossRoutes"));
 const InventoryRoutes = lazy(() => import("./inventory/inventoryRoutes"));
 const EmployeesRoutes = lazy(() => import("./employees/employeesRoutes"));
-const CrmRoutes = lazy(() => import("./CRM/Crm"));
+const CrmRoutes = lazy(() => import("./crm/crmRoutes"));
+
 // ==============================================
 // APP
 // ==============================================
@@ -170,7 +171,6 @@ function App() {
               <Route path="/kitchen/*" element={<KitchenRoutes />} />
               <Route path="/billing/*" element={<BillingRoutes />} />
               <Route path="/payments/*" element={<PaymentRoutes />} />
-              <Route path="/crm/*" element={<CrmRoutes />} />
 
               {/* Reports */}
               <Route path="/reports/*" element={<ReportsRoutes />} />
@@ -186,6 +186,9 @@ function App() {
               <Route path="/inventory/*" element={<InventoryRoutes />} />
               <Route path="/expenses/*" element={<ExpenseRoutes />} />
 
+              {/* CRM — gated inside CrmRoutes on Settings -> CRM */}
+              <Route path="/crm/*" element={<CrmRoutes />} />
+
               {/* Employees */}
               <Route path="/employees/*" element={<EmployeesRoutes />} />
 
@@ -200,7 +203,18 @@ function App() {
           </Route>
         </Route>
 
-        
+        {/* ==========================================
+          DEFAULT ROUTE
+
+          "/" used to redirect to /dashboard. It renders the public
+          homepage now, so the redirect is gone — the route above owns
+          it. Staff land on the dashboard from the sign-in flow, which
+          is unchanged.
+      ========================================== */}
+
+        {/* ==========================================
+          NOT FOUND
+      ========================================== */}
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

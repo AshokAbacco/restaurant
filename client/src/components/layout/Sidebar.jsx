@@ -32,6 +32,7 @@ import {
   FiX,
   FiMonitor,
   FiExternalLink,
+  FiUserCheck,
 } from "react-icons/fi";
 import { TableProperties } from "lucide-react";
 import { MdOutlineTableRestaurant } from "react-icons/md";
@@ -39,6 +40,7 @@ import { MdOutlineTableRestaurant } from "react-icons/md";
 import { useAuth } from "../../auth/AuthContext";
 import { useRestaurantProfile } from "../../context/RestaurantProfileContext";
 import BrandMark from "./BrandMark";
+import { useCrm } from "../../crm/CrmContext";
 
 // Persisted across route-driven remounts of <Sidebar/>, so reopening the
 // drawer puts you back where you were in a 16-item menu rather than at the
@@ -48,6 +50,8 @@ let lastMenuScrollTop = 0;
 const Sidebar = ({ open, onClose }) => {
   const { user, logout } = useAuth();
   const { restaurantName, logoUrl } = useRestaurantProfile();
+  // CRM appears in the menu only while Settings -> CRM is on.
+  const { enabled: crmEnabled } = useCrm();
 
   const location = useLocation();
   const menuRef = useRef(null);
@@ -185,10 +189,12 @@ const Sidebar = ({ open, onClose }) => {
       path: "/payments",
       icon: <FiCreditCard />,
     },
+
     {
       name: "CRM",
       path: "/crm",
-      icon: <FiCreditCard />,
+      icon: <FiUserCheck />,
+      requiresCrm: true, // shown only when Settings -> CRM is on
     },
 
     {
@@ -307,6 +313,13 @@ const Sidebar = ({ open, onClose }) => {
       path: "/payments",
       icon: <FiCreditCard />,
     },
+
+    {
+      name: "CRM",
+      path: "/crm",
+      icon: <FiUserCheck />,
+      requiresCrm: true, // shown only when Settings -> CRM is on
+    },
   ];
 
   // =====================================================
@@ -393,28 +406,32 @@ const Sidebar = ({ open, onClose }) => {
   // =====================================================
 
   const menus = useMemo(() => {
+    // Items marked requiresCrm (the CRM link) only appear while
+    // Settings -> CRM is switched on.
+    const visible = (list) => list.filter((item) => !item.requiresCrm || crmEnabled);
+
     switch (user?.role) {
       case "OWNER":
-        return ownerMenu;
+        return visible(ownerMenu);
 
       // Manager gets the exact same access as Owner.
       case "MANAGER":
-        return ownerMenu;
+        return visible(ownerMenu);
 
       case "CASHIER":
-        return cashierMenu;
+        return visible(cashierMenu);
 
       case "WAITER":
-        return waiterMenu;
+        return visible(waiterMenu);
 
       case "KITCHEN":
-        return kitchenMenu;
+        return visible(kitchenMenu);
 
       default:
         return [];
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, crmEnabled]);
 
   // =====================================================
   // LOGOUT

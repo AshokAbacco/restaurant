@@ -14,6 +14,9 @@ const routeNames = {
   menu: "Menu Management",
   inventory: "Inventory",
   customers: "Customers",
+  crm: "CRM",
+  groups: "Customer Groups",
+  "follow-ups": "Follow-ups",
   billing: "Billing",
   payments: "Payments",
   employees: "Employees",
@@ -36,6 +39,8 @@ const Breadcrumb = () => {
     return paths.map((segment, index) => ({
       name:
         routeNames[segment] ||
+        // Record ids (e.g. /crm/customers/<uuid>) read as "Details", not a uuid.
+        (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(segment) ? "Details" : null) ||
         segment.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       path: "/" + paths.slice(0, index + 1).join("/"),
       last: index === paths.length - 1,
