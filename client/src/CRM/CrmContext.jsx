@@ -1,4 +1,4 @@
-// src/crm/CrmContext.jsx
+// src/CRM/CrmContext.jsx
 //
 // Whether CRM is switched on for the current outlet (Settings -> CRM), plus
 // its thresholds. Fetched once per session and shared, so the sidebar, the
