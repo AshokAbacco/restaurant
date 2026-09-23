@@ -15,6 +15,7 @@ import * as paymentsService from "../payments/payments.service.js";
 import * as posService from "../pos.service.js";
 import * as invoicesService from "../invoices/invoices.service.js";
 import * as discountsService from "../discounts/discounts.service.js";
+import * as loyaltyService from "../../crm/loyalty.service.js";
 import * as duePaymentsService from "../due-payments/duePayments.service.js";
 import * as cashDrawerService from "../cash-drawer/cashDrawer.service.js";
 
@@ -91,7 +92,21 @@ export async function getBillingSummary(orderId, outletId) {
     .filter((p) => p.status === "PAID")
     .reduce((sum, p) => sum + Number(p.amount), 0);
 
+  const balanceDue = Math.max(grandTotal - totalPaid, 0);
+
+  // Loyalty (Settings -> Loyalty): points, vouchers and coupons the cashier
+  // can apply. Never allowed to break the bill preview.
+  let loyalty = null;
+  if (!order.invoice) {
+    try {
+      loyalty = await loyaltyService.getBillingLoyalty(outletId, order, balanceDue);
+    } catch (err) {
+      console.error("[billing] loyalty preview failed:", err.message);
+    }
+  }
+
   return {
+    loyalty,
     orderId: order.id,
     orderNumber: order.orderNumber,
     orderType: order.orderType,
@@ -104,7 +119,12 @@ export async function getBillingSummary(orderId, outletId) {
         }
       : null,
     customer: order.customer
-      ? { name: order.customer.name, mobile: order.customer.mobile }
+      ? {
+          id: order.customer.id,
+          name: order.customer.name,
+          mobile: order.customer.mobile,
+          loyaltyPoints: order.customer.loyaltyPoints,
+        }
       : null,
     waiter: order.waiter ? order.waiter.fullName : null,
     outlet: order.outlet || null,
@@ -123,7 +143,7 @@ export async function getBillingSummary(orderId, outletId) {
     discountAmount,
     grandTotal,
     totalPaid,
-    balanceDue: Math.max(grandTotal - totalPaid, 0),
+    balanceDue,
     alreadyInvoiced: !!order.invoice,
     createdAt: order.createdAt,
   };
@@ -142,7 +162,7 @@ export async function getBillingSummary(orderId, outletId) {
 //   byte-for-byte the same behavior as before this feature existed.
 export async function completeBilling(
   orderId,
-  { payments, discount, allowDue, customerId, performedById } = {},
+  { payments, discount, allowDue, customerId, performedById, loyalty } = {},
   outletId,
 ) {
   const order = await prisma.order.findFirst({ where: { id: orderId, outletId } });
@@ -177,8 +197,12 @@ export async function completeBilling(
   if (order.status === "CANCELLED")
     throw new Error("Cannot bill a cancelled order.");
 
+  // A bill paid entirely with points / a voucher legitimately has no
+  // payment lines, so "no payments" is only rejected when no reward was
+  // requested either (it's re-checked once rewards are applied below).
+  const wantsRewards = Boolean(loyalty && (loyalty.redeemPoints || loyalty.voucherCode || loyalty.couponCode));
   if (!payments || payments.length === 0) {
-    if (!allowDue) {
+    if (!allowDue && !wantsRewards) {
       throw new Error("At least one payment is required to complete billing.");
     }
     // allowDue with zero payments = the entire bill goes on account —
@@ -197,6 +221,23 @@ export async function completeBilling(
   if (discount && (discount.discountId || discount.code || discount.amount)) {
     await discountsService.applyDiscountToOrder(orderId, discount, outletId);
   }
+
+  // Loyalty: reward voucher, coupon code and points redemption. Validated
+  // and applied server-side; undone if anything below fails, so a bill that
+  // doesn't go through never costs the customer their points or voucher.
+  let rewards = { applied: [], undo: async () => {} };
+  let actorName = null;
+  if (wantsRewards) {
+    if (performedById) {
+      const emp = await prisma.employee
+        .findUnique({ where: { id: performedById }, select: { fullName: true } })
+        .catch(() => null);
+      actorName = emp?.fullName || null;
+    }
+    rewards = await loyaltyService.applyBillingRewards(outletId, orderId, loyalty, actorName);
+  }
+
+  try {
 
   // Record every payment line (also covers split payments — just pass
   // multiple entries). createPayment already keeps the order's payment
@@ -227,6 +268,9 @@ export async function completeBilling(
   }
 
   const paymentCheck = await paymentsService.syncOrderPaymentStatus(orderId, outletId);
+  if ((!payments || payments.length === 0) && !allowDue && paymentCheck.paymentStatus !== "PAID") {
+    throw new Error("At least one payment is required to complete billing.");
+  }
   let duePayment = null;
 
   if (paymentCheck.paymentStatus !== "PAID") {
@@ -280,12 +324,30 @@ export async function completeBilling(
   );
   const fullInvoice = await invoicesService.getInvoiceByOrder(orderId, outletId);
 
+  // Points for this bill (plus welcome / referral / campaign bonuses).
+  // Earning must never undo a completed payment, so failures only log.
+  let loyaltyResult = null;
+  try {
+    loyaltyResult = await loyaltyService.earnForOrder(outletId, orderId, actorName);
+  } catch (err) {
+    console.error("[billing] loyalty earn failed:", err.message);
+  }
+
   return {
     order: completedOrder,
     payments: createdPayments,
     invoice: fullInvoice,
     duePayment,
+    loyalty: loyaltyResult
+      ? { ...loyaltyResult, redeemed: rewards.applied }
+      : rewards.applied.length
+        ? { redeemed: rewards.applied }
+        : null,
   };
+  } catch (err) {
+    await rewards.undo();
+    throw err;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────

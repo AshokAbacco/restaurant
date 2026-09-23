@@ -97,6 +97,15 @@ const SETTINGS = [
     path: "/settings/crm",
   },
   {
+    id: 6.3,
+    title: "Loyalty",
+    description:
+      "Points per rupee spent, redemption value, expiry, birthday and referral rewards, and membership levels.",
+    icon: FiAward,
+    color: "bg-[#D97706] dark:bg-[#F59E0B]",
+    path: "/settings/loyalty",
+  },
+  {
     id: 6.5,
     title: "Order Status Labels",
     description:

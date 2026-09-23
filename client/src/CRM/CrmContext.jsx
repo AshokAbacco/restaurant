@@ -1,4 +1,4 @@
-// src/CRM/CrmContext.jsx
+// src/crm/CrmContext.jsx
 //
 // Whether CRM is switched on for the current outlet (Settings -> CRM), plus
 // its thresholds. Fetched once per session and shared, so the sidebar, the
@@ -13,26 +13,32 @@ import { getCrmConfig } from "./crmApi";
 
 const CrmContext = createContext(null);
 
-const FALLBACK = { enabled: false, config: {}, loading: false, refresh: async () => {} };
+const FALLBACK = { enabled: false, config: {}, loyalty: { enabled: false }, loading: false, refresh: async () => {} };
 
 export function CrmProvider({ children }) {
   const { user } = useAuth();
-  const [state, setState] = useState({ enabled: false, config: {}, loading: true });
+  const [state, setState] = useState({ enabled: false, config: {}, loyalty: { enabled: false }, loading: true });
 
   const refresh = useCallback(async () => {
     try {
       const data = await getCrmConfig();
-      setState({ enabled: Boolean(data?.enabled), config: data?.config || {}, loading: false });
+      setState({
+        enabled: Boolean(data?.enabled),
+        config: data?.config || {},
+        // Loyalty rides on CRM, so /crm/config reports both in one call.
+        loyalty: data?.loyalty || { enabled: false },
+        loading: false,
+      });
     } catch {
       // Unreachable or no permission: behave as "off" — the POS then works
       // exactly as it did before CRM existed.
-      setState({ enabled: false, config: {}, loading: false });
+      setState({ enabled: false, config: {}, loyalty: { enabled: false }, loading: false });
     }
   }, []);
 
   useEffect(() => {
     if (!user) {
-      setState({ enabled: false, config: {}, loading: false });
+      setState({ enabled: false, config: {}, loyalty: { enabled: false }, loading: false });
       return;
     }
     refresh();

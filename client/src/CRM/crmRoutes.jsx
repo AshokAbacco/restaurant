@@ -11,6 +11,7 @@ import CustomerList from "./pages/CustomerList";
 import CustomerProfile from "./pages/CustomerProfile";
 import CustomerGroups from "./pages/CustomerGroups";
 import FollowUps from "./pages/FollowUps";
+import LoyaltyProgram from "./pages/LoyaltyProgram";
 
 export default function CrmRoutes() {
   const { enabled, loading } = useCrm();
@@ -28,6 +29,7 @@ export default function CrmRoutes() {
       <Route path="customers" element={<CustomerList />} />
       <Route path="customers/:id" element={<CustomerProfile />} />
       <Route path="follow-ups" element={<FollowUps />} />
+      <Route path="loyalty" element={<LoyaltyProgram />} />
       <Route path="groups" element={<CustomerGroups />} />
       <Route path="*" element={<Navigate to="/crm" replace />} />
     </Routes>

@@ -15,6 +15,7 @@ const routeNames = {
   inventory: "Inventory",
   customers: "Customers",
   crm: "CRM",
+  loyalty: "Loyalty",
   groups: "Customer Groups",
   "follow-ups": "Follow-ups",
   billing: "Billing",

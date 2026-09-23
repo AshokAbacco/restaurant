@@ -725,6 +725,8 @@ model Outlet {
   customerReminders      CustomerReminder[]
   customerHistory        CustomerHistory[]
   outletSetting          OutletSetting?
+  loyaltyCampaigns       LoyaltyCampaign[]
+  customerVouchers       CustomerVoucher[]
   owner                  Owner?
 
   @@unique([organizationId, name])
@@ -1701,6 +1703,13 @@ model Customer {
   creditLimit     Decimal?       @db.Decimal(10, 2)
   marketingOptIn  Boolean        @default(true)
 
+  // Referral programme — each customer gets a short code to share; the
+  // customer who joined with it records who referred them.
+  referralCode String?
+  referredById String?
+  referredBy   Customer?  @relation("CustomerReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    Customer[] @relation("CustomerReferrals")
+
   orders              Order[]
   loyaltyTransactions LoyaltyTransaction[]
   duePayments         DuePayment[]
@@ -1712,11 +1721,13 @@ model Customer {
   feedback       CustomerFeedback[]
   reminders      CustomerReminder[]
   history        CustomerHistory[]
+  vouchers       CustomerVoucher[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([outletId, mobile])
+  @@unique([outletId, referralCode])
   @@index([mobile])
   @@index([outletId])
   @@index([outletId, status])
@@ -1940,11 +1951,15 @@ model OutletSetting {
   outletId String @unique
   outlet   Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
 
-  crmEnabled Boolean @default(false)
-  crm        Json?
-  payment    Json?
-  kiosk      Json?
-  taxBilling Json?
+  crmEnabled     Boolean @default(false)
+  crm            Json?
+  // Loyalty programme (Settings -> Loyalty). Needs CRM, because points
+  // belong to customers.
+  loyaltyEnabled Boolean @default(false)
+  loyalty        Json?
+  payment        Json?
+  kiosk          Json?
+  taxBilling     Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2030,6 +2045,14 @@ enum DuePaymentStatus {
   SETTLED
 }
 
+// Represents a physical POS terminal/billing station (e.g. "Counter 1",
+// "Captain", "Billing Station") — matches PetPooja's Counter Summary
+// report, which groups sales by which physical device processed them.
+// Deliberately a device-level identity, not a staff-level one: the same
+// physical terminal keeps its counter identity across shifts regardless
+// of who's logged into it, and one staff member's login can be used at
+// different counters at different times (see counter-selection on the
+// client — a per-browser choice, not part of the JWT).
 model BillingCounter {
   id       String @id @default(uuid())
   outletId String
@@ -2270,6 +2293,7 @@ model Order {
   discountsApplied    OrderDiscount[]
   loyaltyTransactions LoyaltyTransaction[]
   customerFeedback    CustomerFeedback[]
+  vouchersUsed        CustomerVoucher[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2586,10 +2610,131 @@ model LoyaltyTransaction {
   points Int // signed: + earn / - redeem
   reason String?
 
-  createdAt DateTime @default(now())
+  // ── Loyalty programme (Settings -> Loyalty) ───────────────────────────
+  // All new columns are optional or defaulted, so rows written before the
+  // programme existed stay valid: they read as ADJUST with no expiry.
+  type            LoyaltyTransactionType @default(ADJUST)
+  // Customer's balance right after this entry — makes the ledger readable
+  // on its own without re-summing history.
+  balanceAfter    Int?
+  // Bill amount the points were earned on, or rupee value of a redemption.
+  amount          Decimal?               @db.Decimal(12, 2)
+  // Expiry works per "lot": each credit remembers when it expires and how
+  // many of its points are still unspent. Redemptions use the oldest lots
+  // first (FIFO), and whatever is left in a lot past its date expires.
+  expiresAt       DateTime?
+  remainingPoints Int                    @default(0)
+
+  campaignId String?
+  campaign   LoyaltyCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  createdByName String?
+  createdAt     DateTime @default(now())
 
   @@index([outletId])
+  @@index([customerId, createdAt])
+  @@index([outletId, type])
+  @@index([outletId, expiresAt])
   @@map("loyalty_transactions")
+}
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+  WELCOME
+  BIRTHDAY
+  ANNIVERSARY
+  REFERRAL
+  BONUS
+  ADJUST
+  EXPIRE
+  REVERSAL
+  VOUCHER // points converted into a reward voucher
+}
+
+// Bonus-points campaigns: "Double points on weekends", "+50 points on
+// bills over ₹1,000 this Diwali week".
+model LoyaltyCampaign {
+  id            String   @id @default(uuid())
+  outletId      String
+  outlet        Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  // Earned points are multiplied by this (2 = double points) …
+  multiplier    Decimal  @default(1) @db.Decimal(5, 2)
+  // … and/or this many extra points are added per qualifying bill.
+  bonusPoints   Int      @default(0)
+  minBillAmount Decimal? @db.Decimal(12, 2)
+  startsAt      DateTime
+  endsAt        DateTime
+  // 0 = Sunday … 6 = Saturday. Empty = every day.
+  daysOfWeek    Int[]    @default([])
+  isActive      Boolean  @default(true)
+
+  transactions LoyaltyTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId, isActive])
+  @@map("loyalty_campaigns")
+}
+
+enum VoucherType {
+  FIXED_AMOUNT
+  PERCENTAGE
+}
+
+enum VoucherSource {
+  POINTS
+  WELCOME
+  BIRTHDAY
+  ANNIVERSARY
+  REFERRAL
+  MANUAL
+}
+
+enum VoucherStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+// A reward voucher that belongs to one customer — bought with points,
+// given for a birthday, or issued by a manager. Used once, at billing.
+model CustomerVoucher {
+  id         String   @id @default(uuid())
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  code          String
+  title         String
+  type          VoucherType   @default(FIXED_AMOUNT)
+  value         Decimal       @db.Decimal(10, 2)
+  // Cap for percentage vouchers ("20% off, up to ₹300").
+  maxDiscount   Decimal?      @db.Decimal(10, 2)
+  minBillAmount Decimal?      @db.Decimal(12, 2)
+  pointsUsed    Int?
+  source        VoucherSource @default(MANUAL)
+  status        VoucherStatus @default(ACTIVE)
+  expiresAt     DateTime?
+
+  usedAt         DateTime?
+  usedOrderId    String?
+  usedOrder      Order?    @relation(fields: [usedOrderId], references: [id], onDelete: SetNull)
+  discountAmount Decimal?  @db.Decimal(10, 2)
+
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([outletId, code])
+  @@index([customerId, status])
+  @@index([outletId, status])
+  @@map("customer_vouchers")
 }
 
 // ─────────────────────────────────────────────

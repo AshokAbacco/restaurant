@@ -28,6 +28,53 @@ export const CRM_DEFAULTS = Object.freeze({
   showInsightsOnPos: true,
 });
 
+export const DEFAULT_TIERS = Object.freeze([
+  { name: "Silver", minSpend: 0, multiplier: 1, color: "#9CA3AF" },
+  { name: "Gold", minSpend: 10000, multiplier: 1.25, color: "#D97706" },
+  { name: "Platinum", minSpend: 25000, multiplier: 1.5, color: "#6366F1" },
+]);
+
+export const LOYALTY_DEFAULTS = Object.freeze({
+  // Earning — "₹100 spent = 1 point"
+  earnSpendAmount: 100,
+  earnPoints: 1,
+  minBillForEarning: 0,
+  // Redemption — "100 points = ₹100 off"
+  redeemPoints: 100,
+  redeemValue: 100,
+  minRedeemPoints: 100,
+  maxRedeemPercent: 50, // at most this % of a bill can be paid with points
+  minBillForRedemption: 0,
+  // Expiry
+  pointsExpire: true,
+  expiryDays: 365,
+  // Automatic rewards
+  welcomeBonusPoints: 50,
+  birthdayRewardType: "POINTS", // POINTS | VOUCHER | NONE
+  birthdayPoints: 100,
+  birthdayVoucherValue: 200,
+  anniversaryRewardType: "POINTS",
+  anniversaryPoints: 100,
+  anniversaryVoucherValue: 200,
+  occasionVoucherValidDays: 30,
+  referrerPoints: 100, // the customer who shared their code
+  refereePoints: 50, // the new customer who used it
+  // Vouchers bought with points stay valid this long
+  voucherValidDays: 30,
+  // Membership levels, by lifetime spend
+  tiersEnabled: true,
+  tiers: DEFAULT_TIERS,
+  // Customer messages (sent from the CRM with one click)
+  templates: {
+    earn: "Hi {name}, you earned {earned} points at {restaurant}! Your balance is now {points} points (worth {value}).",
+    balance: "Hi {name}, you have {points} loyalty points at {restaurant}, worth {value} on your next visit.",
+    voucher: "Hi {name}, here's your reward from {restaurant}: {title}. Use code {code} on your next bill{expiry}.",
+    birthday: "Happy birthday {name}! 🎂 {restaurant} has added a birthday reward to your account. See you soon!",
+    anniversary: "Happy anniversary {name}! 💐 Celebrate with us — {restaurant} has added a reward to your account.",
+    expiry: "Hi {name}, {expiring} of your loyalty points at {restaurant} expire on {date}. Visit us to use them!",
+  },
+});
+
 const PAYMENT_DEFAULTS = Object.freeze({
   paymentEnabled: true,
   mode: "Test",
@@ -56,6 +103,7 @@ const TAX_DEFAULTS = Object.freeze({
 // URL segment -> { column, defaults }
 const SECTIONS = {
   crm: { column: "crm", defaults: CRM_DEFAULTS },
+  loyalty: { column: "loyalty", defaults: LOYALTY_DEFAULTS },
   payment: { column: "payment", defaults: PAYMENT_DEFAULTS },
   kiosk: { column: "kiosk", defaults: KIOSK_DEFAULTS },
   tax: { column: "taxBilling", defaults: TAX_DEFAULTS },
@@ -105,6 +153,62 @@ function normalizeCrmConfig(raw = {}) {
   };
 }
 
+const REWARD_TYPES = ["POINTS", "VOUCHER", "NONE"];
+
+function normalizeTiers(raw) {
+  const list = Array.isArray(raw) && raw.length ? raw : DEFAULT_TIERS;
+  const tiers = list
+    .filter((t) => isPlainObject(t) && String(t.name || "").trim())
+    .slice(0, 10)
+    .map((t) => ({
+      name: String(t.name).trim().slice(0, 30),
+      minSpend: toNonNegativeNumber(t.minSpend, 0),
+      multiplier: Math.min(10, Math.max(0, toNonNegativeNumber(t.multiplier, 1))),
+      color: /^#[0-9a-fA-F]{3,8}$/.test(t.color || "") ? t.color : "#9CA3AF",
+    }))
+    .sort((a, b) => a.minSpend - b.minSpend);
+  if (!tiers.length) return [...DEFAULT_TIERS];
+  // The lowest level is where everyone starts.
+  tiers[0].minSpend = 0;
+  return tiers;
+}
+
+// Every number the billing maths depends on is coerced here, so a bad value
+// typed into the settings form can never reach a bill.
+export function normalizeLoyaltyConfig(raw = {}) {
+  const d = LOYALTY_DEFAULTS;
+  const b = { ...d, ...(isPlainObject(raw) ? raw : {}) };
+  const int = (v, fb, min = 0) => Math.max(min, Math.round(toNonNegativeNumber(v, fb)));
+  const templates = { ...d.templates, ...(isPlainObject(b.templates) ? b.templates : {}) };
+  for (const k of Object.keys(templates)) templates[k] = String(templates[k] || "").slice(0, 500);
+  return {
+    earnSpendAmount: Math.max(1, toNonNegativeNumber(b.earnSpendAmount, d.earnSpendAmount)),
+    earnPoints: int(b.earnPoints, d.earnPoints, 0),
+    minBillForEarning: toNonNegativeNumber(b.minBillForEarning, 0),
+    redeemPoints: int(b.redeemPoints, d.redeemPoints, 1),
+    redeemValue: Math.max(0.01, toNonNegativeNumber(b.redeemValue, d.redeemValue)),
+    minRedeemPoints: int(b.minRedeemPoints, d.minRedeemPoints, 1),
+    maxRedeemPercent: Math.min(100, Math.max(1, toNonNegativeNumber(b.maxRedeemPercent, d.maxRedeemPercent))),
+    minBillForRedemption: toNonNegativeNumber(b.minBillForRedemption, 0),
+    pointsExpire: Boolean(b.pointsExpire),
+    expiryDays: int(b.expiryDays, d.expiryDays, 1),
+    welcomeBonusPoints: int(b.welcomeBonusPoints, 0),
+    birthdayRewardType: REWARD_TYPES.includes(b.birthdayRewardType) ? b.birthdayRewardType : d.birthdayRewardType,
+    birthdayPoints: int(b.birthdayPoints, 0),
+    birthdayVoucherValue: toNonNegativeNumber(b.birthdayVoucherValue, 0),
+    anniversaryRewardType: REWARD_TYPES.includes(b.anniversaryRewardType) ? b.anniversaryRewardType : d.anniversaryRewardType,
+    anniversaryPoints: int(b.anniversaryPoints, 0),
+    anniversaryVoucherValue: toNonNegativeNumber(b.anniversaryVoucherValue, 0),
+    occasionVoucherValidDays: int(b.occasionVoucherValidDays, d.occasionVoucherValidDays, 1),
+    referrerPoints: int(b.referrerPoints, 0),
+    refereePoints: int(b.refereePoints, 0),
+    voucherValidDays: int(b.voucherValidDays, d.voucherValidDays, 1),
+    tiersEnabled: Boolean(b.tiersEnabled),
+    tiers: normalizeTiers(b.tiers),
+    templates,
+  };
+}
+
 // ── Small in-process cache for the CRM flag ─────────────────────────────
 // The POS and every /api/crm request check whether CRM is on. The database
 // is a long network hop away from the app (see config/prisma.js), so the
@@ -114,6 +218,7 @@ const crmCache = new Map(); // outletId -> { value, expiresAt }
 
 export function invalidateCrmCache(outletId) {
   crmCache.delete(outletId);
+  loyaltyCache?.delete(outletId);
 }
 
 async function readRow(outletId) {
@@ -134,9 +239,36 @@ export async function getCrmSettings(outletId) {
   return value;
 }
 
+// { enabled, crmEnabled, config } — loyalty only works while CRM is on too.
+const loyaltyCache = new Map();
+export async function getLoyaltySettings(outletId) {
+  const cached = loyaltyCache.get(outletId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const row = await readRow(outletId);
+  const value = {
+    enabled: Boolean(row?.loyaltyEnabled) && Boolean(row?.crmEnabled),
+    loyaltySwitch: Boolean(row?.loyaltyEnabled),
+    crmEnabled: Boolean(row?.crmEnabled),
+    config: normalizeLoyaltyConfig(row?.loyalty || {}),
+  };
+  loyaltyCache.set(outletId, { value, expiresAt: Date.now() + CRM_CACHE_TTL_MS });
+  return value;
+}
+
 export async function getSection(outletId, section) {
   const def = SECTIONS[section];
   if (!def) throw badRequest(`Unknown settings section "${section}".`);
+
+  if (section === "loyalty") {
+    const row = await readRow(outletId);
+    return {
+      section,
+      enabled: Boolean(row?.loyaltyEnabled),
+      crmEnabled: Boolean(row?.crmEnabled),
+      data: normalizeLoyaltyConfig(row?.loyalty || {}),
+      updatedAt: row?.updatedAt || null,
+    };
+  }
 
   if (section === "crm") {
     const row = await readRow(outletId);
@@ -170,6 +302,23 @@ export async function updateSection(outletId, section, payload) {
   if (!def) throw badRequest(`Unknown settings section "${section}".`);
 
   const body = sanitizeSectionPayload(payload || {});
+
+  if (section === "loyalty") {
+    const { enabled, ...rest } = body;
+    const existing = await readRow(outletId);
+    const config = normalizeLoyaltyConfig({ ...(existing?.loyalty || {}), ...rest });
+    const data = {
+      loyalty: config,
+      ...(enabled !== undefined ? { loyaltyEnabled: Boolean(enabled) } : {}),
+    };
+    await prisma.outletSetting.upsert({
+      where: { outletId },
+      create: { outletId, ...data },
+      update: data,
+    });
+    invalidateCrmCache(outletId);
+    return getSection(outletId, "loyalty");
+  }
 
   if (section === "crm") {
     const { enabled, ...rest } = body;
@@ -207,12 +356,12 @@ export async function updateSection(outletId, section, payload) {
 export async function resetSection(outletId, section) {
   const def = SECTIONS[section];
   if (!def) throw badRequest(`Unknown settings section "${section}".`);
-  const value = section === "crm" ? { ...CRM_DEFAULTS } : { ...def.defaults };
+  const value = { ...def.defaults };
   await prisma.outletSetting.upsert({
     where: { outletId },
     create: { outletId, [def.column]: value },
     update: { [def.column]: value },
   });
-  if (section === "crm") invalidateCrmCache(outletId);
+  if (section === "crm" || section === "loyalty") invalidateCrmCache(outletId);
   return getSection(outletId, section);
 }

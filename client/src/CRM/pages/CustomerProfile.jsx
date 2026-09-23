@@ -17,15 +17,18 @@ import {
 } from "../crmApi";
 import { useAuth } from "../../auth/AuthContext";
 import CustomerFormModal from "../components/CustomerFormModal";
+import CustomerLoyaltyTab from "../components/CustomerLoyaltyTab";
+import { useCrm } from "../CrmContext";
 import {
   CRM_MANAGER_ROLES, CrmPage, SegmentBadge, StatusBadge, TagChip, Avatar, StatCard, ErrorNote, EmptyState,
   inr, fmtDate, fmtDateTime, fmtDay, relativeDays, ORDER_TYPE_LABEL,
   cardClass, inputClass, labelClass, btnPrimary, btnSecondary, chipClass,
 } from "../components/crmUI";
 
-const TABS = [
+const BASE_TABS = [
   ["overview", "Overview"],
   ["orders", "Purchase history"],
+  ["loyalty", "Loyalty", "loyalty"], // shown only when the programme is on
   ["notes", "Notes"],
   ["communication", "Communication"],
   ["feedback", "Feedback"],
@@ -48,7 +51,9 @@ export default function CustomerProfile() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "overview";
   const { user } = useAuth();
+  const { loyalty: loyaltyProgramme } = useCrm();
   const canManage = CRM_MANAGER_ROLES.includes(user?.role);
+  const TABS = BASE_TABS.filter(([, , needs]) => needs !== "loyalty" || loyaltyProgramme?.enabled);
 
   const [customer, setCustomer] = useState(null);
   const [error, setError] = useState("");
@@ -191,6 +196,7 @@ export default function CustomerProfile() {
 
       {tab === "overview" && <OverviewTab c={c} />}
       {tab === "orders" && <OrdersTab customerId={id} />}
+      {tab === "loyalty" && loyaltyProgramme?.enabled && <CustomerLoyaltyTab customer={c} onChange={load} />}
       {tab === "notes" && <NotesTab customerId={id} canManage={canManage} onChange={load} />}
       {tab === "communication" && <CommunicationTab customerId={id} onChange={load} />}
       {tab === "feedback" && <FeedbackTab customerId={id} onChange={load} />}

@@ -26,23 +26,6 @@ const Navbar = () => {
   const { isAuthenticated } = useAuth();
   const panelRef = useRef(null);
 
-  // ==========================================
-  // MOBILE SHEET BEHAVIOUR
-  // ==========================================
-  //
-  // The sheet has to close on navigation — otherwise tapping a link
-  // inside it changes the route behind a panel that stays open over the
-  // new page.
-  //
-  // Rather than watching the route in an effect and calling setState
-  // (which React 19 rightly flags: it's a cascading render, and the
-  // linter catches it), the state records *which page* the sheet was
-  // opened on, and "open" is derived from whether that's still the page
-  // we're on. Any route change closes it as a consequence of rendering,
-  // with no effect involved — and this way the browser's own back and
-  // forward buttons close it too, which an effect on `pathname` would
-  // have handled only by accident.
-
   const [openedOn, setOpenedOn] = useState(null);
   const open = openedOn === pathname;
 

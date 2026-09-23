@@ -34,6 +34,9 @@ import TaxBilling from "./tax/TaxBilling";
 // CRM
 import CrmSettings from "./crm/CrmSettings";
 
+// Loyalty
+import LoyaltySettings from "./loyalty/LoyaltySettings";
+
 // Order Status
 import OrderStatusSettings from "./order-status/OrderStatusSettings";
 import CountersSettings from "./counters/CountersSettings";
@@ -93,6 +96,9 @@ const SettingsRoutes = () => {
 
       {/* CRM — the on/off switch that controls CRM across the POS */}
       <Route path="crm" element={<CrmSettings />} />
+
+      {/* Loyalty — points, rewards and membership levels */}
+      <Route path="loyalty" element={<LoyaltySettings />} />
 
       {/* Order Status */}
       <Route path="order-status" element={<OrderStatusSettings />} />

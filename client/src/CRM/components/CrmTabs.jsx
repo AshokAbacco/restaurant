@@ -1,17 +1,23 @@
-// src/CRM/components/CrmTabs.jsx
+// src/crm/components/CrmTabs.jsx
 import { NavLink } from "react-router-dom";
+import { useCrm } from "../CrmContext";
 
 const TABS = [
   { to: "/crm", label: "Overview", end: true },
   { to: "/crm/customers", label: "Customers" },
   { to: "/crm/follow-ups", label: "Follow-ups & feedback" },
+  { to: "/crm/loyalty", label: "Loyalty", requiresLoyalty: true },
   { to: "/crm/groups", label: "Groups" },
 ];
 
 export default function CrmTabs() {
+  const { loyalty } = useCrm();
+  // The Loyalty tab appears only while Settings -> Loyalty is on.
+  const tabs = TABS.filter((t) => !t.requiresLoyalty || loyalty?.enabled);
+
   return (
     <nav className="mb-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-[#E7EAE1] dark:border-[#262B24]">
-      {TABS.map((t) => (
+      {tabs.map((t) => (
         <NavLink
           key={t.to}
           to={t.to}

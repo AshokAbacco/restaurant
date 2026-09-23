@@ -9,6 +9,7 @@ import { Router } from "express";
 import { requireRole } from "../auth/auth.middleware.js";
 import { requireCrmEnabled } from "./crm.middleware.js";
 import * as c from "./crm.controller.js";
+import * as l from "./loyalty.controller.js";
 
 const router = Router();
 const managers = requireRole("OWNER", "ADMIN", "MANAGER");
@@ -54,6 +55,22 @@ router.get("/tags", c.listTags);
 router.post("/tags", managers, c.createTag);
 router.put("/tags/:tagId", managers, c.updateTag);
 router.delete("/tags/:tagId", managers, c.deleteTag);
+
+// Loyalty (Settings -> Loyalty). The service answers 403 when it's off.
+router.get("/loyalty/overview", l.overview);
+router.get("/loyalty/transactions", l.transactions);
+router.get("/loyalty/vouchers", l.listVouchers);
+router.patch("/loyalty/vouchers/:voucherId/cancel", managers, l.cancelVoucher);
+router.get("/loyalty/campaigns", l.listCampaigns);
+router.post("/loyalty/campaigns", managers, l.createCampaign);
+router.put("/loyalty/campaigns/:campaignId", managers, l.updateCampaign);
+router.delete("/loyalty/campaigns/:campaignId", managers, l.deleteCampaign);
+router.get("/loyalty/coupons", l.listCoupons);
+router.post("/loyalty/coupons", managers, l.createCoupon);
+router.put("/loyalty/coupons/:couponId", managers, l.updateCoupon);
+router.get("/customers/:id/loyalty", l.customerLoyalty);
+router.post("/customers/:id/loyalty/adjust", managers, l.adjust);
+router.post("/customers/:id/vouchers", l.createVoucher);
 
 // Attach / detach a customer on an existing POS order
 router.patch("/orders/:orderId/customer", c.linkOrderCustomer);

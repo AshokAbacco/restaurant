@@ -8,7 +8,8 @@
 // that doesn't exist — both 404.
 import { Prisma } from "@prisma/client";
 import prisma from "../config/prisma.js";
-import { getCrmSettings } from "../settings/outletSettings.service.js";
+import { getCrmSettings, getLoyaltySettings } from "../settings/outletSettings.service.js";
+import { decorateCustomers, tierRange, resolveReferrer } from "./loyalty.service.js";
 import {
   upcomingMonthDays,
   queryCustomers,
@@ -195,14 +196,32 @@ function isUniqueViolation(err) {
 }
 
 // ── Config ──────────────────────────────────────────────────────────────
+// CRM switch + thresholds, plus the loyalty switch and the parts of the
+// loyalty rules the POS/billing screens need to show.
 export async function getConfig(outletId) {
-  return getCrmSettings(outletId);
+  const [crm, loyalty] = await Promise.all([getCrmSettings(outletId), getLoyaltySettings(outletId)]);
+  return {
+    ...crm,
+    loyalty: {
+      enabled: loyalty.enabled,
+      tiers: loyalty.config.tiersEnabled ? loyalty.config.tiers : [],
+      redeemPoints: loyalty.config.redeemPoints,
+      redeemValue: loyalty.config.redeemValue,
+      templates: loyalty.config.templates,
+    },
+  };
 }
 
 // ── Customers: list / search / lookup ───────────────────────────────────
 export async function listCustomers(outletId, query) {
   const { config } = await getCrmSettings(outletId);
-  const result = await queryCustomers(outletId, query, config);
+  const filters = { ...query };
+  if (query.tier) {
+    const range = await tierRange(outletId, query.tier);
+    if (range) Object.assign(filters, { tierMin: range.min, tierMax: range.max });
+  }
+  const result = await queryCustomers(outletId, filters, config);
+  await decorateCustomers(outletId, result.data);
   return { ...result, segments: SEGMENT_LABELS };
 }
 
@@ -216,7 +235,7 @@ export async function searchCustomers(outletId, q) {
     { search: term, limit: 8, sortBy: "lastVisitAt", sortDir: "desc" },
     config,
   );
-  return data;
+  return decorateCustomers(outletId, data);
 }
 
 // Exact mobile match — the POS "who is this?" check.
@@ -233,7 +252,9 @@ export async function lookupByMobile(outletId, mobile) {
   });
   if (!customer) return null;
   const { config } = await getCrmSettings(outletId);
-  return getStatsForCustomer(outletId, customer.id, config);
+  const row = await getStatsForCustomer(outletId, customer.id, config);
+  await decorateCustomers(outletId, row ? [row] : []);
+  return row;
 }
 
 // ── Customers: profile ──────────────────────────────────────────────────
@@ -280,6 +301,7 @@ export async function getCustomerProfile(outletId, id) {
     ]);
 
   const [notes, communications, feedback, openFeedback, pendingReminders] = counts;
+  if (stats) await decorateCustomers(outletId, [stats]);
 
   return {
     ...stats,
@@ -317,6 +339,9 @@ export async function createCustomer(outletId, body, user) {
   const data = customerDataFromBody(body || {}, { partial: false });
   const tags = await assertTagsBelongToOutlet(body?.tagIds, outletId);
   const actor = await resolveActor(user);
+  // Referral: "referred by" accepts the referrer's code or mobile number.
+  const referrer = body?.referredBy ? await resolveReferrer(outletId, body.referredBy) : null;
+  if (referrer) data.referredById = referrer.id;
 
   let customer;
   try {
@@ -359,9 +384,15 @@ export async function createCustomer(outletId, body, user) {
   await logHistory(outletId, customer.id, "CREATED", `Customer added (${customer.source || "CRM"})`, actor, {
     tags: tags.map((t) => t.name),
   });
+  if (referrer) {
+    await logHistory(outletId, customer.id, "REFERRED", `Referred by ${referrer.name}`, actor, { referrerId: referrer.id });
+    await logHistory(outletId, referrer.id, "REFERRAL_MADE", `Referred ${customer.name}`, actor, { customerId: customer.id });
+  }
 
   const { config } = await getCrmSettings(outletId);
-  return getStatsForCustomer(outletId, customer.id, config);
+  const created = await getStatsForCustomer(outletId, customer.id, config);
+  await decorateCustomers(outletId, created ? [created] : []);
+  return created;
 }
 
 const TRACKED_FIELDS = {

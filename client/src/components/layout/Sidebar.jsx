@@ -191,7 +191,7 @@ const Sidebar = ({ open, onClose }) => {
     },
 
     {
-      name: "CRM",
+      name: "CRM & Loyalty",
       path: "/crm",
       icon: <FiUserCheck />,
       requiresCrm: true, // shown only when Settings -> CRM is on
@@ -315,7 +315,7 @@ const Sidebar = ({ open, onClose }) => {
     },
 
     {
-      name: "CRM",
+      name: "CRM & Loyalty",
       path: "/crm",
       icon: <FiUserCheck />,
       requiresCrm: true, // shown only when Settings -> CRM is on
