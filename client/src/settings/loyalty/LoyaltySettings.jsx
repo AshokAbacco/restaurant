@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
 import { FiAward, FiSave, FiRefreshCw, FiExternalLink, FiPlus, FiTrash2 } from "react-icons/fi";
 import useModuleSettings from "../useModuleSettings";
 import SaveToast from "../SaveToast";
-import { useCrm } from "../../crm/CrmContext";
+import { useCrm } from "../../CRM/CrmContext";
 
 const DEFAULT_TIERS = [
   { name: "Silver", minSpend: 0, multiplier: 1, color: "#9CA3AF" },
