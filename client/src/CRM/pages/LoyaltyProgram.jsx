@@ -6,11 +6,9 @@
 // points ledger.
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FiPlus, FiSettings, FiEdit2, FiTrash2, FiSlash, FiRefreshCw, FiGift } from "react-icons/fi";
+import { FiSettings, FiSlash, FiRefreshCw, FiGift } from "react-icons/fi";
 import {
-  getLoyaltyOverview, listLoyaltyTransactions, listVouchers, cancelVoucher,
-  listCampaigns, createCampaign, updateCampaign, deleteCampaign,
-  listCoupons, createCoupon, updateCoupon, issueVoucher,
+  getLoyaltyOverview, listLoyaltyTransactions, listVouchers, cancelVoucher, issueVoucher,
 } from "../loyaltyApi";
 import { listCustomers } from "../crmApi";
 import { useAuth } from "../../auth/AuthContext";
@@ -22,10 +20,9 @@ import {
 
 const VIEWS = [
   ["overview", "Overview"],
-  ["campaigns", "Bonus campaigns"],
-  ["coupons", "Discount coupons"],
+  // Vouchers, every customer's points, and the points ledger all live
+  // under one tab — they're read together.
   ["vouchers", "Reward vouchers"],
-  ["history", "Points history"],
 ];
 
 export default function LoyaltyProgram() {
@@ -88,10 +85,7 @@ export default function LoyaltyProgram() {
       </div>
 
       {view === "overview" && <Overview data={data} />}
-      {view === "campaigns" && <Campaigns canManage={canManage} />}
-      {view === "coupons" && <Coupons canManage={canManage} />}
       {view === "vouchers" && <Vouchers canManage={canManage} />}
-      {view === "history" && <History />}
     </CrmPage>
   );
 }
@@ -148,230 +142,6 @@ function Overview({ data }) {
   );
 }
 
-// ── Bonus point campaigns ───────────────────────────────────────────────
-function Campaigns({ canManage }) {
-  const [rows, setRows] = useState([]);
-  const [error, setError] = useState("");
-  const [editing, setEditing] = useState(null);
-  const load = useCallback(() => listCampaigns().then(setRows).catch((e) => setError(e.message)), []);
-  useEffect(() => { load(); }, [load]);
-
-  async function remove(c) {
-    if (!window.confirm(`Delete "${c.name}"?`)) return;
-    await deleteCampaign(c.id).catch((e) => setError(e.message));
-    load();
-  }
-
-  return (
-    <div className="space-y-3">
-      <ErrorNote>{error}</ErrorNote>
-      {canManage && <button onClick={() => setEditing("new")} className={btnPrimary}><FiPlus /> New campaign</button>}
-      {rows.length === 0 ? (
-        <EmptyState>No campaigns. Use one for "double points this weekend".</EmptyState>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((c) => (
-            <div key={c.id} className={`${cardClass} p-4`}>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold text-[#1F2937] dark:text-white">{c.name}</p>
-                  <p className="text-xs text-[#9CA3AF]">{fmtDate(c.startsAt)} – {fmtDate(c.endsAt)}</p>
-                </div>
-                {canManage && (
-                  <div className="flex gap-1">
-                    <button onClick={() => setEditing(c)} className="rounded-lg p-1.5 text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5"><FiEdit2 size={14} /></button>
-                    <button onClick={() => remove(c)} className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"><FiTrash2 size={14} /></button>
-                  </div>
-                )}
-              </div>
-              <p className="mt-2 text-sm font-bold text-[#3FA34D] dark:text-[#43B75A]">{c.multiplier}× points</p>
-              {c.minBillAmount > 0 && <p className="text-xs text-[#6B7280] dark:text-[#9CA8A0]">On bills of {inr(c.minBillAmount)} or more</p>}
-              <p className="mt-1 text-xs font-semibold" style={{ color: c.isActive ? "#3FA34D" : "#9CA3AF" }}>{c.isActive ? "Active" : "Paused"}</p>
-            </div>
-          ))}
-        </div>
-      )}
-      {editing && (
-        <CampaignModal
-          campaign={editing === "new" ? null : editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); }}
-        />
-      )}
-    </div>
-  );
-}
-
-function toLocalInput(d) {
-  if (!d) return "";
-  const date = new Date(d);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function CampaignModal({ campaign, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    name: campaign?.name || "",
-    multiplier: campaign?.multiplier || 2,
-    minBillAmount: campaign?.minBillAmount || "",
-    startsAt: toLocalInput(campaign?.startsAt || new Date()),
-    endsAt: toLocalInput(campaign?.endsAt || new Date(Date.now() + 7 * 86400000)),
-    isActive: campaign?.isActive ?? true,
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
-
-  async function save(e) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    const payload = {
-      ...form,
-      multiplier: Number(form.multiplier),
-      minBillAmount: form.minBillAmount === "" ? 0 : Number(form.minBillAmount),
-      startsAt: new Date(form.startsAt).toISOString(),
-      endsAt: new Date(form.endsAt).toISOString(),
-    };
-    try {
-      if (campaign) await updateCampaign(campaign.id, payload);
-      else await createCampaign(payload);
-      onSaved();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      title={campaign ? "Edit campaign" : "New bonus campaign"}
-      onClose={onClose}
-      footer={<><button onClick={onClose} className={btnSecondary}>Cancel</button><button form="campaign-form" disabled={saving} className={btnPrimary}>{saving ? "Saving…" : "Save"}</button></>}
-    >
-      <form id="campaign-form" onSubmit={save} className="space-y-3">
-        <div><label className={labelClass}>Name *</label><input autoFocus value={form.name} onChange={set("name")} className={inputClass} placeholder="e.g. Double points weekend" /></div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className={labelClass}>Points multiplier *</label><input type="number" step="0.5" min="1" value={form.multiplier} onChange={set("multiplier")} className={inputClass} /></div>
-          <div><label className={labelClass}>Minimum bill (₹)</label><input type="number" min="0" value={form.minBillAmount} onChange={set("minBillAmount")} className={inputClass} placeholder="Any" /></div>
-          <div><label className={labelClass}>Starts *</label><input type="datetime-local" value={form.startsAt} onChange={set("startsAt")} className={inputClass} /></div>
-          <div><label className={labelClass}>Ends *</label><input type="datetime-local" value={form.endsAt} onChange={set("endsAt")} className={inputClass} /></div>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-[#1F2937] dark:text-[#E4E9E2]">
-          <input type="checkbox" checked={form.isActive} onChange={set("isActive")} className="h-4 w-4 accent-[#3FA34D]" /> Active
-        </label>
-        <ErrorNote>{error}</ErrorNote>
-      </form>
-    </Modal>
-  );
-}
-
-// ── Discount coupons ────────────────────────────────────────────────────
-function Coupons({ canManage }) {
-  const [rows, setRows] = useState([]);
-  const [error, setError] = useState("");
-  const [editing, setEditing] = useState(null);
-  const load = useCallback(() => listCoupons().then(setRows).catch((e) => setError(e.message)), []);
-  useEffect(() => { load(); }, [load]);
-
-  return (
-    <div className="space-y-3">
-      <ErrorNote>{error}</ErrorNote>
-      {canManage && <button onClick={() => setEditing("new")} className={btnPrimary}><FiPlus /> New coupon</button>}
-      {rows.length === 0 ? (
-        <EmptyState>No coupon codes yet.</EmptyState>
-      ) : (
-        <div className={`${cardClass} overflow-x-auto`}>
-          <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="bg-[#F3F5EE] text-xs uppercase text-[#6B7280] dark:bg-white/5 dark:text-[#9CA8A0]">
-              <tr><th className="px-4 py-2">Code</th><th className="px-4 py-2">Discount</th><th className="px-4 py-2">Minimum bill</th><th className="px-4 py-2">Valid</th><th className="px-4 py-2">Used</th><th className="px-4 py-2">Status</th><th /></tr>
-            </thead>
-            <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
-              {rows.map((c) => (
-                <tr key={c.id}>
-                  <td className="px-4 py-2 font-mono font-semibold text-[#1F2937] dark:text-white">{c.code}</td>
-                  <td className="px-4 py-2">{c.type === "PERCENTAGE" ? `${c.value}%` : inr(c.value)}</td>
-                  <td className="px-4 py-2">{c.minOrderAmount ? inr(c.minOrderAmount) : "—"}</td>
-                  <td className="px-4 py-2 text-xs text-[#6B7280] dark:text-[#9CA8A0]">{c.validFrom || c.validTo ? `${fmtDate(c.validFrom)} – ${fmtDate(c.validTo)}` : "Always"}</td>
-                  <td className="px-4 py-2">{c.timesUsed}{c.usageLimit ? ` / ${c.usageLimit}` : ""}</td>
-                  <td className="px-4 py-2 text-xs font-semibold" style={{ color: c.isActive ? "#3FA34D" : "#9CA3AF" }}>{c.isActive ? "Active" : "Off"}</td>
-                  <td className="px-4 py-2 text-right">
-                    {canManage && <button onClick={() => setEditing(c)} className="rounded-lg p-1.5 text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5"><FiEdit2 size={14} /></button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {editing && <CouponModal coupon={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
-    </div>
-  );
-}
-
-function CouponModal({ coupon, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    code: coupon?.code || "",
-    type: coupon?.type || "PERCENTAGE",
-    value: coupon?.value || "",
-    minOrderAmount: coupon?.minOrderAmount || "",
-    usageLimit: coupon?.usageLimit || "",
-    validFrom: coupon?.validFrom ? coupon.validFrom.slice(0, 10) : "",
-    validTo: coupon?.validTo ? coupon.validTo.slice(0, 10) : "",
-    isActive: coupon?.isActive ?? true,
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
-
-  async function save(e) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const payload = { ...form, value: Number(form.value) };
-      if (coupon) await updateCoupon(coupon.id, payload);
-      else await createCoupon(payload);
-      onSaved();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      title={coupon ? "Edit coupon" : "New discount coupon"}
-      onClose={onClose}
-      footer={<><button onClick={onClose} className={btnSecondary}>Cancel</button><button form="coupon-form" disabled={saving} className={btnPrimary}>{saving ? "Saving…" : "Save"}</button></>}
-    >
-      <form id="coupon-form" onSubmit={save} className="space-y-3">
-        <div><label className={labelClass}>Code *</label><input autoFocus value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} className={`${inputClass} font-mono uppercase`} placeholder="WELCOME10" /></div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Type</label>
-            <select value={form.type} onChange={set("type")} className={inputClass}>
-              <option value="PERCENTAGE">Percentage off</option>
-              <option value="FIXED_AMOUNT">Flat amount off</option>
-            </select>
-          </div>
-          <div><label className={labelClass}>{form.type === "PERCENTAGE" ? "Percent *" : "Amount (₹) *"}</label><input type="number" min="1" value={form.value} onChange={set("value")} className={inputClass} /></div>
-          <div><label className={labelClass}>Minimum bill (₹)</label><input type="number" min="0" value={form.minOrderAmount} onChange={set("minOrderAmount")} className={inputClass} placeholder="Any" /></div>
-          <div><label className={labelClass}>Usage limit</label><input type="number" min="1" value={form.usageLimit} onChange={set("usageLimit")} className={inputClass} placeholder="Unlimited" /></div>
-          <div><label className={labelClass}>Valid from</label><input type="date" value={form.validFrom} onChange={set("validFrom")} className={inputClass} /></div>
-          <div><label className={labelClass}>Valid to</label><input type="date" value={form.validTo} onChange={set("validTo")} className={inputClass} /></div>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-[#1F2937] dark:text-[#E4E9E2]">
-          <input type="checkbox" checked={form.isActive} onChange={set("isActive")} className="h-4 w-4 accent-[#3FA34D]" /> Active
-        </label>
-        <ErrorNote>{error}</ErrorNote>
-      </form>
-    </Modal>
-  );
-}
-
 // ── Reward vouchers ─────────────────────────────────────────────────────
 // Two parts: the vouchers themselves, and every customer with their points
 // balance — so you can see who's eligible and issue a reward on the spot
@@ -401,7 +171,12 @@ function Vouchers({ canManage }) {
       const counts = {};
       for (const v of activeList) if (v.customer?.id) counts[v.customer.id] = (counts[v.customer.id] || 0) + 1;
       setActiveByCustomer(counts);
-      setMembers([...(customers.data || [])].sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0)));
+      // Only customers who actually hold points — a list of zeros is noise.
+      setMembers(
+        (customers.data || [])
+          .filter((c) => (c.loyaltyPoints || 0) > 0)
+          .sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0)),
+      );
       setError("");
     } catch (err) {
       setError(err.message);
@@ -495,7 +270,11 @@ function Vouchers({ canManage }) {
         {loading && members.length === 0 ? (
           <p className="text-sm text-[#9CA3AF]">Loading…</p>
         ) : shownMembers.length === 0 ? (
-          <EmptyState>No customers yet. They're added on the POS while taking an order.</EmptyState>
+          <EmptyState>
+            {term
+              ? "No customer with points matches that search."
+              : "Nobody holds points yet. Points are added when a bill with a customer on it is completed."}
+          </EmptyState>
         ) : (
           <div className={`${cardClass} overflow-x-auto`}>
             <table className="w-full min-w-[860px] text-left text-sm">
@@ -534,6 +313,12 @@ function Vouchers({ canManage }) {
             </table>
           </div>
         )}
+      </section>
+
+      {/* Points ledger */}
+      <section>
+        <h3 className="mb-3 font-bold text-[#1F2937] dark:text-white">Points history</h3>
+        <History />
       </section>
 
       {issueFor && (

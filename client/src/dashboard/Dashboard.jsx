@@ -366,7 +366,7 @@ const Dashboard = () => {
             onClick={() => navigate("/pos?orderType=TAKEAWAY")}
             className="rounded-lg border border-[#E7EAE1] bg-white px-4 py-2 text-[14px] font-semibold text-[#1F2937] transition-colors hover:border-[#3FA34D] hover:text-[#3FA34D] dark:border-[#262B24] dark:bg-[#171C17] dark:text-white dark:hover:border-[#43B75A] dark:hover:text-[#43B75A]"
           >
-            Pick Up
+            Takeaway
           </button>
         </div>
       </div>

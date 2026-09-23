@@ -572,7 +572,7 @@ export default function PosOrderScreen() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-[#F3F5EE] dark:bg-[#12160F]">
+    <div className="flex h-screen flex-col bg-[#fff] dark:bg-[#12160F]">
       <header className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
         <h1 className="font-mono text-lg font-bold text-[#1F2937] dark:text-white">
           POS · New Order

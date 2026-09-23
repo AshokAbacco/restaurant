@@ -7,7 +7,7 @@ const TABS = [
   { to: "/crm/customers", label: "Customers" },
   { to: "/crm/follow-ups", label: "Follow-ups & feedback" },
   { to: "/crm/loyalty", label: "Loyalty", requiresLoyalty: true },
-  { to: "/crm/groups", label: "Groups" },
+  // { to: "/crm/groups", label: "Groups" },
 ];
 
 export default function CrmTabs() {

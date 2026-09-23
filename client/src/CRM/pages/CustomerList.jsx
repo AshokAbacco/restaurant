@@ -219,7 +219,7 @@ export default function CustomerList() {
           <table className="w-full min-w-[1500px] text-left text-sm">
             <thead className="bg-[#F3F5EE] text-xs font-semibold uppercase tracking-wide text-[#6B7280] dark:bg-white/5 dark:text-[#9CA8A0]">
               <tr>
-                {["Customer", "Mobile", "Email", "Address", "Orders", "Total spent", "Avg bill", "Last visit", "Favourite items", "Groups", "Outstanding", "Birthday / Anniv.", "Notes", "Status", ""].map((h) => (
+                {["Customer", "Mobile", "Email", "Address", "Orders", "Total spent", "Avg bill", "Last visit", "Favourite items", "Birthday / Anniv.", "Notes", "Status", ""].map((h) => (
                   <th key={h} className="whitespace-nowrap px-3 py-3">{h}</th>
                 ))}
               </tr>
@@ -248,14 +248,7 @@ export default function CustomerList() {
                   <td className="max-w-[200px] px-3 py-3 text-[#6B7280] dark:text-[#9CA8A0]">
                     {c.favoriteItems?.length ? c.favoriteItems.map((f) => `${f.name} (${f.quantity})`).join(", ") : "—"}
                   </td>
-                  <td className="px-3 py-3">
-                    <div className="flex max-w-[180px] flex-wrap gap-1">
-                      {c.tags?.length ? c.tags.map((t) => <TagChip key={t.id} tag={t} />) : <span className="text-[#9CA3AF]">—</span>}
-                    </div>
-                  </td>
-                  <td className={`whitespace-nowrap px-3 py-3 font-semibold ${c.outstanding > 0 ? "text-amber-600 dark:text-amber-400" : "text-[#9CA3AF]"}`}>
-                    {c.outstanding > 0 ? inr(c.outstanding, 2) : "—"}
-                  </td>
+                 
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-[#6B7280] dark:text-[#9CA8A0]">
                     <span className="block">🎂 {fmtDay(c.birthday)}</span>
                     <span className="block">💍 {fmtDay(c.anniversary)}</span>
