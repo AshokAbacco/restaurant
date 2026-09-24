@@ -62,7 +62,9 @@ export const LOYALTY_DEFAULTS = Object.freeze({
   // Vouchers bought with points stay valid this long
   voucherValidDays: 30,
   // Membership levels, by lifetime spend
-  tiersEnabled: true,
+  // Membership levels were removed: earning is the spend rule plus the
+  // minimum bill, with no level multipliers.
+  tiersEnabled: false,
   tiers: DEFAULT_TIERS,
   // Customer messages (sent from the CRM with one click)
   templates: {
@@ -203,7 +205,9 @@ export function normalizeLoyaltyConfig(raw = {}) {
     referrerPoints: int(b.referrerPoints, 0),
     refereePoints: int(b.refereePoints, 0),
     voucherValidDays: int(b.voucherValidDays, d.voucherValidDays, 1),
-    tiersEnabled: Boolean(b.tiersEnabled),
+    // Forced off, so a config saved before levels were removed can't keep
+    // multiplying points.
+    tiersEnabled: false,
     tiers: normalizeTiers(b.tiers),
     templates,
   };

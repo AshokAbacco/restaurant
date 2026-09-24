@@ -8,16 +8,10 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { FiAward, FiSave, FiRefreshCw, FiExternalLink, FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiAward, FiSave, FiRefreshCw, FiExternalLink } from "react-icons/fi";
 import useModuleSettings from "../useModuleSettings";
 import SaveToast from "../SaveToast";
-import { useCrm } from "../../CRM/CrmContext";
-
-const DEFAULT_TIERS = [
-  { name: "Silver", minSpend: 0, multiplier: 1, color: "#9CA3AF" },
-  { name: "Gold", minSpend: 10000, multiplier: 1.25, color: "#D97706" },
-  { name: "Platinum", minSpend: 50000, multiplier: 1.5, color: "#7C3AED" },
-];
+import { useCrm } from "../../crm/CrmContext";
 
 const DEFAULTS = {
   earnSpendAmount: 100,
@@ -41,8 +35,6 @@ const DEFAULTS = {
   referrerPoints: 100,
   refereePoints: 50,
   voucherValidDays: 30,
-  tiersEnabled: true,
-  tiers: DEFAULT_TIERS,
   templates: {},
 };
 
@@ -84,16 +76,6 @@ const LoyaltySettings = () => {
   const setVal = (key) => (e) => setSettings((s) => ({ ...s, [key]: e.target.value }));
   const setBool = (key) => (e) => setSettings((s) => ({ ...s, [key]: e.target.checked }));
 
-  const tiers = Array.isArray(settings.tiers) ? settings.tiers : DEFAULT_TIERS;
-  const setTier = (i, key, value) =>
-    setSettings((s) => {
-      const next = [...(Array.isArray(s.tiers) ? s.tiers : DEFAULT_TIERS)];
-      next[i] = { ...next[i], [key]: key === "name" || key === "color" ? value : Number(value) };
-      return { ...s, tiers: next };
-    });
-  const addTier = () =>
-    setSettings((s) => ({ ...s, tiers: [...(s.tiers || []), { name: "New level", minSpend: 0, multiplier: 1, color: "#3FA34D" }] }));
-  const removeTier = (i) => setSettings((s) => ({ ...s, tiers: (s.tiers || []).filter((_, idx) => idx !== i) }));
 
   const toggleEnabled = async () => {
     const saved = await save({ enabled: !enabled });
@@ -191,7 +173,7 @@ const LoyaltySettings = () => {
           <p className="mt-6 rounded-xl bg-[#F3F5EE] dark:bg-white/5 p-4 text-sm text-[#1F2937] dark:text-[#E4E9E2]">
             <strong>Example:</strong> a customer spends ₹{example.spend.toLocaleString("en-IN")} and earns{" "}
             <strong>{example.pts} points</strong>, worth about <strong>₹{example.worth}</strong> on a future bill.
-            Membership levels and bonus campaigns can multiply this.
+            Every bill above the minimum earns at this same rate.
           </p>
         </Card>
 
@@ -267,34 +249,6 @@ const LoyaltySettings = () => {
             <Field label="Referral: points for the referrer" hint="The existing customer who shared their code."><input type="number" min="0" value={settings.referrerPoints} onChange={setNum("referrerPoints")} className={inputClass} /></Field>
             <Field label="Referral: points for the new customer" hint="Given on their first bill."><input type="number" min="0" value={settings.refereePoints} onChange={setNum("refereePoints")} className={inputClass} /></Field>
           </div>
-        </Card>
-
-        {/* TIERS */}
-        <Card title="Membership levels" subtitle="Silver, Gold, Platinum — based on lifetime spend, each with its own points multiplier.">
-          <ToggleRow
-            title="Use membership levels"
-            description="Off means everyone earns at the base rate."
-            checked={Boolean(settings.tiersEnabled)}
-            onChange={setBool("tiersEnabled")}
-          />
-          {settings.tiersEnabled && (
-            <div className="mt-6 space-y-3">
-              {tiers.map((t, i) => (
-                <div key={i} className="grid grid-cols-2 items-end gap-3 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-4 md:grid-cols-5">
-                  <Field label="Name"><input value={t.name} onChange={(e) => setTier(i, "name", e.target.value)} className={inputClass} /></Field>
-                  <Field label="From lifetime spend (₹)"><input type="number" min="0" value={t.minSpend} onChange={(e) => setTier(i, "minSpend", e.target.value)} className={inputClass} /></Field>
-                  <Field label="Points multiplier"><input type="number" step="0.05" min="1" value={t.multiplier} onChange={(e) => setTier(i, "multiplier", e.target.value)} className={inputClass} /></Field>
-                  <Field label="Colour"><input type="color" value={t.color} onChange={(e) => setTier(i, "color", e.target.value)} className="h-12 w-full rounded-lg border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#1D231C]" /></Field>
-                  <button onClick={() => removeTier(i)} className="h-12 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center justify-center gap-2">
-                    <FiTrash2 /> Remove
-                  </button>
-                </div>
-              ))}
-              <button onClick={addTier} className="h-12 px-5 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] text-[#1F2937] dark:text-[#E4E9E2] hover:bg-[#F3F5EE] dark:hover:bg-[#1D231C] flex items-center gap-2">
-                <FiPlus /> Add level
-              </button>
-            </div>
-          )}
         </Card>
 
         <div className="mt-10 flex justify-end">

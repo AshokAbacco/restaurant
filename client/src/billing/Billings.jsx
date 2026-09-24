@@ -17,6 +17,7 @@ import {
   getKotsForOrder,
 } from "../pos/api/posApi";
 import { fetchWithOfflineFallback } from "../offline/offlineCache";
+import LoyaltyRedeemPanel from "../crm/components/LoyaltyRedeemPanel";
 import {
   completeBillingOffline,
   getPendingBillingOrderIds,
@@ -58,6 +59,8 @@ function orderBalanceDue(order) {
   return Math.max(Number(order.grandTotal) - paid, 0);
 }
 
+const NO_REWARDS = { loyalty: {}, rewardValue: 0, lines: [] };
+
 export default function Billings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const preselectedOrderId = searchParams.get("orderId");
@@ -87,6 +90,11 @@ export default function Billings() {
   // Discount keyed in at the billing counter — applied on top of whatever
   // discount (if any) is already on the order. Not persisted until
   // "Complete Payment" is clicked; everything below is just a live preview.
+  // Loyalty rewards chosen for this bill (points / voucher / coupon).
+  // Applied by the server on Complete Payment; here they only reduce what
+  // is left to collect.
+  const [rewards, setRewards] = useState(NO_REWARDS);
+
   const [discountType, setDiscountType] = useState(null); // null | "PERCENTAGE" | "FIXED_AMOUNT"
   const [discountValue, setDiscountValue] = useState("");
   const [discountReason, setDiscountReason] = useState("");
@@ -187,6 +195,7 @@ export default function Billings() {
     setKitchenError(null);
     setMode("CASH");
     setDiscountType(null);
+    setRewards(NO_REWARDS);
     setDiscountValue("");
     setDiscountReason("");
     // FIX: this used to call getBillingSummary(orderId) directly with no
@@ -292,12 +301,19 @@ export default function Billings() {
     ? Math.max(summary.balanceDue - pendingDiscountAmount, 0)
     : 0;
 
+  // What the customer still has to pay once points/vouchers are applied.
+  const rewardValue = Math.min(rewards.rewardValue || 0, previewBalanceDue);
+  const payableAfterRewards = Math.max(
+    Math.round((previewBalanceDue - rewardValue) * 100) / 100,
+    0,
+  );
+
   const splitTotal = splitLines.reduce(
     (sum, l) => sum + (Number(l.amount) || 0),
     0,
   );
   const splitMismatch = summary
-    ? Math.abs(splitTotal - previewBalanceDue) > 0.01
+    ? Math.abs(splitTotal - payableAfterRewards) > 0.01
     : true;
 
   async function handleCompletePayment() {
@@ -310,7 +326,9 @@ export default function Billings() {
         ? splitLines
             .filter((l) => Number(l.amount) > 0)
             .map((l) => ({ method: l.method, amount: Number(l.amount) }))
-        : [{ method: mode, amount: previewBalanceDue }];
+        : payableAfterRewards > 0
+          ? [{ method: mode, amount: payableAfterRewards }]
+          : []; // fully covered by points or a voucher
 
     // Only sent if a discount was actually keyed in — the backend skips
     // discount application entirely when this is omitted.
@@ -333,7 +351,14 @@ export default function Billings() {
     try {
       const data = await completeBillingOffline(
         selectedOrderId,
-        { payments, discount },
+        {
+          payments,
+          discount,
+          // Only sent when a reward was actually chosen.
+          ...(Object.keys(rewards.loyalty || {}).length
+            ? { loyalty: rewards.loyalty }
+            : {}),
+        },
         { cashOnly: isCashOnly },
       );
 
@@ -422,6 +447,7 @@ export default function Billings() {
     setSentToKitchen(false);
     setKitchenError(null);
     setDiscountType(null);
+    setRewards(NO_REWARDS);
     setDiscountValue("");
     setDiscountReason("");
     selectOrder(null);
@@ -823,6 +849,19 @@ export default function Billings() {
                 )}
               </div>
 
+              {/* Loyalty — points, vouchers and coupon codes for the
+                  customer on this order. Hidden when Settings -> Loyalty
+                  is off or the order has no customer. */}
+              {!result && summary.loyalty?.enabled && (
+                <div className="mt-5">
+                  <LoyaltyRedeemPanel
+                    loyalty={summary.loyalty}
+                    billAmount={previewBalanceDue}
+                    onChange={setRewards}
+                  />
+                </div>
+              )}
+
               {!result && (
                 <div className="mt-5">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
@@ -916,7 +955,7 @@ export default function Billings() {
                         className={`text-xs font-medium ${splitMismatch ? "text-[#EF5350] dark:text-red-400" : "text-[#3FA34D] dark:text-[#43B75A]"}`}
                       >
                         Split total: ₹{splitTotal.toFixed(2)} of ₹
-                        {previewBalanceDue.toFixed(2)} due
+                        {payableAfterRewards.toFixed(2)} due
                       </p>
                     </div>
                   )}
@@ -963,7 +1002,7 @@ export default function Billings() {
                 >
                   {processing
                     ? "Processing payment…"
-                    : `Complete Payment · ₹${previewBalanceDue.toFixed(2)}`}
+                    : `Complete Payment · ₹${payableAfterRewards.toFixed(2)}`}
                 </button>
               </div>
             )}

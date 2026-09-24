@@ -1068,7 +1068,7 @@ export async function getCustomerLoyalty(outletId, customerId) {
   };
 }
 
-export async function listTransactions(outletId, { customerId, type, page, limit } = {}) {
+export async function listTransactions(outletId, { customerId, type, page, limit, hideSpent } = {}) {
   await requireLoyalty(outletId);
   const take = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
   const skip = (Math.max(1, parseInt(page, 10) || 1) - 1) * take;
@@ -1077,6 +1077,12 @@ export async function listTransactions(outletId, { customerId, type, page, limit
     outletId,
     ...(customerId ? { customerId } : {}),
     ...(type && TYPES.includes(type) ? { type } : {}),
+    // hideSpent drops credits that have been fully redeemed or expired —
+    // they're used up, so they only clutter the ledger. Done here rather
+    // than in the page so paging and the total stay correct.
+    ...(hideSpent === "true" || hideSpent === true
+      ? { NOT: { AND: [{ points: { gt: 0 } }, { remainingPoints: 0 }] } }
+      : {}),
   };
   const [rows, total] = await Promise.all([
     prisma.loyaltyTransaction.findMany({

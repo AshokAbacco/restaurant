@@ -102,11 +102,6 @@ export default function LoyaltyRedeemPanel({ loyalty, billAmount, onChange }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="flex items-center gap-2 text-sm font-bold text-[#1F2937] dark:text-[#E4E9E2]">
           <FiAward className="text-[#3FA34D] dark:text-[#43B75A]" /> Loyalty
-          {loyalty.tier && (
-            <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: loyalty.tier.color, backgroundColor: `${loyalty.tier.color}1A` }}>
-              {loyalty.tier.name}
-            </span>
-          )}
         </h4>
         {c && (
           <span className="text-xs text-[#6B7280] dark:text-[#9CA8A0]">

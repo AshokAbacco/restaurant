@@ -7,9 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   FiAward, FiGift, FiShare2, FiPlus, FiMessageCircle, FiCopy, FiSlash, FiClock,
 } from "react-icons/fi";
-import {
-  getCustomerLoyalty, adjustPoints, issueVoucher, cancelVoucher,
-} from "../loyaltyApi";
+import { getCustomerLoyalty, adjustPoints, cancelVoucher } from "../loyaltyApi";
 import { useRestaurantProfile } from "../../context/RestaurantProfileContext";
 import {
   CRM_MANAGER_ROLES, Modal, StatCard, ErrorNote, EmptyState,
@@ -42,7 +40,8 @@ export default function CustomerLoyaltyTab({ customer, onChange }) {
   const canManage = CRM_MANAGER_ROLES.includes(user?.role);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const [modal, setModal] = useState(null); // "adjust" | "voucher"
+  const [modal, setModal] = useState(null); // "adjust"
+  const [showSpent, setShowSpent] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +68,12 @@ export default function CustomerLoyaltyTab({ customer, onChange }) {
   if (error && !data) return <ErrorNote>{error}</ErrorNote>;
   if (!data) return <p className="text-sm text-[#9CA3AF]">Loading…</p>;
 
+  // A credit whose points have all been spent (remainingPoints === 0).
+  const isSpent = (t) => t.points > 0 && t.remainingPoints === 0;
+  const allTx = data.transactions || [];
+  const spentCount = allTx.filter(isSpent).length;
+  const visibleTx = showSpent ? allTx : allTx.filter((t) => !isSpent(t));
+
   const waNumber = customer.mobile?.replace(/[^\d]/g, "").replace(/^(\d{10})$/, "91$1");
   const vars = {
     name: customer.name,
@@ -85,13 +90,8 @@ export default function CustomerLoyaltyTab({ customer, onChange }) {
     <div className="space-y-4">
       <ErrorNote>{error}</ErrorNote>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Points balance" value={data.points} hint={`worth ${inr(data.pointsValue)}`} accent="text-[#3FA34D] dark:text-[#43B75A]" />
-        <StatCard
-          label="Membership"
-          value={data.tier ? <span style={{ color: data.tier.color }}>{data.tier.name}</span> : "—"}
-          hint={data.tier?.multiplier > 1 ? `${data.tier.multiplier}× points` : `Lifetime spend ${inr(data.totalSpent)}`}
-        />
         <StatCard label="Lifetime earned" value={data.lifetimeEarned} />
         <StatCard label="Lifetime redeemed" value={data.lifetimeRedeemed} hint={data.lifetimeExpired ? `${data.lifetimeExpired} expired` : undefined} />
         <StatCard
@@ -113,17 +113,16 @@ export default function CustomerLoyaltyTab({ customer, onChange }) {
           </a>
         )}
         {canManage && (
-          <>
-            <button onClick={() => setModal("voucher")} className={btnSecondary}><FiGift /> Issue voucher</button>
-            <button onClick={() => setModal("adjust")} className={btnPrimary}><FiPlus /> Adjust points</button>
-          </>
+          <button onClick={() => setModal("adjust")} className={btnPrimary}><FiPlus /> Adjust points</button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Vouchers */}
+      {/* Vouchers and Referrals */}
+
+      {/* <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section className={`${cardClass} p-5`}>
           <h3 className="mb-3 flex items-center gap-2 font-bold text-[#1F2937] dark:text-white"><FiGift /> Reward vouchers</h3>
+          
           {data.vouchers?.length ? (
             <ul className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
               {data.vouchers.map((v) => (
@@ -153,8 +152,7 @@ export default function CustomerLoyaltyTab({ customer, onChange }) {
             <EmptyState>No vouchers yet.</EmptyState>
           )}
         </section>
-
-        {/* Referrals */}
+     
         <section className={`${cardClass} p-5`}>
           <h3 className="mb-3 flex items-center gap-2 font-bold text-[#1F2937] dark:text-white"><FiShare2 /> Referrals</h3>
           <div className="flex items-center gap-2">
@@ -178,14 +176,26 @@ export default function CustomerLoyaltyTab({ customer, onChange }) {
             </ul>
           )}
         </section>
-      </div>
+      </div> */}
 
-      {/* Ledger */}
+      {/* Ledger — once points have been redeemed, the batches they came
+          out of are used up and just clutter the list, so they're hidden
+          unless asked for. */}
       <section className={`${cardClass} overflow-hidden`}>
-        <h3 className="flex items-center gap-2 border-b border-[#E7EAE1] px-5 py-4 font-bold text-[#1F2937] dark:border-[#262B24] dark:text-white">
-          <FiAward /> Points history
-        </h3>
-        {data.transactions?.length ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E7EAE1] px-5 py-4 dark:border-[#262B24]">
+          <h3 className="flex items-center gap-2 font-bold text-[#1F2937] dark:text-white">
+            <FiAward /> Points history
+          </h3>
+          {spentCount > 0 && (
+            <button
+              onClick={() => setShowSpent((v) => !v)}
+              className="text-xs font-semibold text-[#3FA34D] hover:underline dark:text-[#43B75A]"
+            >
+              {showSpent ? "Hide" : "Show"} {spentCount} used-up entr{spentCount === 1 ? "y" : "ies"}
+            </button>
+          )}
+        </div>
+        {visibleTx.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-[#F3F5EE] text-xs uppercase text-[#6B7280] dark:bg-white/5 dark:text-[#9CA8A0]">
@@ -199,7 +209,7 @@ export default function CustomerLoyaltyTab({ customer, onChange }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
-                {data.transactions.map((t) => (
+                {visibleTx.map((t) => (
                   <tr key={t.id}>
                     <td className="whitespace-nowrap px-4 py-2 text-[#6B7280] dark:text-[#9CA8A0]">{fmtDateTime(t.createdAt)}</td>
                     <td className="whitespace-nowrap px-4 py-2 font-semibold text-[#1F2937] dark:text-[#E4E9E2]">{TYPE_LABEL[t.type] || t.type}</td>
@@ -217,24 +227,16 @@ export default function CustomerLoyaltyTab({ customer, onChange }) {
             </table>
           </div>
         ) : (
-          <div className="p-4"><EmptyState>No points activity yet.</EmptyState></div>
+          <div className="p-4">
+            <EmptyState>
+              {allTx.length ? "Every entry here has been used up." : "No points activity yet."}
+            </EmptyState>
+          </div>
         )}
       </section>
 
       {modal === "adjust" && (
         <AdjustModal
-          customer={customer}
-          balance={data.points}
-          onClose={() => setModal(null)}
-          onSaved={() => {
-            setModal(null);
-            load();
-            onChange?.();
-          }}
-        />
-      )}
-      {modal === "voucher" && (
-        <VoucherModal
           customer={customer}
           balance={data.points}
           onClose={() => setModal(null)}
@@ -289,79 +291,6 @@ function AdjustModal({ customer, balance, onClose, onSaved }) {
         <div>
           <label className={labelClass}>Reason *</label>
           <input value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} placeholder="e.g. Goodwill for the delayed order" />
-        </div>
-        <ErrorNote>{error}</ErrorNote>
-      </form>
-    </Modal>
-  );
-}
-
-function VoucherModal({ customer, balance, onClose, onSaved }) {
-  const [form, setForm] = useState({ title: "", type: "FIXED_AMOUNT", value: "", minBillAmount: "", validDays: 30, pointsCost: "" });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  async function save(e) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      await issueVoucher(customer.id, {
-        ...form,
-        value: Number(form.value),
-        minBillAmount: form.minBillAmount === "" ? null : Number(form.minBillAmount),
-        pointsCost: form.pointsCost === "" ? null : Number(form.pointsCost),
-        validDays: Number(form.validDays),
-      });
-      onSaved();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      title="Issue a reward voucher"
-      onClose={onClose}
-      footer={
-        <>
-          <button onClick={onClose} className={btnSecondary}>Cancel</button>
-          <button form="voucher-form" disabled={saving || !form.title.trim() || !form.value} className={btnPrimary}>{saving ? "Saving…" : "Issue voucher"}</button>
-        </>
-      }
-    >
-      <form id="voucher-form" onSubmit={save} className="space-y-3">
-        <div>
-          <label className={labelClass}>Title *</label>
-          <input autoFocus value={form.title} onChange={set("title")} className={inputClass} placeholder="e.g. ₹200 off your next visit" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Type</label>
-            <select value={form.type} onChange={set("type")} className={inputClass}>
-              <option value="FIXED_AMOUNT">Flat amount off</option>
-              <option value="PERCENTAGE">Percentage off</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>{form.type === "PERCENTAGE" ? "Percent *" : "Amount (₹) *"}</label>
-            <input type="number" min="1" value={form.value} onChange={set("value")} className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>Minimum bill (₹)</label>
-            <input type="number" min="0" value={form.minBillAmount} onChange={set("minBillAmount")} className={inputClass} placeholder="Any" />
-          </div>
-          <div>
-            <label className={labelClass}>Valid for (days)</label>
-            <input type="number" min="1" value={form.validDays} onChange={set("validDays")} className={inputClass} />
-          </div>
-          <div className="col-span-2">
-            <label className={labelClass}>Deduct points for this voucher</label>
-            <input type="number" min="0" value={form.pointsCost} onChange={set("pointsCost")} className={inputClass} placeholder={`Leave empty for a free reward · balance ${balance}`} />
-          </div>
         </div>
         <ErrorNote>{error}</ErrorNote>
       </form>
