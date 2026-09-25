@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
 import { FiAward, FiSave, FiRefreshCw, FiExternalLink } from "react-icons/fi";
 import useModuleSettings from "../useModuleSettings";
 import SaveToast from "../SaveToast";
-import { useCrm } from "../../crm/CrmContext";
+import { useCrm } from "../../CRM/CrmContext";
 
 const DEFAULTS = {
   earnSpendAmount: 100,

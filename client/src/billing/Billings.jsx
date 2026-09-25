@@ -24,7 +24,7 @@ import {
   getKotsForOrder,
 } from "../pos/api/posApi";
 import { fetchWithOfflineFallback } from "../offline/offlineCache";
-import LoyaltyRedeemPanel from "../crm/components/LoyaltyRedeemPanel";
+import LoyaltyRedeemPanel from "../CRM/components/LoyaltyRedeemPanel";
 import {
   completeBillingOffline,
   getPendingBillingOrderIds,
