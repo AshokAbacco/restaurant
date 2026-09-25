@@ -18,6 +18,70 @@ import * as discountsService from "../discounts/discounts.service.js";
 import * as loyaltyService from "../../crm/loyalty.service.js";
 import * as duePaymentsService from "../due-payments/duePayments.service.js";
 import * as cashDrawerService from "../cash-drawer/cashDrawer.service.js";
+import { getDeliveryBillingEnabled } from "../../settings/outletSettings.service.js";
+
+// Orders still waiting to be billed. COMPLETED / CANCELLED / REFUNDED are
+// never billable, so they are filtered out in the database instead of being
+// shipped to the browser and discarded there.
+const BILLABLE_STATUSES = [
+  "NEW",
+  "ACCEPTED",
+  "PREPARING",
+  "READY",
+  "SERVED",
+  "OUT_FOR_DELIVERY",
+  "ON_HOLD",
+];
+
+// Active Orders list on the Billing page.
+//
+// PERFORMANCE: the Billing page used to call GET /pos/orders?limit=100,
+// which returns the 100 newest orders of ANY status with every item, menu
+// item, add-on, table and customer record attached, and then threw most of
+// them away client-side. This returns only still-billable orders, and only
+// the handful of fields a list row actually shows.
+//
+// DELIVERY orders are left out unless Settings -> Tax & Billing -> "Enable
+// Billing for Delivery Orders" is on. Delivered (COMPLETED) delivery orders
+// are never returned either way.
+export async function listBillableOrders(outletId, { limit = 200 } = {}) {
+  const deliveryBillingEnabled = await getDeliveryBillingEnabled(outletId);
+
+  const data = await prisma.order.findMany({
+    where: {
+      outletId,
+      status: { in: BILLABLE_STATUSES },
+      ...(deliveryBillingEnabled ? {} : { orderType: { not: "DELIVERY" } }),
+    },
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      orderType: true,
+      grandTotal: true,
+      createdAt: true,
+      table: { select: { id: true, name: true } },
+      customer: { select: { id: true, name: true } },
+      // Only PAID lines matter for the balance shown on each row.
+      payments: {
+        where: { status: "PAID" },
+        select: { amount: true, status: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(Math.max(Number(limit) || 200, 1), 500),
+  });
+
+  return { data, deliveryBillingEnabled };
+}
+
+// Lightweight flag for pages that need to know whether DELIVERY orders go
+// through Billing (e.g. the Orders page decides between "Mark Delivered"
+// and "Complete Service"). /api/settings is restricted to managers, so the
+// POS roles read it from here.
+export async function getBillingConfig(outletId) {
+  return { deliveryBillingEnabled: await getDeliveryBillingEnabled(outletId) };
+}
 
 function toInvoiceLine(orderItem) {
   return {
@@ -41,8 +105,10 @@ export async function getBillingSummary(orderId, outletId) {
   const order = await prisma.order.findFirst({
     where: { id: orderId, outletId },
     include: {
-      table: true,
-      customer: true,
+      table: { select: { id: true, name: true, section: true } },
+      customer: {
+        select: { id: true, name: true, mobile: true, loyaltyPoints: true },
+      },
       waiter: { select: { fullName: true, employeeCode: true } },
       // Restaurant header for the printed bill — same fields the invoice
       // itself pulls, so the preview in the modal and the final invoice
@@ -69,12 +135,28 @@ export async function getBillingSummary(orderId, outletId) {
         orderBy: { kotNumber: "asc" },
       },
       kitchenBranch: { select: { name: true } },
+      // PERFORMANCE: only the fields the bill actually prints — full menu
+      // item / add-on / invoice rows made this query much heavier than the
+      // bill it feeds.
       items: {
-        include: { menuItem: true, addOns: { include: { addOn: true } } },
+        select: {
+          id: true,
+          quantity: true,
+          unitPrice: true,
+          totalPrice: true,
+          menuItem: { select: { name: true } },
+          addOns: {
+            select: {
+              quantity: true,
+              unitPrice: true,
+              totalPrice: true,
+              addOn: { select: { name: true } },
+            },
+          },
+        },
       },
-      payments: true,
-      discountsApplied: true,
-      invoice: true,
+      payments: { select: { amount: true, status: true } },
+      invoice: { select: { id: true } },
     },
   });
   if (!order) throw new Error("Order not found");
@@ -196,6 +278,16 @@ export async function completeBilling(
   }
   if (order.status === "CANCELLED")
     throw new Error("Cannot bill a cancelled order.");
+
+  // DELIVERY orders are closed out from the Orders page ("Mark Delivered")
+  // unless the outlet has turned on Settings -> Tax & Billing -> "Enable
+  // Billing for Delivery Orders". Checked here too so a stale Billing tab
+  // or a direct API call can't bill one while the option is off.
+  if (order.orderType === "DELIVERY" && !(await getDeliveryBillingEnabled(outletId))) {
+    throw new Error(
+      "Billing for delivery orders is turned off. Enable it in Settings -> Tax & Billing.",
+    );
+  }
 
   // A bill paid entirely with points / a voucher legitimately has no
   // payment lines, so "no payments" is only rejected when no reward was

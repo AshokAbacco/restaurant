@@ -7,7 +7,12 @@ import TableOrderCard, {
   CATEGORY_RANK,
 } from "./components/TableOrderCard";
 import MoveKotItemsModal from "./components/MoveKotItemsModal";
-import { getTablesBoard, getOrders, updateKotStatus } from "./api/posApi";
+import {
+  getTablesBoard,
+  getOrders,
+  updateKotStatus,
+  getBillingConfig,
+} from "./api/posApi";
 import { fetchWithOfflineFallback } from "../offline/offlineCache";
 import {
   markOrderDeliveredOffline,
@@ -204,6 +209,28 @@ export default function OrdersPage() {
 
   // Phase 1.4 — "Move KOT/Items" dialog
   const [showMoveModal, setShowMoveModal] = useState(false);
+
+  // Settings -> Tax & Billing -> "Enable Billing for Delivery Orders".
+  // Off (default): every DELIVERY card gets "Mark Delivered", which
+  // completes the order here — the Billing page doesn't list delivery
+  // orders. On: own-fleet delivery goes to Billing via "Complete Service"
+  // as before (aggregator orders are always closed with Mark Delivered).
+  const [deliveryBillingEnabled, setDeliveryBillingEnabled] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchWithOfflineFallback("billing:config", getBillingConfig)
+      .then(({ data }) => {
+        if (!cancelled) {
+          setDeliveryBillingEnabled(Boolean(data?.deliveryBillingEnabled));
+        }
+      })
+      .catch(() => {
+        /* keep the default (off) */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadTables = useCallback(async () => {
     const { data, fromCache } = await fetchWithOfflineFallback(
@@ -483,6 +510,7 @@ export default function OrdersPage() {
                   table={item}
                   onCompleteService={handleCompleteService}
                   onOrderDelivered={handleOrderDelivered}
+                  deliveryBillingEnabled={deliveryBillingEnabled}
                   completing={completingOrderId === item.order?.id}
                   pendingSync={
                     isOrderCard && pendingOrderIds.has(item.order?.id)

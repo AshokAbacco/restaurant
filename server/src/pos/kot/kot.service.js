@@ -331,7 +331,16 @@ export async function getActiveKitchenDisplay(
       kitchenSection: true,
       kitchenBranch: { select: { id: true, name: true } },
       chef: { select: { fullName: true } },
-      items: { include: { orderItem: { include: { menuItem: true } } } },
+      // PERFORMANCE: the kitchen card only prints the item name — the full
+      // menu item row (description, image, pricing, ...) was re-sent for
+      // every item on every 8-second poll and after every tap.
+      items: {
+        include: {
+          orderItem: {
+            include: { menuItem: { select: { id: true, name: true } } },
+          },
+        },
+      },
       notes: {
         include: { chef: { select: { fullName: true } } },
         orderBy: { createdAt: "asc" },
@@ -405,34 +414,39 @@ export async function updateKotStatus(
   }
 
   const timestampField = LIFECYCLE_TIMESTAMP_FIELD[status];
+  const sync = ORDER_SYNC_FROM_KOT_STATUS[status];
 
-  const kot = await prisma.kitchenOrder.update({
-    where: { id },
-    data: {
-      status,
-      ...(timestampField ? { [timestampField]: new Date() } : {}),
-      ...(status === "RECALLED" ? { recallCount: { increment: 1 } } : {}),
-      statusLogs: {
-        create: {
-          fromStatus: existing.status,
-          toStatus: status,
-          changedById,
-          reason,
+  // PERFORMANCE: the database is a long network hop away, and every
+  // Ready / Served tap used to wait on FOUR sequential queries (read KOT,
+  // update KOT, read order, update order). The order sync is now a single
+  // conditional updateMany ("only if the order is still in one of the
+  // `from` states" — same guard as before, just done by the database), and
+  // it runs in parallel with the KOT update since it only needs the
+  // orderId we already have. Two round trips instead of four.
+  const [kot] = await Promise.all([
+    prisma.kitchenOrder.update({
+      where: { id },
+      data: {
+        status,
+        ...(timestampField ? { [timestampField]: new Date() } : {}),
+        ...(status === "RECALLED" ? { recallCount: { increment: 1 } } : {}),
+        statusLogs: {
+          create: {
+            fromStatus: existing.status,
+            toStatus: status,
+            changedById,
+            reason,
+          },
         },
       },
-    },
-  });
-
-  const sync = ORDER_SYNC_FROM_KOT_STATUS[status];
-  if (sync) {
-    const order = await prisma.order.findUnique({ where: { id: kot.orderId } });
-    if (order && sync.from.includes(order.status)) {
-      await prisma.order.update({
-        where: { id: kot.orderId },
-        data: { status: sync.to },
-      });
-    }
-  }
+    }),
+    sync
+      ? prisma.order.updateMany({
+          where: { id: existing.orderId, outletId, status: { in: sync.from } },
+          data: { status: sync.to },
+        })
+      : null,
+  ]);
 
   return kot;
 }

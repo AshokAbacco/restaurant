@@ -100,6 +100,10 @@ const TAX_DEFAULTS = Object.freeze({
   sgst: 9,
   igst: 18,
   taxType: "Inclusive",
+  // Billing page: DELIVERY orders are hidden from the Billing page (and
+  // cannot be billed there) unless the outlet turns this on. Delivery
+  // orders are closed out from the Orders page with "Mark Delivered".
+  enableDeliveryBilling: false,
 });
 
 // URL segment -> { column, defaults }
@@ -259,6 +263,35 @@ export async function getLoyaltySettings(outletId) {
   return value;
 }
 
+// ── Delivery billing flag (Settings -> Tax & Billing) ───────────────────
+// Read on every Billing page load and every Complete Payment, so it is
+// cached briefly like the CRM flag and dropped the moment Tax & Billing is
+// saved or reset.
+const deliveryBillingCache = new Map(); // outletId -> { value, expiresAt }
+
+export function invalidateDeliveryBillingCache(outletId) {
+  deliveryBillingCache.delete(outletId);
+}
+
+export async function getDeliveryBillingEnabled(outletId) {
+  const cached = deliveryBillingCache.get(outletId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const row = await prisma.outletSetting.findUnique({
+    where: { outletId },
+    select: { taxBilling: true },
+  });
+  const saved = isPlainObject(row?.taxBilling) ? row.taxBilling : {};
+  const value =
+    saved.enableDeliveryBilling === true ||
+    saved.enableDeliveryBilling === "true";
+  deliveryBillingCache.set(outletId, {
+    value,
+    expiresAt: Date.now() + CRM_CACHE_TTL_MS,
+  });
+  return value;
+}
+
 export async function getSection(outletId, section) {
   const def = SECTIONS[section];
   if (!def) throw badRequest(`Unknown settings section "${section}".`);
@@ -352,6 +385,7 @@ export async function updateSection(outletId, section, payload) {
     create: { outletId, [def.column]: merged },
     update: { [def.column]: merged },
   });
+  if (section === "tax") invalidateDeliveryBillingCache(outletId);
   return getSection(outletId, section);
 }
 
@@ -367,5 +401,6 @@ export async function resetSection(outletId, section) {
     update: { [def.column]: value },
   });
   if (section === "crm" || section === "loyalty") invalidateCrmCache(outletId);
+  if (section === "tax") invalidateDeliveryBillingCache(outletId);
   return getSection(outletId, section);
 }

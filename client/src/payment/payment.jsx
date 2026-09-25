@@ -26,6 +26,7 @@ const GREEN = "FF059669";
 const AMBER = "FFD97706";
 const RED = "FFDC2626";
 const GREY = "FF94A3B8";
+const BLUE = "FF2563EB";
 
 // Clear, always-visible order-type badge — shown as its own column so
 // "Table / Type" is no longer one blended cell that's ambiguous for
@@ -83,25 +84,66 @@ function endOfDayISO(dateStr) {
   return new Date(`${dateStr}T23:59:59.999`).toISOString();
 }
 
-function orderPaidAmount(order) {
+// A DELIVERY order paid online: one that came in through an online
+// platform (Swiggy, Zomato, ... — POS "Online Orders" tab, stored as a
+// DELIVERY order tagged with onlinePlatformId). The customer pays the
+// platform online, so there is nothing for the restaurant to collect and
+// no Payment row is ever recorded against it here.
+function isOnlineDelivery(order) {
+  return (
+    order.orderType === "DELIVERY" &&
+    Boolean(order.onlinePlatformId || order.onlinePlatform?.id)
+  );
+}
+
+function recordedPaidAmount(order) {
   return (order.payments || [])
     .filter((p) => p.status === "PAID")
     .reduce((sum, p) => sum + Number(p.amount), 0);
+}
+
+// An online-paid delivery order counts as fully paid (it was paid on the
+// platform), so it never shows up as money still owed.
+function orderPaidAmount(order) {
+  const recorded = recordedPaidAmount(order);
+  if (
+    isOnlineDelivery(order) &&
+    !CANCELLED_ORDER_STATUSES.includes(order.status)
+  ) {
+    return Math.max(recorded, Number(order.grandTotal));
+  }
+  return recorded;
 }
 
 function orderBalanceDue(order) {
   return Math.max(Number(order.grandTotal) - orderPaidAmount(order), 0);
 }
 
+// Payment column:
+//   DELIVERY orders -> Paid / Pending / Online (always one of these three)
+//   other orders    -> Paid / Partial / Pending (unchanged)
+//   cancelled       -> "—"
 function paymentLabelFor(order) {
-  const paid = orderPaidAmount(order);
-  const due = orderBalanceDue(order);
   const isCancelled = CANCELLED_ORDER_STATUSES.includes(order.status);
   if (isCancelled) return "—";
+  if (isOnlineDelivery(order)) return "Online";
+  const paid = orderPaidAmount(order);
+  const due = orderBalanceDue(order);
   if (due <= 0) return "Paid";
+  if (order.orderType === "DELIVERY") return "Pending";
   if (paid > 0) return "Partial";
   return "Pending";
 }
+
+// Colour per payment label — shared by the table and the Excel export so
+// both always agree.
+const PAYMENT_LABEL_STYLE = {
+  Paid: { className: "text-[#3FA34D] dark:text-[#43B75A]", argb: GREEN },
+  Online: { className: "text-blue-600 dark:text-blue-400", argb: BLUE },
+  Partial: { className: "text-amber-600 dark:text-amber-400", argb: AMBER },
+  Pending: { className: "text-[#EF5350] dark:text-red-400", argb: RED },
+  "—": { className: "text-[#9CA3AF] dark:text-[#6B7280]", argb: GREY },
+};
 
 const PRESETS = [
   { key: "today", label: "Today" },
@@ -194,6 +236,10 @@ export default function Payment() {
     let paymentsCompletedCount = 0;
     let paymentsPendingAmount = 0;
     let paymentsPendingCount = 0;
+    // Online-paid DELIVERY orders — already included in Payments Completed,
+    // tracked separately so the card can say how much of it came online.
+    let paymentsOnlineAmount = 0;
+    let paymentsOnlineCount = 0;
 
     for (const order of orders) {
       if (COMPLETED_ORDER_STATUSES.includes(order.status)) {
@@ -210,6 +256,10 @@ export default function Payment() {
       if (paid > 0) {
         paymentsCompletedAmount += paid;
         paymentsCompletedCount += 1;
+        if (paymentLabelFor(order) === "Online") {
+          paymentsOnlineAmount += paid;
+          paymentsOnlineCount += 1;
+        }
       }
       if (due > 0 && !CANCELLED_ORDER_STATUSES.includes(order.status)) {
         paymentsPendingAmount += due;
@@ -226,6 +276,8 @@ export default function Payment() {
       paymentsCompletedCount,
       paymentsPendingAmount,
       paymentsPendingCount,
+      paymentsOnlineAmount,
+      paymentsOnlineCount,
     };
   }, [orders]);
 
@@ -317,6 +369,11 @@ export default function Payment() {
           stats.paymentsCompletedCount,
         ],
         [
+          "Online Payments (Delivery, incl. above)",
+          stats.paymentsOnlineAmount,
+          stats.paymentsOnlineCount,
+        ],
+        [
           "Payments Pending",
           stats.paymentsPendingAmount,
           stats.paymentsPendingCount,
@@ -384,15 +441,10 @@ export default function Payment() {
       orders.forEach((order) => {
         const paid = orderPaidAmount(order);
         const due = orderBalanceDue(order);
-        const isCancelled = CANCELLED_ORDER_STATUSES.includes(order.status);
         const paymentLabel = paymentLabelFor(order);
-        const paymentColor = isCancelled
-          ? GREY
-          : due <= 0
-            ? GREEN
-            : paid > 0
-              ? AMBER
-              : RED;
+        const paymentColor = (
+          PAYMENT_LABEL_STYLE[paymentLabel] || PAYMENT_LABEL_STYLE.Pending
+        ).argb;
 
         const row = sheet.getRow(r);
         row.getCell(1).value = order.orderNumber;
@@ -562,7 +614,11 @@ export default function Payment() {
         <SummaryCard
           label="Payments Completed"
           value={loading ? "—" : `₹${stats.paymentsCompletedAmount.toFixed(2)}`}
-          sub={`${stats.paymentsCompletedCount} order${stats.paymentsCompletedCount === 1 ? "" : "s"}`}
+          sub={`${stats.paymentsCompletedCount} order${stats.paymentsCompletedCount === 1 ? "" : "s"}${
+            stats.paymentsOnlineCount > 0
+              ? ` · ₹${stats.paymentsOnlineAmount.toFixed(2)} online (${stats.paymentsOnlineCount})`
+              : ""
+          }`}
           accent="text-[#3FA34D] dark:text-[#43B75A]"
         />
         <SummaryCard
@@ -608,17 +664,11 @@ export default function Payment() {
                 {orders.map((order) => {
                   const paid = orderPaidAmount(order);
                   const due = orderBalanceDue(order);
-                  const isCancelled = CANCELLED_ORDER_STATUSES.includes(
-                    order.status,
-                  );
                   const paymentLabel = paymentLabelFor(order);
-                  const paymentColor = isCancelled
-                    ? "text-[#9CA3AF] dark:text-[#6B7280]"
-                    : due <= 0
-                      ? "text-[#3FA34D] dark:text-[#43B75A]"
-                      : paid > 0
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-[#EF5350] dark:text-red-400";
+                  const paymentColor = (
+                    PAYMENT_LABEL_STYLE[paymentLabel] ||
+                    PAYMENT_LABEL_STYLE.Pending
+                  ).className;
                   const typeBadge = ORDER_TYPE_META[order.orderType];
 
                   return (

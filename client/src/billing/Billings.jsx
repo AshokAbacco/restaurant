@@ -4,13 +4,20 @@
 // columns: active orders (left) | bill + payment (middle) | invoice, which
 // appears in its own column on the right once payment completes, instead
 // of replacing the billing panel or taking over the whole page.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 import { WifiOff } from "lucide-react";
-import InvoiceView from "./InvoiceView";
 import {
-  getOrders,
+  getBillableOrders,
   getBillingSummary,
   removeOrderItem,
   sendToKitchen,
@@ -31,6 +38,11 @@ import {
 // read-only, clearly marked as not billable yet (there's no real orderId
 // to bill against until it syncs).
 import { getQueueSnapshot, subscribeToQueue } from "../offline/offlineQueue";
+
+// PERFORMANCE: the invoice (and the QR / barcode libraries it pulls in) is
+// only needed once a payment completes, so it is loaded on demand instead
+// of being part of the chunk that has to download before this page opens.
+const InvoiceView = lazy(() => import("./InvoiceView"));
 
 const PAYMENT_METHODS = [
   { key: "CASH", label: "Cash" },
@@ -68,6 +80,9 @@ export default function Billings() {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState(null);
+  // Settings -> Tax & Billing -> "Enable Billing for Delivery Orders".
+  // null = not known yet (list still loading). Off by default server-side.
+  const [deliveryBillingEnabled, setDeliveryBillingEnabled] = useState(null);
 
   const [selectedOrderId, setSelectedOrderId] = useState(
     preselectedOrderId || null,
@@ -152,17 +167,36 @@ export default function Billings() {
     setQueuedOrders(snapshot.items.filter((i) => i.status === "pending"));
   }, []);
 
-  const loadOrders = useCallback(() => {
-    setOrdersLoading(true);
+  // PERFORMANCE: this used to call getOrders({ limit: 100 }) — the 100
+  // newest orders of EVERY status (completed ones included), each with all
+  // of its items, menu items, add-ons, table and customer attached — and
+  // then drop most of them here. That payload was also written to
+  // IndexedDB before anything could render. getBillableOrders asks the
+  // server for only still-billable orders, in a slim list-row shape.
+  //
+  // DELIVERY orders are filtered out server-side unless delivery billing
+  // is enabled in Settings; the filter below is just a safety net (e.g. a
+  // cached copy from before the setting was changed).
+  const loadOrders = useCallback(({ silent = false } = {}) => {
+    if (!silent) setOrdersLoading(true);
     setOrdersError(null);
-    fetchWithOfflineFallback("billing:activeOrders", async () => {
-      const data = await getOrders({ limit: 100 });
-      return (data?.data || []).filter((o) =>
-        ACTIVE_STATUSES.includes(o.status),
-      );
+    fetchWithOfflineFallback("billing:activeOrders:v2", async () => {
+      const res = await getBillableOrders();
+      return {
+        orders: res?.data || [],
+        deliveryBillingEnabled: Boolean(res?.deliveryBillingEnabled),
+      };
     })
       .then(({ data, fromCache }) => {
-        setOrders(data);
+        const deliveryOn = Boolean(data?.deliveryBillingEnabled);
+        setDeliveryBillingEnabled(deliveryOn);
+        setOrders(
+          (data?.orders || []).filter(
+            (o) =>
+              ACTIVE_STATUSES.includes(o.status) &&
+              (deliveryOn || o.orderType !== "DELIVERY"),
+          ),
+        );
         setIsOffline(fromCache);
       })
       .catch((err) => setOrdersError(err.message))
@@ -185,8 +219,13 @@ export default function Billings() {
     };
   }, [loadOrders, refreshPendingBillingIds, refreshQueuedOrders]);
 
+  // Guards against out-of-order responses: clicking order A then quickly
+  // order B must never end with A's bill on screen.
+  const summaryRequestRef = useRef(0);
+
   const loadSummary = useCallback((orderId) => {
-    if (!orderId) return;
+    if (!orderId) return Promise.resolve();
+    const requestId = ++summaryRequestRef.current;
     setSummaryLoading(true);
     setSummaryError(null);
     setResult(null);
@@ -204,10 +243,11 @@ export default function Billings() {
     // minutes earlier while still online. Caching per-orderId means a
     // bill already viewed once stays viewable (and payable, cash-only)
     // for the rest of the offline stretch.
-    fetchWithOfflineFallback(`billing:summary:${orderId}`, () =>
+    return fetchWithOfflineFallback(`billing:summary:${orderId}`, () =>
       getBillingSummary(orderId),
     )
       .then(({ data, fromCache }) => {
+        if (requestId !== summaryRequestRef.current) return; // stale
         if (!data || !Array.isArray(data.items)) {
           throw new Error("Billing summary came back in an unexpected shape.");
         }
@@ -221,8 +261,16 @@ export default function Billings() {
           },
         ]);
       })
-      .catch((err) => setSummaryError(err.message))
-      .finally(() => setSummaryLoading(false));
+      .catch((err) => {
+        if (requestId === summaryRequestRef.current) {
+          setSummaryError(err.message);
+        }
+      })
+      .finally(() => {
+        if (requestId === summaryRequestRef.current) {
+          setSummaryLoading(false);
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -241,7 +289,7 @@ export default function Billings() {
       await removeOrderItem(selectedOrderId, itemId);
       setConfirmVoidId(null);
       await loadSummary(selectedOrderId);
-      loadOrders(); // the order total in the left-hand list changed
+      loadOrders({ silent: true }); // the order total in the left-hand list changed
     } catch (err) {
       setVoidError(err.message);
     } finally {
@@ -249,10 +297,13 @@ export default function Billings() {
     }
   }
 
-  function selectOrder(orderId) {
-    setSelectedOrderId(orderId);
-    setSearchParams(orderId ? { orderId } : {}, { replace: true });
-  }
+  const selectOrder = useCallback(
+    (orderId) => {
+      setSelectedOrderId(orderId);
+      setSearchParams(orderId ? { orderId } : {}, { replace: true });
+    },
+    [setSearchParams],
+  );
 
   function updateSplitLine(id, patch) {
     setSplitLines((prev) =>
@@ -430,7 +481,7 @@ export default function Billings() {
 
       setResult(data);
       if (!data.queuedOffline) {
-        loadOrders(); // the just-billed order drops off the active list
+        loadOrders({ silent: true }); // the just-billed order drops off the active list
       } else {
         refreshPendingBillingIds();
       }
@@ -456,6 +507,53 @@ export default function Billings() {
   const selectedOrder = useMemo(
     () => orders.find((o) => o.id === selectedOrderId) || null,
     [orders, selectedOrderId],
+  );
+
+  // A DELIVERY order opened directly (e.g. an old /billing?orderId= link)
+  // while delivery billing is off: show a notice instead of the bill.
+  // Only decided once the setting is known (not null), so an enabled
+  // outlet never sees this flash while the list is still loading.
+  const deliveryBlocked =
+    deliveryBillingEnabled === false && summary?.orderType === "DELIVERY";
+
+  // PERFORMANCE: the order list is memoised so typing a discount, picking a
+  // payment method, etc. doesn't re-render every row on each keystroke.
+  const orderRows = useMemo(
+    () =>
+      orders.map((order) => {
+        const due = orderBalanceDue(order);
+        return (
+          <li key={order.id}>
+            <button
+              onClick={() => selectOrder(order.id)}
+              className={`flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors ${
+                selectedOrderId === order.id
+                  ? "bg-[#EAF6EC] dark:bg-[#43B75A]/10"
+                  : "hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+              }`}
+            >
+              <span className="font-mono text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
+                {order.orderNumber}
+              </span>
+              <span className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                {order.table?.name || order.orderType?.replace("_", " ")}
+              </span>
+              <span className="flex w-full items-center justify-between text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                <span>{order.status}</span>
+                <span className="font-mono font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
+                  ₹{due.toFixed(2)}
+                </span>
+              </span>
+              {pendingBillingOrderIds.has(order.id) && (
+                <span className="mt-1 rounded-full border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                  Sync pending
+                </span>
+              )}
+            </button>
+          </li>
+        );
+      }),
+    [orders, selectedOrderId, pendingBillingOrderIds, selectOrder],
   );
 
   // Three side-by-side columns only from xl up. Below that the viewport
@@ -507,40 +605,7 @@ export default function Billings() {
             </p>
           ) : (
             <ul className="divide-y divide-[#E7EAE1] dark:divide-[#262B24]">
-              {orders.map((order) => {
-                const due = orderBalanceDue(order);
-                return (
-                  <li key={order.id}>
-                    <button
-                      onClick={() => selectOrder(order.id)}
-                      className={`flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors ${
-                        selectedOrderId === order.id
-                          ? "bg-[#EAF6EC] dark:bg-[#43B75A]/10"
-                          : "hover:bg-[#F3F5EE] dark:hover:bg-white/5"
-                      }`}
-                    >
-                      <span className="font-mono text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
-                        {order.orderNumber}
-                      </span>
-                      <span className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-                        {order.table?.name ||
-                          order.orderType?.replace("_", " ")}
-                      </span>
-                      <span className="flex w-full items-center justify-between text-xs text-[#9CA3AF] dark:text-[#6B7280]">
-                        <span>{order.status}</span>
-                        <span className="font-mono font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
-                          ₹{due.toFixed(2)}
-                        </span>
-                      </span>
-                      {pendingBillingOrderIds.has(order.id) && (
-                        <span className="mt-1 rounded-full border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
-                          Sync pending
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
+              {orderRows}
             </ul>
           )}
           {queuedOrders.length > 0 && (
@@ -588,6 +653,24 @@ export default function Billings() {
         ) : summaryError && !summary ? (
           <div className="p-5 text-sm text-[#EF5350] dark:text-red-400">
             {summaryError}
+          </div>
+        ) : deliveryBlocked ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+            <p className="text-sm font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+              Billing for delivery orders is turned off
+            </p>
+            <p className="max-w-sm text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+              Delivery orders are completed from the Orders page with
+              &ldquo;Mark Delivered&rdquo;. To bill them here, enable
+              &ldquo;Enable Billing for Delivery Orders&rdquo; in Settings
+              &rarr; Tax &amp; Billing.
+            </p>
+            <button
+              onClick={() => selectOrder(null)}
+              className="mt-2 rounded-lg bg-[#F3F5EE] dark:bg-white/5 px-4 py-2 text-sm font-semibold text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
+            >
+              Close
+            </button>
           </div>
         ) : summary ? (
           <>
@@ -1011,15 +1094,23 @@ export default function Billings() {
       </div>
 
       {/* ============ Invoice (right) — only appears once paid ============ */}
-      {selectedOrderId && (summary || result) && (
+      {selectedOrderId && (summary || result) && !deliveryBlocked && (
         <div className="flex w-full xl:flex-1 min-h-[420px] xl:min-h-[500px] flex-col overflow-hidden rounded-2xl border border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17]">
           {result && result.invoice ? (
-            <InvoiceView
-              invoice={result.invoice}
-              summary={summary}
-              payments={result.payments}
-              onDone={handleDone}
-            />
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+                  Loading invoice…
+                </div>
+              }
+            >
+              <InvoiceView
+                invoice={result.invoice}
+                summary={summary}
+                payments={result.payments}
+                onDone={handleDone}
+              />
+            </Suspense>
           ) : result && result.queuedOffline ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
               <WifiOff className="h-8 w-8 text-amber-500 dark:text-amber-400" />

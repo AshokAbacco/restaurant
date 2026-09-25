@@ -229,6 +229,8 @@ export default function TableOrderCard({
   onOrderDelivered,
   completing,
   pendingSync = false,
+  // Settings -> Tax & Billing -> "Enable Billing for Delivery Orders".
+  deliveryBillingEnabled = false,
 }) {
   const { order } = table;
   const isTakeaway = order?.orderType === "TAKEAWAY";
@@ -241,7 +243,12 @@ export default function TableOrderCard({
   // up front at the counter) and aggregator orders (the platform settles
   // separately, there's nothing to collect here). Own-fleet delivery still
   // has a bill to raise, so it goes to Billing like dine-in does.
-  const closesWithoutBilling = isTakeaway || isOnline;
+  //
+  // DELIVERY orders only go through Billing when the outlet has enabled
+  // delivery billing in Settings; otherwise the Billing page doesn't list
+  // them, so every delivery order is closed here with "Mark Delivered".
+  const closesWithoutBilling =
+    isTakeaway || isOnline || (isDelivery && !deliveryBillingEnabled);
   const isFree = !order;
   // kitchenStatus comes straight from the order's live KitchenOrder rows —
   // the same source the Kitchen Display itself reads from. Falls back to

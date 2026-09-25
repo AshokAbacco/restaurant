@@ -56,6 +56,9 @@ const TaxBilling = () => {
     sgst: 9,
     igst: 18,
     taxType: "Inclusive",
+    // Off by default: DELIVERY orders are completed from the Orders page
+    // ("Mark Delivered") and never appear on the Billing page.
+    enableDeliveryBilling: false,
   },
   );
 
@@ -307,6 +310,19 @@ const TaxBilling = () => {
 
         <Card title="Billing Settings">
           <div className="grid md:grid-cols-2 gap-6">
+            {/* Saved with the rest of Tax & Billing. When on, DELIVERY
+                orders are listed on the Billing page and can be billed
+                there; when off (default) they are hidden from Billing. */}
+            <div className="md:col-span-2">
+              <ToggleRow
+                title="Enable Billing for Delivery Orders"
+                description="Show DELIVERY orders on the Billing page so they can be billed there. When off, delivery orders are completed from the Orders page with Mark Delivered and are not shown in Billing."
+                name="enableDeliveryBilling"
+                checked={Boolean(settings.enableDeliveryBilling)}
+                onChange={handleChange}
+              />
+            </div>
+
             <div>
               <label className="block mb-2 font-medium text-[#1F2937] dark:text-[#E4E9E2]">
                 Invoice Prefix

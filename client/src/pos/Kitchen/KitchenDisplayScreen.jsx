@@ -1,5 +1,5 @@
 //client\src\pos\Kitchen\KitchenDisplayScreen.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WifiOff } from "lucide-react";
 import KotCard from "./Kotcard";
 import {
@@ -52,6 +52,21 @@ const STAGE_RANK = {
   SERVED: 4,
   COMPLETED: 5,
 };
+
+// Lifecycle timestamp set alongside each status — mirrors
+// LIFECYCLE_TIMESTAMP_FIELD in kot.service.js, so an optimistic Served
+// freezes the card's timer immediately, exactly as the server copy will.
+const STATUS_TIMESTAMP_FIELD = {
+  ACCEPTED: "acceptedAt",
+  READY: "readyAt",
+  SERVED: "servedAt",
+  COMPLETED: "completedAt",
+};
+
+// How long a card's button stays disabled after a tap. Only there to stop
+// an accidental double-tap turning "Ready" into "Ready + Served" — the
+// status itself changes on screen instantly.
+const TAP_COOLDOWN_MS = 400;
 
 // Most urgent first — matches PRIORITY_RANK in server/src/pos/kot/kot.service.js.
 const PRIORITY_RANK = {
@@ -225,7 +240,54 @@ export default function KitchenDisplayScreen() {
   // this, it just hasn't reached the server yet" from "nothing happened."
   const [pendingKotIds, setPendingKotIds] = useState(new Set());
 
+  // ── Instant Ready / Served ────────────────────────────────────────────
+  // PERFORMANCE: a tap used to wait for the status PUT, THEN a full re-fetch
+  // of the whole board, THEN the pending-sync check — all before the card
+  // changed, which is the "Updating…" delay. Now the card changes the
+  // moment it's tapped (optimistic), and the server call + re-fetch happen
+  // in the background.
+  //
+  // kotId -> { status, at } tapped here but not yet confirmed by the server.
+  // Laid over every fetched copy of the board (see withOptimistic), so an
+  // 8-second poll that lands mid-request can't flip the card back.
+  const optimisticRef = useRef(new Map());
+  // Per-order request chain: Ready then Served on the same order reach the
+  // server in that order, even when tapped faster than the network — the
+  // order-status sync on the server depends on seeing READY before SERVED.
+  const chainRef = useRef(new Map());
+  // Board fetches that STARTED before a status change finished may carry
+  // the old status; their results are dropped (see load).
+  const loadSeqRef = useRef(0);
+  const staleBeforeRef = useRef(0);
+  const cooldownTimersRef = useRef(new Set());
+
+  useEffect(() => {
+    const timers = cooldownTimersRef.current;
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, []);
+
+  const withOptimistic = useCallback((list, { prune = false } = {}) => {
+    const pending = optimisticRef.current;
+    if (!pending.size || !Array.isArray(list)) return list;
+    return list.map((k) => {
+      const opt = pending.get(k.id);
+      if (!opt) return k;
+      if ((STAGE_RANK[opt.status] ?? 0) <= (STAGE_RANK[k.status] ?? 0)) {
+        // The server has caught up (or gone further) — nothing to overlay.
+        if (prune) pending.delete(k.id);
+        return k;
+      }
+      const tsField = STATUS_TIMESTAMP_FIELD[opt.status];
+      return {
+        ...k,
+        status: opt.status,
+        ...(tsField && !k[tsField] ? { [tsField]: opt.at } : {}),
+      };
+    });
+  }, []);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     try {
       const branchId =
         activeKitchenBranchId === "ALL" ? null : activeKitchenBranchId;
@@ -235,7 +297,10 @@ export default function KitchenDisplayScreen() {
         `kds:display:${branchId || "all"}`,
         () => getKitchenDisplay(undefined, branchId),
       );
-      setKots(data);
+      // Started before the latest status change finished — may be stale.
+      // A newer fetch is already on its way.
+      if (seq <= staleBeforeRef.current) return;
+      setKots(withOptimistic(data, { prune: !fromCache }));
       setIsOffline(fromCache);
       setError(null);
     } catch (err) {
@@ -243,7 +308,7 @@ export default function KitchenDisplayScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeKitchenBranchId]);
+  }, [activeKitchenBranchId, withOptimistic]);
 
   const loadQueued = useCallback(async () => {
     setQueuedKots(await getQueuedKots());
@@ -331,48 +396,101 @@ export default function KitchenDisplayScreen() {
   // hasn't already reached the target status moves forward together. The
   // server's own KOT_STAGE_RANK guard makes a redundant call a harmless
   // no-op, but filtering here saves the round trips.
-  async function handleAdvance(ticket, nextStatus) {
+  //
+  // Optimistic: the card shows the new status immediately; the server call
+  // and the board refresh run in the background. If the server rejects the
+  // change, the card goes back to its real status and the error shows.
+  function handleAdvance(ticket, nextStatus) {
     const behind = ticket.kots.filter(
       (k) => (STAGE_RANK[k.status] ?? 0) < (STAGE_RANK[nextStatus] ?? 0),
     );
     if (behind.length === 0) return;
 
+    // Queued/not-yet-synced tickets (awaitingCreate) don't exist on the
+    // server yet — there's no real kotId to PATCH. Advance the status
+    // LOCALLY instead (see advanceQueuedKotStatus in offlineQueue.js) so
+    // Ready/Served genuinely work while still offline; it's replayed onto
+    // the real KOT automatically once the underlying order syncs.
+    const queued = behind.filter((k) => k.awaitingCreate);
+    const live = behind.filter((k) => !k.awaitingCreate);
+
+    // Brief tap cooldown on this card only (accidental double-tap guard).
     setUpdatingId(ticket.key);
-    try {
-      // Queued/not-yet-synced tickets (awaitingCreate) don't exist on the
-      // server yet — there's no real kotId to PATCH. Advance the status
-      // LOCALLY instead (see advanceQueuedKotStatus in offlineQueue.js) so
-      // Ready/Served genuinely work while still offline; it's replayed onto
-      // the real KOT automatically once the underlying order syncs.
-      const queued = behind.filter((k) => k.awaitingCreate);
-      const live = behind.filter((k) => !k.awaitingCreate);
+    const timer = setTimeout(() => {
+      cooldownTimersRef.current.delete(timer);
+      setUpdatingId((cur) => (cur === ticket.key ? null : cur));
+    }, TAP_COOLDOWN_MS);
+    cooldownTimersRef.current.add(timer);
+    setError(null);
 
-      for (const k of queued) {
-        await advanceQueuedKotStatus(
-          k.clientRequestId,
-          k.kitchenSectionId,
-          nextStatus,
-        );
-      }
-
-      // updateKotStatusOffline tries the network first, and only falls
-      // back to the local queue (+ an optimistic cache patch) on a
-      // genuine connectivity failure — see kdsQueue.js.
-      await Promise.all(
-        live.map((k) => updateKotStatusOffline(k.id, nextStatus)),
-      );
-
-      if (queued.length) await loadQueued();
-      if (live.length) {
-        await load();
-        await refreshPendingIds();
-      }
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUpdatingId(null);
+    if (queued.length) {
+      (async () => {
+        for (const k of queued) {
+          await advanceQueuedKotStatus(
+            k.clientRequestId,
+            k.kitchenSectionId,
+            nextStatus,
+          );
+        }
+        await loadQueued();
+      })().catch((err) => setError(err.message));
     }
+
+    if (live.length === 0) return;
+
+    // 1) Show it now.
+    const at = new Date().toISOString();
+    for (const k of live) {
+      optimisticRef.current.set(k.id, { status: nextStatus, at });
+    }
+    setKots((prev) => withOptimistic(prev));
+
+    // 2) Tell the server, in order per ticket card.
+    // updateKotStatusOffline tries the network first, and only falls back
+    // to the local queue (+ an optimistic cache patch) on a genuine
+    // connectivity failure — see kdsQueue.js.
+    const previous = chainRef.current.get(ticket.key) || Promise.resolve();
+    const run = previous
+      .catch(() => {})
+      .then(() =>
+        Promise.all(live.map((k) => updateKotStatusOffline(k.id, nextStatus))),
+      );
+    chainRef.current.set(ticket.key, run);
+
+    run
+      .then((results) => {
+        // Reached the server: the next fetch carries the real status, so
+        // the overlay can go. Queued offline: keep it, so the card doesn't
+        // fall back to the cached old status until the queue syncs.
+        results.forEach((result, i) => {
+          const id = live[i].id;
+          if (
+            !result?.queuedOffline &&
+            optimisticRef.current.get(id)?.status === nextStatus
+          ) {
+            optimisticRef.current.delete(id);
+          }
+        });
+      })
+      .catch((err) => {
+        // Rejected — drop the overlay so the refresh below restores the
+        // real status, and say why.
+        for (const k of live) {
+          if (optimisticRef.current.get(k.id)?.status === nextStatus) {
+            optimisticRef.current.delete(k.id);
+          }
+        }
+        setError(err.message);
+      })
+      .finally(() => {
+        if (chainRef.current.get(ticket.key) === run) {
+          chainRef.current.delete(ticket.key);
+        }
+        // 3) Reconcile in the background — nothing waits on this.
+        staleBeforeRef.current = loadSeqRef.current;
+        load();
+        refreshPendingIds();
+      });
   }
 
   // Notes belong to a single KitchenOrder row in the schema, so a note added

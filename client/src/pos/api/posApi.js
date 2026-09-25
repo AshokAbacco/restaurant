@@ -274,6 +274,15 @@ export const getInvoiceForOrder = (orderId) =>
 export const getBillingSummary = (orderId) =>
   request(`/pos/billing/orders/${orderId}/summary`);
 
+// Billing page "Active Orders" list — only still-billable orders, in a slim
+// shape (no items/menu items/add-ons). DELIVERY orders are left out unless
+// Settings -> Tax & Billing -> "Enable Billing for Delivery Orders" is on.
+// Returns { data, deliveryBillingEnabled }.
+export const getBillableOrders = () => request(`/pos/billing/orders`);
+
+// { deliveryBillingEnabled } — readable by every POS role.
+export const getBillingConfig = () => request(`/pos/billing/config`);
+
 // payload: { payments: [{ method, amount, transactionReference? }], discount?,
 //   allowDue?, customerId? }
 // Records the payment(s). If the payments given don't cover the full bill

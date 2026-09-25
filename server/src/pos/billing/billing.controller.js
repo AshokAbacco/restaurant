@@ -47,3 +47,30 @@ export async function getBillHistory(req, res) {
       .json({ message: "Failed to fetch bill history", error: err.message });
   }
 }
+// Active Orders list for the Billing page — only still-billable orders, in
+// a slim shape. DELIVERY orders are included only when Settings -> Tax &
+// Billing -> "Enable Billing for Delivery Orders" is on.
+export async function getBillableOrders(req, res) {
+  try {
+    const result = await billingService.listBillableOrders(req.tenant.outletId, {
+      limit: req.query.limit,
+    });
+    res.json(result);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch billable orders", error: err.message });
+  }
+}
+
+// { deliveryBillingEnabled } — readable by every POS role (unlike
+// /api/settings, which is manager-only).
+export async function getBillingConfig(req, res) {
+  try {
+    res.json(await billingService.getBillingConfig(req.tenant.outletId));
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch billing settings", error: err.message });
+  }
+}
