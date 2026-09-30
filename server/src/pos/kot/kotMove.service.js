@@ -29,6 +29,7 @@ import prisma from "../../config/prisma.js";
 import { recalculateOrderTotals, generateOrderNumber } from "../pos.service.js";
 import { transferTable as transferWholeOrder } from "../pos.service.js";
 import { generateKotNumber } from "./kot.service.js";
+import { mergeOrdersIntoBill } from "../billing/billing.service.js";
 
 class MoveError extends Error {
   constructor(message, statusCode = 400) {
@@ -96,9 +97,25 @@ export async function moveTableWise({ sourceTableId, destinationTableId }, outle
     throw new MoveError(`${sourceTable.name} has no active order to move.`);
   }
 
-  // Reuses the exact same function the Table View's plain "transfer table"
-  // action already calls — table-wise move in this dialog IS that action,
-  // just reachable from a different entry point.
+  // FIX: if the destination table already has an active order, re-pointing
+  // this order at it (transferTable) left TWO open orders — and two bills —
+  // on one table, even though the dialog says "everything is merged into
+  // it". Fold it into the destination's order instead, using the same merge
+  // the Billing page uses, so the party ends up on one bill.
+  const destinationOrder = await prisma.order.findFirst({
+    where: {
+      tableId: destinationTableId,
+      outletId,
+      status: { notIn: ACTIVE_STATUSES_EXCLUDED },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (destinationOrder) {
+    return mergeOrdersIntoBill(destinationOrder.id, [order.id], {}, outletId);
+  }
+
+  // Empty destination: a plain move, same as the Table View's "transfer
+  // table" action.
   return transferWholeOrder(order.id, destinationTableId, outletId);
 }
 

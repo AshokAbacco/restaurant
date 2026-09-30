@@ -274,6 +274,16 @@ export const getInvoiceForOrder = (orderId) =>
 export const getBillingSummary = (orderId) =>
   request(`/pos/billing/orders/${orderId}/summary`);
 
+// Table merge -> single bill: folds other tables' active dine-in orders into
+// this order (items, KOTs, service charge, discounts, guests), re-prices GST
+// from the combined items, cancels the merged orders and frees their tables.
+// Returns the refreshed billing summary for the combined bill.
+export const mergeOrdersIntoBill = (orderId, sourceOrderIds) =>
+  request(`/pos/billing/orders/${orderId}/merge`, {
+    method: "POST",
+    body: JSON.stringify({ sourceOrderIds }),
+  });
+
 // Billing page "Active Orders" list — only still-billable orders, in a slim
 // shape (no items/menu items/add-ons). DELIVERY orders are left out unless
 // Settings -> Tax & Billing -> "Enable Billing for Delivery Orders" is on.

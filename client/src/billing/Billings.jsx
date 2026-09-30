@@ -20,6 +20,7 @@ import {
   getBillableOrders,
   getBillingSummary,
   removeOrderItem,
+  mergeOrdersIntoBill,
   sendToKitchen,
   getKotsForOrder,
 } from "../pos/api/posApi";
@@ -95,6 +96,13 @@ export default function Billings() {
   const [voidingId, setVoidingId] = useState(null);
   const [voidError, setVoidError] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+
+  // Table merge -> single bill. The cashier ticks the other table(s) the
+  // party is sitting at; their orders are folded into the bill on screen.
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeSelection, setMergeSelection] = useState([]);
+  const [merging, setMerging] = useState(false);
+  const [mergeError, setMergeError] = useState(null);
   const [summaryError, setSummaryError] = useState(null);
 
   const [mode, setMode] = useState("CASH"); // CASH | CARD | UPI | SPLIT
@@ -237,6 +245,9 @@ export default function Billings() {
     setRewards(NO_REWARDS);
     setDiscountValue("");
     setDiscountReason("");
+    setMergeOpen(false);
+    setMergeSelection([]);
+    setMergeError(null);
     // FIX: this used to call getBillingSummary(orderId) directly with no
     // offline fallback — opening ANY bill while offline just failed
     // outright, even for an order the cashier had already looked at
@@ -295,6 +306,34 @@ export default function Billings() {
     } finally {
       setVoidingId(null);
     }
+  }
+
+  // Merges the ticked tables' orders into the bill on screen, then re-reads
+  // the bill (server owns the combined subtotal / GST / total) and the
+  // Active Orders list (the merged orders drop off it).
+  async function handleMergeTables() {
+    if (!selectedOrderId || mergeSelection.length === 0) return;
+    setMerging(true);
+    setMergeError(null);
+    try {
+      await mergeOrdersIntoBill(selectedOrderId, mergeSelection);
+      setMergeOpen(false);
+      setMergeSelection([]);
+      await loadSummary(selectedOrderId);
+      loadOrders({ silent: true });
+    } catch (err) {
+      setMergeError(err.message);
+    } finally {
+      setMerging(false);
+    }
+  }
+
+  function toggleMergeSelection(orderId) {
+    setMergeSelection((prev) =>
+      prev.includes(orderId)
+        ? prev.filter((id) => id !== orderId)
+        : [...prev, orderId],
+    );
   }
 
   const selectOrder = useCallback(
@@ -509,6 +548,29 @@ export default function Billings() {
     [orders, selectedOrderId],
   );
 
+  // Other tables' open dine-in orders that can be merged into this bill.
+  const mergeCandidates = useMemo(
+    () =>
+      orders.filter(
+        (o) =>
+          o.id !== selectedOrderId &&
+          o.orderType === "DINE_IN" &&
+          o.table &&
+          !pendingBillingOrderIds.has(o.id),
+      ),
+    [orders, selectedOrderId, pendingBillingOrderIds],
+  );
+  const mergeSelectedTotal = mergeCandidates
+    .filter((o) => mergeSelection.includes(o.id))
+    .reduce((sum, o) => sum + Number(o.grandTotal || 0), 0);
+  const canMerge =
+    summary?.orderType === "DINE_IN" &&
+    !!summary?.table &&
+    !result &&
+    !isOffline &&
+    online &&
+    !pendingBillingOrderIds.has(selectedOrderId);
+
   // A DELIVERY order opened directly (e.g. an old /billing?orderId= link)
   // while delivery billing is off: show a notice instead of the bill.
   // Only decided once the setting is known (not null), so an enabled
@@ -701,8 +763,15 @@ export default function Billings() {
                     Table
                   </p>
                   <p className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
-                    {summary.table?.name || "—"}
+                    {summary.table?.name
+                      ? [summary.table.name, ...(summary.mergedTables || [])].join(" + ")
+                      : "—"}
                   </p>
+                  {summary.mergedTables?.length > 0 && (
+                    <p className="text-[11px] font-medium text-[#3FA34D] dark:text-[#43B75A]">
+                      Merged bill · {summary.mergedTables.length + 1} tables
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
@@ -713,6 +782,103 @@ export default function Billings() {
                   </p>
                 </div>
               </div>
+
+              {/* ---- Merge tables into this bill ---- */}
+              {canMerge && (
+                <div className="mb-4 rounded-xl border border-[#E7EAE1] dark:border-[#262B24] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF] dark:text-[#6B7280]">
+                        Merge tables
+                      </p>
+                      {!mergeOpen && (
+                        <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                          One party across several tables? Combine them into this bill.
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setMergeOpen((v) => !v);
+                        setMergeSelection([]);
+                        setMergeError(null);
+                      }}
+                      className="shrink-0 rounded-lg border border-[#E7EAE1] dark:border-[#262B24] px-3 py-1.5 text-xs font-semibold text-[#3FA34D] dark:text-[#43B75A] hover:bg-[#EAF6EC] dark:hover:bg-[#43B75A]/10"
+                    >
+                      {mergeOpen ? "Cancel" : "+ Merge tables"}
+                    </button>
+                  </div>
+
+                  {mergeOpen && (
+                    <div className="mt-3">
+                      {mergeCandidates.length === 0 ? (
+                        <p className="text-sm text-[#9CA3AF] dark:text-[#6B7280]">
+                          No other table has an open order to merge.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="mb-2 text-xs text-[#6B7280] dark:text-[#9CA8A0]">
+                            Select the table(s) to add to{" "}
+                            <span className="font-semibold">{summary.table.name}</span>
+                            &apos;s bill. Their items, taxes and discounts move onto
+                            this bill and those tables are freed.
+                          </p>
+                          <ul className="max-h-48 space-y-1.5 overflow-y-auto">
+                            {mergeCandidates.map((o) => {
+                              const checked = mergeSelection.includes(o.id);
+                              return (
+                                <li key={o.id}>
+                                  <label
+                                    className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm ${
+                                      checked
+                                        ? "border-[#3FA34D] bg-[#EAF6EC] dark:border-[#43B75A] dark:bg-[#43B75A]/10"
+                                        : "border-[#E7EAE1] dark:border-[#262B24]"
+                                    }`}
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleMergeSelection(o.id)}
+                                        className="h-4 w-4 accent-[#3FA34D] dark:accent-[#43B75A]"
+                                      />
+                                      <span className="font-semibold text-[#1F2937] dark:text-[#E4E9E2]">
+                                        {o.table.name}
+                                      </span>
+                                      <span className="font-mono text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+                                        {o.orderNumber}
+                                      </span>
+                                    </span>
+                                    <span className="font-mono text-xs font-semibold text-[#6B7280] dark:text-[#9CA8A0]">
+                                      ₹{Number(o.grandTotal || 0).toFixed(2)}
+                                    </span>
+                                  </label>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                          {mergeError && (
+                            <p className="mt-2 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs font-medium text-[#EF5350] dark:text-red-400">
+                              {mergeError}
+                            </p>
+                          )}
+                          <button
+                            onClick={handleMergeTables}
+                            disabled={merging || mergeSelection.length === 0}
+                            className="mt-3 w-full rounded-lg bg-[#3FA34D] py-2 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] disabled:cursor-not-allowed disabled:bg-[#D5DAD0] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] dark:disabled:bg-white/10 dark:disabled:text-[#6B7280]"
+                          >
+                            {merging
+                              ? "Merging…"
+                              : mergeSelection.length === 0
+                                ? "Select table(s) to merge"
+                                : `Merge ${mergeSelection.length} table${mergeSelection.length === 1 ? "" : "s"} into this bill (+₹${mergeSelectedTotal.toFixed(2)})`}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <ul className="mb-4 space-y-2">
                 {summary.items.map((item) => (

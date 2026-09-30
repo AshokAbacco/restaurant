@@ -29,6 +29,23 @@ export async function completeBilling(req, res) {
   }
 }
 
+// POST /pos/billing/orders/:orderId/merge  { sourceOrderIds: [...] }
+// Folds other tables' active orders into this one so they're paid on a
+// single bill / invoice. Returns the refreshed billing summary.
+export async function mergeOrdersIntoBill(req, res) {
+  try {
+    const summary = await billingService.mergeOrdersIntoBill(
+      req.params.orderId,
+      req.body?.sourceOrderIds,
+      { performedById: req.user?.employeeId, role: req.user?.role },
+      req.tenant.outletId,
+    );
+    res.json(summary);
+  } catch (err) {
+    res.status(400).json({ message: "Failed to merge tables", error: err.message });
+  }
+}
+
 export async function getBillHistory(req, res) {
   try {
     const history = await billingService.listBillHistory(

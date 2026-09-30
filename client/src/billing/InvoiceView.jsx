@@ -139,7 +139,21 @@ export default function InvoiceView({ invoice, summary, payments, onDone }) {
   const cashierName =
     invoice.cashierName || invoice.cashier?.fullName || summary?.cashier || null;
   const covers = order.numberOfGuests ?? summary?.covers ?? null;
-  const tableName = order.table?.name || null;
+  // "T1 + T2, T3" when other tables were merged into this bill.
+  const mergedTables =
+    summary?.mergedTables?.length
+      ? summary.mergedTables
+      : ((order.notes || "")
+          .split("\n")
+          .reverse()
+          .find((l) => l.startsWith("[Merged tables] "))
+          ?.slice("[Merged tables] ".length)
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean) ?? []);
+  const tableName = order.table?.name
+    ? [order.table.name, ...mergedTables].join(" + ")
+    : null;
   const tableSection = order.table?.section || null;
 
   const paymentList = payments || order.payments || [];

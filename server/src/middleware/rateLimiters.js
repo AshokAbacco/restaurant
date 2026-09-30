@@ -27,7 +27,7 @@ const jsonRateLimitHandler = (req, res) => {
 // to need a 6th attempt soon after 5 failures.
 export const registerRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 5,
+  limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
   handler: jsonRateLimitHandler,

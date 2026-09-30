@@ -227,8 +227,210 @@ export async function getBillingSummary(orderId, outletId) {
     totalPaid,
     balanceDue,
     alreadyInvoiced: !!order.invoice,
+    // Tables whose orders were merged into this bill (see mergeOrdersIntoBill).
+    mergedTables: parseMergedTables(order.notes),
     createdAt: order.createdAt,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TABLE MERGE → ONE BILL
+//
+// A party of 10 sits across two tables; each table ordered separately. At
+// billing time the cashier picks the other table(s) on the bill in front of
+// them, and everything is folded into THIS order, so one payment produces
+// one invoice.
+//
+// What moves onto the target order: every OrderItem (with its add-ons, which
+// hang off the item), every KitchenOrder (so KOT numbers print on the one
+// bill), any OrderDiscount rows, the service charge and discount amounts,
+// and the guest count. GST is then re-derived from the combined items with
+// repriceOrderFromItems — the same function a voided item uses — rather
+// than added up, so the combined bill's tax always matches its lines.
+//
+// What happens to the source orders: they end up with no items and are
+// marked CANCELLED with money fields zeroed and a note pointing at the bill
+// they went into — so they drop off every active list and are never counted
+// twice in reports, but stay findable. Their tables are freed.
+//
+// Refused when a source order already has money against it (a paid
+// payment, an invoice, a due entry, or bill splits) — moving that money
+// between orders is a refund-and-rebill job, not a merge.
+// ─────────────────────────────────────────────────────────────────────────
+const MERGED_NOTE_PREFIX = "[Merged tables] ";
+
+function parseMergedTables(notes) {
+  if (!notes) return [];
+  const line = notes
+    .split("\n")
+    .reverse()
+    .find((l) => l.startsWith(MERGED_NOTE_PREFIX));
+  if (!line) return [];
+  return line
+    .slice(MERGED_NOTE_PREFIX.length)
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+export async function mergeOrdersIntoBill(
+  targetOrderId,
+  sourceOrderIds,
+  { performedById, role } = {},
+  outletId,
+) {
+  const ids = [...new Set((sourceOrderIds || []).filter(Boolean))].filter(
+    (id) => id !== targetOrderId,
+  );
+  if (ids.length === 0) {
+    throw new Error("Select at least one other table to merge into this bill.");
+  }
+
+  const orderInclude = {
+    table: { select: { id: true, name: true } },
+    invoice: { select: { id: true } },
+    duePayment: { select: { id: true } },
+    payments: { where: { status: "PAID" }, select: { id: true } },
+    _count: { select: { billSplits: true } },
+  };
+
+  const target = await prisma.order.findFirst({
+    where: { id: targetOrderId, outletId },
+    include: orderInclude,
+  });
+  if (!target) throw new Error("Order not found");
+
+  const sources = await prisma.order.findMany({
+    where: { id: { in: ids }, outletId },
+    include: orderInclude,
+  });
+  if (sources.length !== ids.length) {
+    throw new Error("One or more of the selected orders were not found.");
+  }
+
+  const label = (o) => o.table?.name || o.orderNumber;
+
+  for (const o of [target, ...sources]) {
+    if (!BILLABLE_STATUSES.includes(o.status)) {
+      throw new Error(`${label(o)} (${o.orderNumber}) is ${o.status.toLowerCase()} and can't be merged.`);
+    }
+    if (o.orderType !== "DINE_IN" || !o.tableId) {
+      throw new Error(`${o.orderNumber} is not a dine-in table order — only table orders can be merged.`);
+    }
+    if (o.invoice) {
+      throw new Error(`${label(o)} (${o.orderNumber}) already has an invoice.`);
+    }
+  }
+  for (const o of sources) {
+    if (o.payments.length || o.duePayment || o._count.billSplits) {
+      throw new Error(
+        `${label(o)} (${o.orderNumber}) already has a payment or split recorded against it — settle it separately.`,
+      );
+    }
+  }
+
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const sum = (field) =>
+    sources.reduce((acc, o) => acc + Number(o[field] || 0), 0);
+
+  const mergedLabels = [
+    ...parseMergedTables(target.notes),
+    ...sources.flatMap((o) => [label(o), ...parseMergedTables(o.notes)]),
+  ];
+  const uniqueLabels = [...new Set(mergedLabels)];
+  const guestTotal =
+    (target.numberOfGuests || 0) +
+    sources.reduce((acc, o) => acc + (o.numberOfGuests || 0), 0);
+
+  // Keep any existing notes, but replace an older "[Merged tables]" line
+  // instead of stacking a second one.
+  const keptNotes = (target.notes || "")
+    .split("\n")
+    .filter((l) => l && !l.startsWith(MERGED_NOTE_PREFIX));
+  const targetNotes = [...keptNotes, MERGED_NOTE_PREFIX + uniqueLabels.join(", ")].join("\n");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.orderItem.updateMany({
+      where: { orderId: { in: ids } },
+      data: { orderId: targetOrderId },
+    });
+    await tx.kitchenOrder.updateMany({
+      where: { orderId: { in: ids } },
+      data: { orderId: targetOrderId },
+    });
+    await tx.orderDiscount.updateMany({
+      where: { orderId: { in: ids } },
+      data: { orderId: targetOrderId },
+    });
+
+    await tx.order.update({
+      where: { id: targetOrderId },
+      data: {
+        serviceChargeAmount: round2(Number(target.serviceChargeAmount || 0) + sum("serviceChargeAmount")),
+        discountAmount: round2(Number(target.discountAmount || 0) + sum("discountAmount")),
+        numberOfGuests: guestTotal || null,
+        // Keep the bill's own customer; if it has none, take the first one
+        // any merged table had, so loyalty/due still have someone to attach to.
+        customerId:
+          target.customerId || sources.find((o) => o.customerId)?.customerId || null,
+        notes: targetNotes,
+      },
+    });
+
+    for (const o of sources) {
+      await tx.order.update({
+        where: { id: o.id },
+        data: {
+          status: "CANCELLED",
+          subtotal: 0,
+          gstAmount: 0,
+          serviceChargeAmount: 0,
+          discountAmount: 0,
+          grandTotal: 0,
+          notes: [o.notes, `Merged into ${target.orderNumber} (${label(target)}) for a single bill.`]
+            .filter(Boolean)
+            .join("\n"),
+        },
+      });
+    }
+
+    // Free the merged tables — the party is now billed on the target table.
+    const sourceTableIds = sources
+      .map((o) => o.tableId)
+      .filter((tid) => tid && tid !== target.tableId);
+    if (sourceTableIds.length) {
+      await tx.restaurantTable.updateMany({
+        where: { id: { in: sourceTableIds }, outletId },
+        data: { status: "FREE" },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        action: "ORDERS_MERGED",
+        entityType: "Order",
+        entityId: targetOrderId,
+        performedById: performedById ?? null,
+        performedByRole: role ?? null,
+        outletId,
+        metadata: {
+          targetOrderNumber: target.orderNumber,
+          targetTable: label(target),
+          merged: sources.map((o) => ({
+            orderId: o.id,
+            orderNumber: o.orderNumber,
+            table: label(o),
+            grandTotal: Number(o.grandTotal),
+          })),
+        },
+      },
+    });
+  });
+
+  // Subtotal + GST + grand total from the combined lines.
+  await posService.repriceOrderFromItems(targetOrderId);
+
+  return getBillingSummary(targetOrderId, outletId);
 }
 
 // payments: [{ method: "CASH"|"CARD"|"UPI"|"OTHER", amount, transactionReference? }]

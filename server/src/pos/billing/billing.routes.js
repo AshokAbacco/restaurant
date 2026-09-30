@@ -12,10 +12,13 @@ const router = Router();
 // GET /pos/billing/orders -> slim list of still-billable orders for the
 //      Billing page (DELIVERY only when enabled in Settings -> Tax & Billing)
 // GET /pos/billing/config -> { deliveryBillingEnabled }
+// POST /pos/billing/orders/:orderId/merge -> merge other tables' orders into
+//      this one for a single bill ({ sourceOrderIds: [] })
 router.get("/history", billingController.getBillHistory);
 router.get("/orders", billingController.getBillableOrders);
 router.get("/config", billingController.getBillingConfig);
 router.get("/orders/:orderId/summary", billingController.getBillingSummary);
 router.post("/orders/:orderId/complete", billingController.completeBilling);
+router.post("/orders/:orderId/merge", billingController.mergeOrdersIntoBill);
 
 export default router;
