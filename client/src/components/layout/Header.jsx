@@ -190,20 +190,23 @@ const Header = ({ onMenuClick }) => {
 
         {/* ================= LOOKUPS ================= */}
 
-        {/* Hidden below md: at phone width these two fields would take the
-            whole row on their own. They move to their own row below. */}
-        <div className="hidden min-w-0 items-center gap-2 md:flex">
+        {/* Inline only at xl (≥1280px). They used to come inline at md
+            (768px), but next to the brand, New Order, 3 icon buttons, the
+            outlet switcher and profile there's no room until ~1280px — on
+            tablets/small laptops they got crushed to empty icon-only boxes.
+            Below xl they sit on their own row (further down). */}
+        <div className="hidden min-w-0 items-center gap-2 xl:flex">
           <LookupField
             label="Bill No"
             placeholder="Bill No — INV-000021"
             onResolve={resolveBill}
-            widthClass="w-[150px] lg:w-[190px]"
+            widthClass="w-[170px] 2xl:w-[200px]"
           />
           <LookupField
             label="KOT No"
             placeholder="KOT No — KOT-000046"
             onResolve={resolveKot}
-            widthClass="w-[150px] lg:w-[190px]"
+            widthClass="w-[170px] 2xl:w-[200px]"
           />
         </div>
 
@@ -252,9 +255,9 @@ const Header = ({ onMenuClick }) => {
        
       </div>
 
-      {/* ================= LOOKUPS (below md) ================= */}
+      {/* ================= LOOKUPS (below xl) ================= */}
 
-      <div className="flex items-center gap-2 px-3 pb-2.5 sm:px-4 md:hidden">
+      <div className="flex items-center gap-2 px-3 pb-2.5 sm:px-4 lg:px-6 xl:hidden">
         <LookupField
           label="Bill No"
           placeholder="Bill No"

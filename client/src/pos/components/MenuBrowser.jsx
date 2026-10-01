@@ -152,10 +152,12 @@ export default function MenuBrowser({ onAddItem }) {
       <button
         key={id ?? "all"}
         onClick={() => setActiveCategoryId(id)}
-        className={`w-full border-l-2 px-3 py-2.5 text-left text-[12px] transition-colors ${
+        // Narrow panel (phone): a scrollable chip. Wide panel (@xl, ≥576px —
+        // tablet and up): a full-width row in the vertical rail.
+        className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-[13px] transition-colors @xl:w-full @xl:shrink @xl:whitespace-normal @xl:rounded-none @xl:border-0 @xl:border-l-2 @xl:px-3 @xl:py-2.5 @xl:text-left ${
           active
             ? "border-[#3FA34D] bg-[#EAF6EC] font-semibold text-[#3FA34D] dark:border-[#43B75A] dark:bg-[#43B75A]/10 dark:text-[#43B75A]"
-            : "border-transparent text-[#6B7280] hover:bg-[#F3F5EE] hover:text-[#1F2937] dark:text-[#9CA8A0] dark:hover:bg-white/5 dark:hover:text-white"
+            : "border-[#E7EAE1] text-[#6B7280] hover:bg-[#F3F5EE] hover:text-[#1F2937] @xl:border-transparent dark:border-[#262B24] dark:text-[#9CA8A0] dark:hover:bg-white/5 dark:hover:text-white @xl:dark:border-transparent"
         }`}
       >
         {label}
@@ -164,11 +166,18 @@ export default function MenuBrowser({ onAddItem }) {
   };
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* ============ CATEGORY RAIL ============ */}
+    // RESPONSIVE: `@container` makes the layout follow the width of THIS
+    // panel, not the screen. The panel is full width on phones/portrait
+    // tablets and shares the row with the order ticket on laptops, so screen
+    // breakpoints (sm/md/lg) were the wrong signal — that's why tiles got
+    // crushed to ~65px on an 800px tablet.
+    <div className="@container h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col @xl:flex-row">
+      {/* ============ CATEGORIES ============ */}
+      {/* Narrow: horizontal chip strip on top. Wide: vertical rail on left. */}
 
-      <div className="flex w-[132px] shrink-0 flex-col border-r border-[#E7EAE1] sm:w-[150px] lg:w-[170px] dark:border-[#262B24]">
-        <div className="min-h-0 flex-1 overflow-y-auto py-1">
+      <div className="shrink-0 border-b border-[#E7EAE1] @xl:flex @xl:w-[150px] @xl:flex-col @xl:border-b-0 @xl:border-r @4xl:w-[170px] dark:border-[#262B24]">
+        <div className="flex gap-2 overflow-x-auto px-3 py-2.5 [scrollbar-width:none] @xl:block @xl:min-h-0 @xl:flex-1 @xl:overflow-y-auto @xl:overflow-x-hidden @xl:px-0 @xl:py-1">
           {categoryRow(ALL_CATEGORY_ID, "All Items")}
           {categories.map((c) => categoryRow(c.id, c.name))}
         </div>
@@ -194,11 +203,11 @@ export default function MenuBrowser({ onAddItem }) {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search item"
               aria-label="Search items by name"
-              className="w-full rounded-lg border border-[#E7EAE1] bg-white py-2 pl-9 pr-3 text-[12px] text-[#1F2937] placeholder:text-[#9CA3AF] focus:border-[#3FA34D] focus:outline-none dark:border-[#262B24] dark:bg-[#1D231D] dark:text-white dark:placeholder:text-[#6B7280] dark:focus:border-[#43B75A]"
+              className="w-full rounded-lg border border-[#E7EAE1] bg-white py-2.5 pl-9 pr-3 text-[13px] text-[#1F2937] placeholder:text-[#9CA3AF] focus:border-[#3FA34D] focus:outline-none dark:border-[#262B24] dark:bg-[#1D231D] dark:text-white dark:placeholder:text-[#6B7280] dark:focus:border-[#43B75A]"
             />
           </div>
 
-          <div className="relative w-[110px] shrink-0 sm:w-[140px]">
+          <div className="relative w-[116px] shrink-0 @md:w-[140px]">
             <Hash className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9CA3AF] dark:text-[#6B7280]" />
             <input
               value={shortCode}
@@ -214,7 +223,7 @@ export default function MenuBrowser({ onAddItem }) {
         {/* ============ GRID ============ */}
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-2 px-3 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-2 px-3">
             {Array.from({ length: 12 }).map((_, i) => (
               <div
                 key={i}
@@ -229,7 +238,7 @@ export default function MenuBrowser({ onAddItem }) {
               : "No items in this category yet."}
           </p>
         ) : (
-          <div className="grid min-h-0 flex-1 auto-rows-min content-start gap-2 overflow-y-auto px-3 pb-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="grid min-h-0 flex-1 auto-rows-min content-start gap-2 overflow-y-auto overscroll-contain px-3 pb-3 grid-cols-[repeat(auto-fill,minmax(128px,1fr))]">
             {visibleItems.map((item) => (
               <button
                 key={item.id}
@@ -250,7 +259,7 @@ export default function MenuBrowser({ onAddItem }) {
                   }`}
                 />
 
-                <span className="line-clamp-2 text-[12px] font-semibold leading-snug text-[#1F2937] dark:text-white">
+                <span className="line-clamp-2 pr-5 text-[13px] font-semibold leading-snug text-[#1F2937] dark:text-white">
                   {item.name}
                 </span>
 
@@ -265,15 +274,18 @@ export default function MenuBrowser({ onAddItem }) {
 
                 {/* Quick on/off — appears on hover, and stays visible when
                     the item is already off so it's easy to find and flip
-                    back on. */}
+                    back on. Touch screens have no hover, so there it was
+                    INVISIBLE but still tappable — a tap on the tile's
+                    corner silently switched the dish off. It's now shown
+                    (dimmed) on touch devices so staff can see it. */}
                 <span
                   role="button"
                   tabIndex={0}
                   onClick={(e) => handleToggleAvailability(item, e)}
                   title={item.isAvailable ? "Mark unavailable" : "Mark available"}
-                  className={`absolute right-1.5 top-1.5 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full transition-opacity ${
+                  className={`absolute right-1.5 top-1.5 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-opacity ${
                     item.isAvailable
-                      ? "bg-[#F3F5EE] text-[#9CA3AF] opacity-0 hover:bg-[#E7EAE1] group-hover:opacity-100 dark:bg-white/5 dark:text-[#6B7280] dark:hover:bg-white/10"
+                      ? "bg-[#F3F5EE] text-[#9CA3AF] opacity-0 hover:bg-[#E7EAE1] group-hover:opacity-100 [@media(hover:none)]:opacity-70 dark:bg-white/5 dark:text-[#6B7280] dark:hover:bg-white/10"
                       : "bg-red-100 text-red-500 opacity-100 hover:bg-red-200 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
                   } ${togglingId === item.id ? "animate-pulse" : ""}`}
                 >
@@ -284,6 +296,7 @@ export default function MenuBrowser({ onAddItem }) {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

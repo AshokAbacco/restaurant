@@ -294,6 +294,24 @@ export default function PosOrderScreen() {
   // updates immediately, so the second click bails out synchronously.
   const submittingRef = useRef(false);
 
+  // RESPONSIVE: below lg (phones + tablets in portrait) the order ticket
+  // sits UNDER the menu, so after tapping a few dishes the cart is off
+  // screen. A floating "View order" bar shows the running count/total and
+  // jumps to the ticket; it hides itself once the ticket is in view.
+  const ticketRef = useRef(null);
+  const [ticketInView, setTicketInView] = useState(false);
+
+  useEffect(() => {
+    const el = ticketRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setTicketInView(entry.isIntersecting),
+      { threshold: 0.15 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // OrderTicket identifies every cart row by `cartLineId` (not menuItemId —
   // two lines can share a menuItemId once add-ons make them distinct). Use
   // crypto.randomUUID when it's available and fall back to a manual id.
@@ -571,10 +589,38 @@ export default function PosOrderScreen() {
     }
   }
 
+  const cartCount = cart.reduce((n, i) => n + i.quantity, 0);
+  const cartSubtotal = cart.reduce(
+    (sum, i) =>
+      sum +
+      (Number(i.sellingPrice) +
+        (i.addOns || []).reduce(
+          (s, a) => s + Number(a.price) * a.quantity,
+          0,
+        )) *
+        i.quantity,
+    0,
+  );
+
+  // RESPONSIVE LAYOUT
+  // ─────────────────────────────────────────────────────────────
+  // This used to be `h-screen` inside AdminLayout (which already has its own
+  // header + padding), so the page was always taller than the viewport and
+  // scrolled twice. And the menu/ticket split kicked in at md (768px) with a
+  // fixed 360px ticket — on a portrait tablet (~800px) that left the menu
+  // grid ~230px wide, so tiles were squeezed to ~65px and names were cut off.
+  //
+  //   phone / tablet portrait (< 1024px): menu full width, ticket below it,
+  //                                       floating "View order" bar
+  //   tablet landscape / laptop (≥ 1024): menu + 340px ticket side by side
+  //   desktop (≥ 1280):                   menu + 380px ticket
+  //
+  // Sticky offsets: the app header is ~102px tall below xl (lookups get their
+  // own row) and ~57px at xl and up.
   return (
-    <div className="flex h-screen flex-col bg-[#fff] dark:bg-[#12160F]">
-      <header className="flex items-center justify-between border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
-        <h1 className="font-mono text-lg font-bold text-[#1F2937] dark:text-white">
+    <div className="flex flex-col rounded-2xl border border-[#E7EAE1] bg-white dark:border-[#262B24] dark:bg-[#12160F]">
+      <header className="flex flex-wrap items-center justify-between gap-2 rounded-t-2xl border-b border-[#E7EAE1] bg-white px-4 py-3 sm:px-6 dark:border-[#262B24] dark:bg-[#171C17]">
+        <h1 className="font-mono text-base font-bold text-[#1F2937] sm:text-lg dark:text-white">
           POS · New Order
         </h1>
         <CounterPicker />
@@ -598,7 +644,7 @@ export default function PosOrderScreen() {
       />
 
       {orderType === "DINE_IN" && (
-        <div className="border-b border-[#E7EAE1] dark:border-[#262B24] bg-white dark:bg-[#171C17] px-6 py-3">
+        <div className="border-b border-[#E7EAE1] bg-white px-4 py-3 sm:px-6 dark:border-[#262B24] dark:bg-[#171C17]">
           <TableStrip
             selectedTableId={tableId}
             initialFloorId={deepLinkFloorId}
@@ -607,10 +653,14 @@ export default function PosOrderScreen() {
         </div>
       )}
 
-     <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 md:grid-cols-[1fr_360px] md:items-start">
-      <div className="min-h-0 overflow-hidden rounded-2xl border border-[#E7EAE1] bg-white dark:border-[#262B24] dark:bg-[#171C17] md:sticky md:top-4 md:h-[calc(100vh-140px)]">
-        <MenuBrowser onAddItem={addItem} />
-      </div>
+      <div
+        className={`grid grid-cols-1 gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start xl:grid-cols-[minmax(0,1fr)_380px] ${
+          cart.length > 0 ? "pb-24 lg:pb-4" : ""
+        }`}
+      >
+        <div className="h-[68dvh] min-h-[420px] overflow-hidden rounded-2xl border border-[#E7EAE1] bg-white lg:sticky lg:top-[7.5rem] lg:h-[calc(100dvh-9rem)] lg:min-h-[480px] xl:top-[4.75rem] xl:h-[calc(100dvh-6.5rem)] dark:border-[#262B24] dark:bg-[#171C17]">
+          <MenuBrowser onAddItem={addItem} />
+        </div>
 
         {printKotOrderId && (
           <KotPrintModal
@@ -620,6 +670,10 @@ export default function PosOrderScreen() {
           />
         )}
 
+        <div
+          ref={ticketRef}
+          className="scroll-mt-28 lg:sticky lg:top-[7.5rem] lg:max-h-[calc(100dvh-9rem)] lg:overflow-y-auto xl:top-[4.75rem] xl:max-h-[calc(100dvh-6.5rem)]"
+        >
         <OrderTicket
           orderType={orderType}
           onChangeOrderType={setOrderType}
@@ -650,7 +704,27 @@ export default function PosOrderScreen() {
           placing={placing}
           error={error}
         />
+        </div>
       </div>
+
+      {/* Floating cart bar — phones and portrait tablets only. */}
+      {cart.length > 0 && !ticketInView && (
+        <button
+          type="button"
+          onClick={() =>
+            ticketRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+          className="fixed inset-x-3 bottom-3 z-30 flex items-center justify-between gap-3 rounded-2xl bg-[#3FA34D] px-5 py-3.5 text-white shadow-xl shadow-black/20 sm:inset-x-6 lg:hidden dark:bg-[#43B75A]"
+        >
+          <span className="text-sm font-semibold">
+            {cartCount} {cartCount === 1 ? "item" : "items"}
+          </span>
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <span className="font-mono">₹{cartSubtotal.toFixed(0)}</span>
+            <span>View order →</span>
+          </span>
+        </button>
+      )}
     </div>
   );
 }

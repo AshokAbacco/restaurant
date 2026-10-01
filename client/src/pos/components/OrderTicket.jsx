@@ -112,7 +112,7 @@ export default function OrderTicket({
             <button
               key={type}
               onClick={() => onChangeOrderType(type)}
-              className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
+              className={`min-w-0 flex-1 truncate rounded-lg px-1 py-2 text-xs font-semibold transition-colors ${
                 orderType === type
                   ? "bg-[#3FA34D] text-white dark:bg-[#43B75A]"
                   : "bg-[#F3F5EE] dark:bg-white/5 text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#E7EAE1] dark:hover:bg-white/10"
@@ -290,7 +290,7 @@ export default function OrderTicket({
               return (
                 <li key={item.cartLineId} className="border-b border-[#E7EAE1] dark:border-[#262B24] pb-3 last:border-0">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-medium text-[#1F2937] dark:text-white">{item.name}</span>
+                    <span className="min-w-0 break-words text-sm font-medium text-[#1F2937] dark:text-white">{item.name}</span>
                     <span className="font-mono text-sm font-semibold text-[#1F2937] dark:text-white">
                       ₹{Number(item.sellingPrice).toFixed(0)}
                     </span>
@@ -316,31 +316,31 @@ export default function OrderTicket({
                     </div>
                   )}
 
-                  <div className="mt-1.5 flex items-center gap-2">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <div className="flex items-center rounded-lg border border-[#E7EAE1] dark:border-[#262B24]">
                       <button
                         onClick={() => onDecrement(item.cartLineId)}
-                        className="px-2 py-0.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+                        className="flex h-8 w-8 items-center justify-center text-base text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       >
                         −
                       </button>
-                      <span className="px-2 font-mono text-sm text-[#1F2937] dark:text-white">{item.quantity}</span>
+                      <span className="min-w-[2rem] px-1 text-center font-mono text-sm text-[#1F2937] dark:text-white">{item.quantity}</span>
                       <button
                         onClick={() => onIncrement(item.cartLineId)}
-                        className="px-2 py-0.5 text-[#9CA3AF] dark:text-[#6B7280] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
+                        className="flex h-8 w-8 items-center justify-center text-base text-[#6B7280] dark:text-[#9CA8A0] hover:bg-[#F3F5EE] dark:hover:bg-white/5"
                       >
                         +
                       </button>
                     </div>
                     <button
                       onClick={() => setEditingLine(item)}
-                      className="text-xs text-[#3FA34D] dark:text-[#43B75A] hover:underline"
+                      className="py-1.5 text-xs text-[#3FA34D] dark:text-[#43B75A] hover:underline"
                     >
                       Add-ons
                     </button>
                     <button
                       onClick={() => onRemove(item.cartLineId)}
-                      className="text-xs text-red-500 dark:text-red-400 hover:underline"
+                      className="py-1.5 text-xs text-red-500 dark:text-red-400 hover:underline"
                     >
                       Remove
                     </button>
@@ -389,7 +389,7 @@ export default function OrderTicket({
         <button
           onClick={onPlaceOrder}
           disabled={!canPlace}
-          className="mt-3 w-full rounded-lg bg-[#3FA34D] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] dark:disabled:bg-[#6B7280]"
+          className="mt-3 w-full rounded-lg bg-[#3FA34D] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#358F42] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] dark:bg-[#43B75A] dark:hover:bg-[#3AA34E] dark:disabled:bg-[#6B7280]"
         >
           {existingOrder
             ? placing
