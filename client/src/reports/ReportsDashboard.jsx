@@ -26,9 +26,9 @@ import {
 } from "react-icons/fi";
 
 import PageHeader from "../components/layout/PageHeader";
-import { getAccessToken } from "../api/apiClient";
+import { authFetch } from "../api/apiClient";
 // If your app already has a central API base / axios instance, swap this out.
-const API_BASE = import.meta.env.VITE_API_URL;
+// (API base comes from apiClient via authFetch.)
 
 // ==========================================
 // FORM CONTROL STYLES
@@ -146,16 +146,10 @@ const ReportsDashboard = () => {
         ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
       });
 
-      const token = getAccessToken();
-
-      const res = await fetch(
-        `${API_BASE}/reports/dashboard?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          credentials: "include",
-        },
+      // SESSION FIX: plain fetch() had no token renewal, so the dashboard
+      // failed with "Invalid or expired token" ~15 minutes after login.
+      const res = await authFetch(
+        `/reports/dashboard?${params.toString()}`,
       );
 
       const json = await res.json();

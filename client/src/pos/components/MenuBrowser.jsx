@@ -23,8 +23,15 @@
 // every possible category combination, so it's an honest "works for what's
 // been seen before" cache, not a full offline menu sync.
 
-import { useEffect, useMemo, useState } from "react";
-import { WifiOff, Power, Search, Hash } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  WifiOff,
+  Power,
+  Search,
+  Hash,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 import {
   getCategories,
@@ -146,12 +153,83 @@ export default function MenuBrowser({ onAddItem }) {
   // RENDER
   // ==========================================
 
+  // ==========================================
+  // CATEGORY STRIP SCROLLING (narrow layout)
+  // ==========================================
+  // FIX: on narrow screens categories are a horizontal chip strip. Its
+  // scrollbar was hidden, so with a mouse (or a narrow desktop window) there
+  // was NO way to reach the categories past the right edge. Now: a thin
+  // visible scrollbar, ◀ ▶ buttons that appear only when there's more to
+  // see, the mouse wheel scrolls the strip sideways, and the selected chip
+  // scrolls into view.
+
+  const stripRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateStripArrows = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const horizontal = el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).display === "flex";
+    setCanScrollLeft(horizontal && el.scrollLeft > 2);
+    setCanScrollRight(
+      horizontal && el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+    );
+  }, []);
+
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    updateStripArrows();
+
+    // Vertical mouse wheel → horizontal scroll, only while the strip
+    // actually scrolls sideways (non-passive so the page doesn't also move).
+    const onWheel = (e) => {
+      if (getComputedStyle(el).display !== "flex") return; // vertical rail mode
+      if (el.scrollWidth <= el.clientWidth) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("scroll", updateStripArrows, { passive: true });
+
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateStripArrows)
+        : null;
+    ro?.observe(el);
+
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("scroll", updateStripArrows);
+      ro?.disconnect();
+    };
+  }, [updateStripArrows]);
+
+  useEffect(() => {
+    updateStripArrows();
+  }, [categories, updateStripArrows]);
+
+  const scrollStrip = (direction) => {
+    const el = stripRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * el.clientWidth * 0.7, behavior: "smooth" });
+  };
+
   const categoryRow = (id, label) => {
     const active = activeCategoryId === id;
     return (
       <button
         key={id ?? "all"}
-        onClick={() => setActiveCategoryId(id)}
+        onClick={(e) => {
+          setActiveCategoryId(id);
+          e.currentTarget.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "nearest",
+          });
+        }}
         // Narrow panel (phone): a scrollable chip. Wide panel (@xl, ≥576px —
         // tablet and up): a full-width row in the vertical rail.
         className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-[13px] transition-colors @xl:w-full @xl:shrink @xl:whitespace-normal @xl:rounded-none @xl:border-0 @xl:border-l-2 @xl:px-3 @xl:py-2.5 @xl:text-left ${
@@ -177,15 +255,51 @@ export default function MenuBrowser({ onAddItem }) {
       {/* Narrow: horizontal chip strip on top. Wide: vertical rail on left. */}
 
       <div className="shrink-0 border-b border-[#E7EAE1] @xl:flex @xl:w-[150px] @xl:flex-col @xl:border-b-0 @xl:border-r @4xl:w-[170px] dark:border-[#262B24]">
-        <div className="flex gap-2 overflow-x-auto px-3 py-2.5 [scrollbar-width:none] @xl:block @xl:min-h-0 @xl:flex-1 @xl:overflow-y-auto @xl:overflow-x-hidden @xl:px-0 @xl:py-1">
-          {categoryRow(ALL_CATEGORY_ID, "All Items")}
-          {categories.map((c) => categoryRow(c.id, c.name))}
+        <div className="relative @xl:flex @xl:min-h-0 @xl:flex-1 @xl:flex-col">
+          <div
+            ref={stripRef}
+            className="flex gap-2 overflow-x-auto scroll-smooth px-3 py-2.5 [scrollbar-color:#D8DED2_transparent] [scrollbar-width:thin] @xl:block @xl:min-h-0 @xl:flex-1 @xl:overflow-y-auto @xl:overflow-x-hidden @xl:px-0 @xl:py-1 dark:[scrollbar-color:#2F362D_transparent]"
+          >
+            {categoryRow(ALL_CATEGORY_ID, "All Items")}
+            {categories.map((c) => categoryRow(c.id, c.name))}
+          </div>
+
+          {/* ◀ ▶ — narrow layout only, shown only when there's more to see. */}
+          {canScrollLeft && (
+            <button
+              type="button"
+              aria-label="Scroll categories left"
+              onClick={() => scrollStrip(-1)}
+              className="absolute inset-y-0 left-0 flex w-10 items-center justify-start bg-gradient-to-r from-white via-white/90 to-transparent pl-1 @xl:hidden dark:from-[#171C17] dark:via-[#171C17]/90"
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#E7EAE1] bg-white shadow-sm dark:border-[#262B24] dark:bg-[#1D231D]">
+                <ChevronLeft className="h-4 w-4 text-[#6B7280] dark:text-[#9CA8A0]" />
+              </span>
+            </button>
+          )}
+          {canScrollRight && (
+            <button
+              type="button"
+              aria-label="Scroll categories right"
+              onClick={() => scrollStrip(1)}
+              className="absolute inset-y-0 right-0 flex w-10 items-center justify-end bg-gradient-to-l from-white via-white/90 to-transparent pr-1 @xl:hidden dark:from-[#171C17] dark:via-[#171C17]/90"
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#E7EAE1] bg-white shadow-sm dark:border-[#262B24] dark:bg-[#1D231D]">
+                <ChevronRight className="h-4 w-4 text-[#6B7280] dark:text-[#9CA8A0]" />
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* ============ ITEMS ============ */}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* FIX: min-h-0 is what lets this column be SHORTER than its content.
+          Without it, in the narrow (stacked) layout the column grew to the
+          full height of every dish, overflowed the panel and was clipped by
+          its overflow-hidden — so the dish grid never got a scrollbar and
+          the lower dishes were simply unreachable. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {offlineNotice && (
           <div className="mx-3 mt-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
             <WifiOff className="h-3.5 w-3.5" />
@@ -195,7 +309,7 @@ export default function MenuBrowser({ onAddItem }) {
 
         {/* ============ SEARCH ============ */}
 
-        <div className="flex gap-2 px-3 py-3">
+        <div className="flex shrink-0 gap-2 px-3 py-3">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9CA3AF] dark:text-[#6B7280]" />
             <input
@@ -238,7 +352,7 @@ export default function MenuBrowser({ onAddItem }) {
               : "No items in this category yet."}
           </p>
         ) : (
-          <div className="grid min-h-0 flex-1 auto-rows-min content-start gap-2 overflow-y-auto overscroll-contain px-3 pb-3 grid-cols-[repeat(auto-fill,minmax(128px,1fr))]">
+          <div className="grid min-h-0 flex-1 auto-rows-min content-start gap-2 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-color:#D8DED2_transparent] [scrollbar-width:thin] dark:[scrollbar-color:#2F362D_transparent] grid-cols-[repeat(auto-fill,minmax(128px,1fr))]">
             {visibleItems.map((item) => (
               <button
                 key={item.id}

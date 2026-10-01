@@ -1,7 +1,9 @@
 // client/src/menu/menuApi.js
-import { apiRequest, getAccessToken } from "../api/apiClient";
-
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
+// SESSION FIX: export/import/upload used plain fetch() with no refresh, so
+// after the access token expired they failed with "Invalid or expired
+// token". authFetch attaches the token and renews it on a 401. (It also
+// uses apiClient's BASE_URL, which handles tablets on the LAN.)
+import { apiRequest, authFetch } from "../api/apiClient";
 
 // ---------- Categories ----------
 export const fetchCategories = () => apiRequest("/categories");
@@ -90,12 +92,7 @@ export const fetchMenuReport = () => apiRequest("/menu/report");
 
 // ---------- Bulk Import / Export ----------
 export const exportMenuCsv = async () => {
-  const token = getAccessToken();
-  const res = await fetch(`${BASE_URL}/menu/export`, {
-    method: "GET",
-    credentials: "include",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const res = await authFetch("/menu/export", { method: "GET" });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
     return { ok: false, data };
@@ -105,14 +102,11 @@ export const exportMenuCsv = async () => {
 };
 
 export const importMenuCsv = async (file) => {
-  const token = getAccessToken();
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${BASE_URL}/menu/import`, {
+  const res = await authFetch("/menu/import", {
     method: "POST",
-    credentials: "include",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
 
@@ -122,16 +116,12 @@ export const importMenuCsv = async (file) => {
 
 // ---------- Image Upload ----------
 export const uploadImage = async (file, folder = "menu-items") => {
-  const token = getAccessToken();
-
   const formData = new FormData();
   formData.append("image", file);
   formData.append("folder", folder);
 
-  const res = await fetch(`${BASE_URL}/upload`, {
+  const res = await authFetch("/upload", {
     method: "POST",
-    credentials: "include",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
 

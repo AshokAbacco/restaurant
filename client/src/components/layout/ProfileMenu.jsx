@@ -77,7 +77,7 @@ const ProfileMenu = () => {
 
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-3 bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-full pl-1 pr-3 py-1 hover:border-[#3FA34D]/40 dark:hover:border-[#43B75A]/40 hover:shadow-sm transition-all"
+        className="flex items-center gap-1 sm:gap-3 bg-white dark:bg-[#171C17] border border-[#E7EAE1] dark:border-[#262B24] rounded-full p-1 sm:pr-3 hover:border-[#3FA34D]/40 dark:hover:border-[#43B75A]/40 hover:shadow-sm transition-all"
       >
         <div className="w-10 h-10 rounded-full bg-[#3FA34D] dark:bg-[#43B75A] flex items-center justify-center text-white font-semibold text-lg">
           {user?.name?.charAt(0) || "R"}
@@ -92,7 +92,7 @@ const ProfileMenu = () => {
         </div> */}
 
         <FiChevronDown
-          className={`text-[#9CA3AF] dark:text-[#6B7280] transition-transform duration-300 ${
+          className={`hidden sm:block text-[#9CA3AF] dark:text-[#6B7280] transition-transform duration-300 ${
             open ? "rotate-180" : ""
           }`}
         />

@@ -2,7 +2,7 @@
 // src/expenses/services/expenseService.js
 // ==============================================
 
-import { apiRequest, getAccessToken, BASE_URL } from "../../api/apiClient";
+import { apiRequest, authFetch, BASE_URL } from "../../api/apiClient";
 
 // ==============================================
 // DASHBOARD
@@ -220,12 +220,8 @@ const EXCEL_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spread
 const downloadBlob = async (url, filename) => {
   let res;
   try {
-    res = await fetch(url, {
-      credentials: "include",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
-    });
+    // authFetch: renews an expired token instead of failing with 401.
+    res = await authFetch(url);
   } catch {
     // fetch itself threw — network down, CORS block, wrong host/port, etc.
     throw new Error("Could not reach the server. Check your connection and try again.");
@@ -272,12 +268,8 @@ export const validateImportFile = async (file) => {
 
   let res;
   try {
-    res = await fetch(`${API_ROOT}/import/validate`, {
+    res = await authFetch(`${API_ROOT}/import/validate`, {
       method: "POST",
-      credentials: "include",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: formData,
     });
   } catch {

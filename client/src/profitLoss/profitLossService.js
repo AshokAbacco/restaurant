@@ -1,7 +1,7 @@
 // ==============================================
 // client/src/profitLoss/profitLossService.js
 // ==============================================
-import { apiRequest } from "../api/apiClient";
+import { apiRequest, authFetch } from "../api/apiClient";
 
 const buildQuery = (params = {}) => {
   const query = new URLSearchParams();
@@ -87,15 +87,8 @@ export const fetchReportJSON = (params) =>
   get("/profit-loss/reports", params, "Failed to load report");
 
 export const downloadReport = async (params) => {
-  const { BASE_URL, getAccessToken } = await import("../api/apiClient");
-
-  const url = `${BASE_URL}/profit-loss/reports${buildQuery(params)}`;
-  const token = getAccessToken();
-
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  // authFetch: renews an expired token instead of failing with 401.
+  const res = await authFetch(`/profit-loss/reports${buildQuery(params)}`);
 
   if (!res.ok) {
     let message = "Failed to generate report";

@@ -1,3 +1,5 @@
+//  src/auth/AuthContext.jsx
+
 import React, {
   createContext,
   useContext,
@@ -6,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import authService from "./authService";
+import { onSessionExpired } from "../api/apiClient";
 
 // ==========================================
 // AUTH CONTEXT
@@ -111,6 +114,25 @@ export const AuthProvider = ({ children }) => {
       cancelled = true;
     };
   }, []);
+
+  // ==========================================
+  // GENUINE SESSION END
+  // apiClient only fires this when the server actually rejects the session
+  // (refresh token revoked / expired / account or outlet deactivated) or the
+  // user logged out in another tab — never for a slow network, a 500 or a
+  // server restart. Clearing state here makes ProtectedRoute redirect to the
+  // login screen cleanly instead of leaving a page full of failing requests.
+  // ==========================================
+
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        setUser(null);
+        setOutlets([]);
+        setIsAuthenticated(false);
+      }),
+    [],
+  );
 
   // ==========================================
   // REGISTER (public Owner signup)
@@ -221,10 +243,13 @@ export const AuthProvider = ({ children }) => {
   // ==========================================
 
   const logout = async () => {
-    await authService.logout();
-
-    setUser(null);
-    setIsAuthenticated(false);
+    try {
+      await authService.logout();
+    } finally {
+      setUser(null);
+      setOutlets([]);
+      setIsAuthenticated(false);
+    }
   };
 
   // ==========================================

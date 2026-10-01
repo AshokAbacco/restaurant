@@ -23,12 +23,50 @@ const isProd = process.env.NODE_ENV === "production";
 //
 // If you later serve the API and app from one domain, "lax" becomes the
 // stricter and better choice — this follows the deployment shape.
-const cookieOptions = {
+const baseCookieOptions = {
   httpOnly: true,
   secure: isProd, // required by SameSite=None, and correct in prod anyway
   sameSite: isProd ? "none" : "lax",
   path: "/api/auth", // only sent to auth endpoints
+};
+
+const cookieOptions = {
+  ...baseCookieOptions,
   maxAge: REFRESH_TOKEN_TTL_MS,
+};
+
+// FIX (logout not clearing the cookie in production): clearCookie() was
+// called with only { path }. A browser only overwrites a cookie whose
+// attributes match, and a cross-site response cookie without
+// SameSite=None; Secure is rejected outright — so in production the
+// "clear" was silently ignored. Use the same attributes it was set with.
+const clearRefreshCookie = (res) =>
+  res.clearCookie(REFRESH_COOKIE_NAME, baseCookieOptions);
+
+// FIX (automatic logouts every few minutes): the session used to depend
+// ENTIRELY on the refresh cookie reaching POST /api/auth/refresh. That
+// cookie has to be SameSite=None (cross-site, see above), and cross-site
+// ("third-party") cookies are blocked by Safari / every iPad & iPhone
+// browser (ITP), by Chrome in incognito, and by Chrome/Brave/Firefox when
+// third-party cookies are switched off. On those devices the cookie is
+// never sent, /refresh returns 401 the first time the short-lived access
+// token expires, and the user is thrown out — every ACCESS_TOKEN_TTL.
+//
+// The refresh token is now ALSO returned in the response body. The client
+// keeps it and sends it in the /refresh body only as a fallback when the
+// cookie didn't arrive. It's the same server-side token — still hashed in
+// the DB, still revoked on logout, still re-checked (account active,
+// outlet active, not expired) on every refresh.
+const readRefreshTokens = (req) => {
+  const fromCookie = req.cookies?.[REFRESH_COOKIE_NAME] || null;
+  const fromBody =
+    typeof req.body?.refreshToken === "string" && req.body.refreshToken
+      ? req.body.refreshToken
+      : null;
+  // Cookie first; body only if it's a different token.
+  return [fromCookie, fromBody].filter(
+    (t, i, all) => t && all.indexOf(t) === i,
+  );
 };
 
 // ==============================================
@@ -89,6 +127,7 @@ export const loginHandler = async (req, res) => {
     success: true,
     user: result.user,
     accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
   });
 };
 
@@ -115,6 +154,7 @@ export const selectOutletHandler = async (req, res) => {
     success: true,
     user: result.user,
     accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
   });
 };
 
@@ -123,12 +163,27 @@ export const selectOutletHandler = async (req, res) => {
 // ==============================================
 
 export const refreshHandler = async (req, res) => {
-  const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  const candidates = readRefreshTokens(req);
 
-  const result = await authService.refreshAccessToken(rawRefreshToken);
+  let result = {
+    success: false,
+    status: 401,
+    message: "No refresh token provided.",
+  };
+  let rawRefreshToken = null;
+
+  // A browser can hold a stale cookie (e.g. from before an outlet switch)
+  // while the client has the current token, or vice versa — try each.
+  for (const candidate of candidates) {
+    result = await authService.refreshAccessToken(candidate);
+    if (result.success) {
+      rawRefreshToken = candidate;
+      break;
+    }
+  }
 
   if (!result.success) {
-    res.clearCookie(REFRESH_COOKIE_NAME, { path: "/api/auth" });
+    clearRefreshCookie(res);
     return res
       .status(result.status)
       .json({ success: false, message: result.message });
@@ -144,6 +199,7 @@ export const refreshHandler = async (req, res) => {
   return res.status(200).json({
     success: true,
     accessToken: result.accessToken,
+    refreshToken: rawRefreshToken,
     user: result.user,
   });
 };
@@ -153,11 +209,12 @@ export const refreshHandler = async (req, res) => {
 // ==============================================
 
 export const logoutHandler = async (req, res) => {
-  const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  // Revoke every token this browser presented (cookie and/or body).
+  for (const token of readRefreshTokens(req)) {
+    await authService.logout(token);
+  }
 
-  await authService.logout(rawRefreshToken);
-
-  res.clearCookie(REFRESH_COOKIE_NAME, { path: "/api/auth" });
+  clearRefreshCookie(res);
 
   return res.status(200).json({ success: true });
 };
@@ -189,6 +246,7 @@ export const switchOutletHandler = async (req, res) => {
     success: true,
     user: result.user,
     accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
   });
 };
 

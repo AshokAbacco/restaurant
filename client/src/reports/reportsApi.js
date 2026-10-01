@@ -10,12 +10,7 @@
 // behavior as every other module (menu, inventory, expenses, etc.) — instead
 // of relying on cookies alone, which is what caused the earlier 401s.
 
-import {
-  apiRequest,
-  getAccessToken,
-  setAccessToken,
-  BASE_URL,
-} from "../api/apiClient";
+import { apiRequest, authFetch } from "../api/apiClient";
 
 // BASE_URL already includes "/api" (e.g. http://localhost:5001/api), and the
 // backend mounts reports at /api/reports — so we just append "/reports".
@@ -61,33 +56,9 @@ export function fetchTransactions(filters) {
  * blob case instead.
  */
 async function fetchExportBlob(path) {
-  const doFetch = () =>
-    fetch(`${BASE_URL}${path}`, {
-      credentials: "include",
-      headers: {
-        Accept: "*/*",
-        ...(getAccessToken()
-          ? { Authorization: `Bearer ${getAccessToken()}` }
-          : {}),
-      },
-    });
-
-  let res = await doFetch();
-
-  if (res.status === 401) {
-    const refreshResult = await apiRequest(
-      "/auth/refresh",
-      { method: "POST" },
-      { skipRefresh: true },
-    );
-
-    if (refreshResult.ok && refreshResult.data?.accessToken) {
-      setAccessToken(refreshResult.data.accessToken);
-      res = await doFetch();
-    }
-  }
-
-  return res;
+  // SESSION FIX: this had its own refresh that bypassed apiClient's shared
+  // refresh (no de-dupe, and it wiped the session on any failure).
+  return authFetch(path, { headers: { Accept: "*/*" } });
 }
 
 /**

@@ -8,6 +8,9 @@ import {
   apiRequest,
   setAccessToken,
   getAccessToken,
+  setRefreshToken,
+  getRefreshToken,
+  clearSession,
   refreshAccessToken,
 } from "../api/apiClient";
 
@@ -108,6 +111,9 @@ const login = async (identifier, password) => {
     };
   }
 
+  // Fallback copy for browsers that block the refresh cookie — see
+  // apiClient.js. Older servers don't send it; that's fine.
+  if (data.refreshToken) setRefreshToken(data.refreshToken);
   setAccessToken(data.accessToken);
 
   return { success: true, token: data.accessToken, user: data.user };
@@ -133,6 +139,9 @@ const selectOutlet = async (preAuthToken, outletId) => {
     };
   }
 
+  // Fallback copy for browsers that block the refresh cookie — see
+  // apiClient.js. Older servers don't send it; that's fine.
+  if (data.refreshToken) setRefreshToken(data.refreshToken);
   setAccessToken(data.accessToken);
 
   return { success: true, token: data.accessToken, user: data.user };
@@ -143,8 +152,25 @@ const selectOutlet = async (preAuthToken, outletId) => {
 // ==============================================
 
 const logout = async () => {
-  await apiRequest("/auth/logout", { method: "POST" }, { skipRefresh: true });
-  setAccessToken(null);
+  // Send the stored refresh token too, so the server can revoke it even on
+  // browsers that never sent the cookie. Clear local tokens no matter what —
+  // a network error must not leave the user "half logged in".
+  try {
+    await apiRequest(
+      "/auth/logout",
+      {
+        method: "POST",
+        body: JSON.stringify(
+          getRefreshToken() ? { refreshToken: getRefreshToken() } : {},
+        ),
+      },
+      { skipRefresh: true },
+    );
+  } catch (err) {
+    console.warn("Logout request failed; clearing local session anyway.", err);
+  } finally {
+    clearSession();
+  }
 };
 
 // ==============================================
@@ -183,23 +209,29 @@ const restoreSession = async () => {
   if (!getAccessToken()) {
     try {
       const refreshed = await refreshAccessToken();
-      if (!refreshed) return null; // genuinely no session — the cookie is gone
+      if (!refreshed) return null; // genuinely no session — server rejected it
     } catch {
-      // Network failure, not a rejection. Nothing cached to fall back on
-      // (no token at all), so this one really is a logged-out state.
+      // Network failure / server error, not a rejection. Nothing cached to
+      // fall back on (no access token at all), so we can't restore now.
       return null;
     }
   }
 
   try {
-    const { ok, data } = await apiRequest("/auth/me");
+    const { ok, status, data } = await apiRequest("/auth/me");
 
     if (!ok || !data?.success) {
-      // The SERVER actively rejected this session (expired/invalid token,
-      // deactivated account) — this is a real logout, not a connectivity
-      // issue, so clearing the token is correct here.
-      setAccessToken(null);
-      return null;
+      // FIX: this used to log the user out on ANY non-OK /auth/me — a 500
+      // during a deploy or a DB hiccup on page reload was enough. apiRequest
+      // has already tried a refresh on 401, so a 401/403 here is a genuine
+      // rejection (revoked / deactivated). Anything else is temporary: keep
+      // the session and restore what the token itself tells us.
+      if (status === 401 || status === 403) {
+        clearSession();
+        return null;
+      }
+      const user = decodeAccessTokenOffline({ allowExpired: true });
+      return user ? { user, outlets: [] } : null;
     }
 
     // FEATURE (multi-tenancy): /auth/me now also returns the account's
@@ -212,7 +244,13 @@ const restoreSession = async () => {
     // fetch() itself threw — no connectivity, not a server rejection.
     // Don't log the user out just because we can't reach the server
     // right now; fall back to what the token itself already tells us.
-    const user = decodeAccessTokenOffline();
+    //
+    // allowExpired: the token may have expired while offline/unreachable,
+    // but we still hold a refresh token, so the session isn't over — the
+    // server will renew (or genuinely reject) it as soon as it's reachable.
+    const user = decodeAccessTokenOffline({
+      allowExpired: Boolean(getRefreshToken()),
+    });
     return user ? { user, outlets: [] } : null;
   }
 };
@@ -223,7 +261,7 @@ const restoreSession = async () => {
 // specifically for "let a previously-logged-in user keep using the app
 // while offline," not a security boundary — every real write still goes
 // through the server, which independently verifies the token there.
-function decodeAccessTokenOffline() {
+function decodeAccessTokenOffline({ allowExpired = false } = {}) {
   const token = getAccessToken();
   if (!token) return null;
 
@@ -232,7 +270,7 @@ function decodeAccessTokenOffline() {
 
     // Respect the token's own expiry — an expired token shouldn't be
     // trusted just because we're offline and can't ask the server.
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
+    if (!allowExpired && payload.exp && payload.exp * 1000 < Date.now()) {
       return null;
     }
 
@@ -275,6 +313,9 @@ const switchOutlet = async (outletId) => {
     };
   }
 
+  // Fallback copy for browsers that block the refresh cookie — see
+  // apiClient.js. Older servers don't send it; that's fine.
+  if (data.refreshToken) setRefreshToken(data.refreshToken);
   setAccessToken(data.accessToken);
 
   return { success: true, token: data.accessToken, user: data.user };
