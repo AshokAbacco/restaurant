@@ -932,11 +932,13 @@ export const resetPassword = async (rawToken, newPassword) => {
     };
   }
 
-  if (newPassword.length < 8) {
+  // Same 6-character minimum as registration and change-password (see
+  // auth.validation.js), so a reset accepts any password signup accepts.
+  if (newPassword.length < 6) {
     return {
       success: false,
       status: 400,
-      message: "Password must be at least 8 characters.",
+      message: "Password must be at least 6 characters.",
     };
   }
 

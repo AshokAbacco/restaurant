@@ -606,7 +606,7 @@ const Login = () => {
                   is the only way in. Hidden during the outlet-selection
                   step, where the user is already mid-login and offering
                   "create an account" would just be confusing. */}
-              {!pendingOutletSelection && (
+              {/* {!pendingOutletSelection && (
                 <p className="mt-4 text-center text-sm text-[#5B6B5F] dark:text-[#9FB0A3]">
                   New to Restaurant ERP?{" "}
                   <Link
@@ -616,7 +616,7 @@ const Login = () => {
                     Create an owner account
                   </Link>
                 </p>
-              )}
+              )} */}
 
               <p className="text-center text-[#5B6B5F] dark:text-[#9FB0A3] text-xs mt-5 leading-6">
                 Restaurant ERP Management System
