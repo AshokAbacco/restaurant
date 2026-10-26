@@ -16,6 +16,7 @@ import {
 } from "./jwt.utils.js";
 import { sendPasswordResetEmail } from "./email.service.js";
 import { planExpiryFrom } from "../pricing/pricing.plans.js";
+import { ensureDefaultMenu } from "../../prisma/defaultMenu.seed.js";
 
 const SALT_ROUNDS = 12;
 const MAX_FAILED_ATTEMPTS = 15;
@@ -144,6 +145,13 @@ const resolveAccessibleOutlets = async (account) => {
 // selection step is needed) and selectOutlet() (after a selection step) —
 // issues the real session: access token + persisted refresh token.
 const finalizeLogin = async (account, outlet) => {
+  // Safety net for the default menu: if this outlet was never initialised
+  // (an account that existed before the default menu was introduced, or a
+  // registration whose seeding failed), give it its own copy now. A single
+  // indexed read once the outlet is initialised, and it never throws — a
+  // seeding problem must not block a login.
+  await ensureDefaultMenu(prisma, outlet.id);
+
   const accessToken = signAccessToken({
     sub: account.id,
     employeeId: account.employeeId,
@@ -403,6 +411,13 @@ export const registerOwner = async (payload = {}) => {
 
       return { organization, outlet, owner };
     });
+
+    // Give the new restaurant its own copy of the default menu (sections,
+    // categories, sub-categories, add-ons, items, kitchen branch). Done
+    // after the signup transaction commits, deliberately: the account
+    // must never fail to be created because of menu data. If this fails,
+    // Outlet.defaultMenuSeededAt stays null and the first login retries it.
+    await ensureDefaultMenu(prisma, created.outlet.id);
 
     // No session is issued here — registration and login stay separate
     // steps, so the owner lands on the existing Login page afterwards and

@@ -7,7 +7,8 @@
     "dev": "nodemon server.js",
     "start": "nodemon server.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed:menu": "node prisma/defaultMenu.seed.js"
   },
   "keywords": [],
   "author": "",

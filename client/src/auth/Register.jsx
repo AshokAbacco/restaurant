@@ -671,8 +671,10 @@ const Register = () => {
           </div>
 
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-[#1C2620] dark:text-white sm:text-4xl">
-            Restaurant{" "}
+            <a href="/" className="inline-flex items-center gap-1">
+              Restaurant{" "}
             <span className="text-[#22B368] dark:text-[#59C97A]">ERP</span>
+            </a>
           </h1>
 
           <p className="mt-2 text-sm text-[#5B6B5F] dark:text-[#9FB0A3] sm:text-base">

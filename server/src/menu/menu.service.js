@@ -10,6 +10,49 @@ class AppError extends Error {
   }
 }
 
+// ---------- Tenant isolation helpers ----------
+//
+// Every user's menu is their own copy (see prisma/defaultMenu.seed.js), and
+// every lookup below is already scoped by outletId. These two helpers close
+// the remaining gaps on WRITES, where req.body used to reach Prisma as-is:
+//
+//  1. scrubUpdate() — drops fields that must never change through an edit.
+//     Without it, PUT { "outletId": "<someone else's outlet>" } would move
+//     a category/item straight into another user's menu, and a nested
+//     relation write ({ "category": { "connect": { "id": ... } } }) could
+//     attach a row to another user's data. JSON has no legitimate
+//     object-valued scalar fields here, so all object values are dropped.
+//
+//  2. assertOwnedRefs() — any category / sub-category / kitchen section id
+//     a menu item points at must belong to the SAME outlet.
+const LOCKED_FIELDS = ["id", "outletId", "createdAt", "updatedAt"];
+
+const scrubUpdate = (data = {}, extraLocked = []) => {
+  const locked = new Set([...LOCKED_FIELDS, ...extraLocked]);
+  const out = {};
+  for (const [k, v] of Object.entries(data ?? {})) {
+    if (locked.has(k)) continue;
+    if (v !== null && typeof v === "object") continue;
+    out[k] = v;
+  }
+  return out;
+};
+
+const assertOwnedRefs = async ({ categoryId, subCategoryId, kitchenSectionId } = {}, outletId) => {
+  if (categoryId) {
+    const category = await repo.findCategoryById(categoryId, outletId);
+    if (!category) throw new AppError("Category does not exist", 400);
+  }
+  if (subCategoryId) {
+    const sub = await repo.findSubCategoryById(subCategoryId, outletId);
+    if (!sub) throw new AppError("Sub category does not exist", 400);
+  }
+  if (kitchenSectionId) {
+    const section = await repo.findKitchenSectionById(kitchenSectionId, outletId);
+    if (!section) throw new AppError("Kitchen section does not exist", 400);
+  }
+};
+
 // ---------- Category ----------
 
 export const listCategories = (outletId) => repo.findAllCategories(outletId);
@@ -34,7 +77,7 @@ export const addCategory = (data, outletId) =>
 
 export const editCategory = async (id, data, outletId) => {
   await getCategory(id, outletId); // throws 404 if missing or another outlet's
-  return repo.updateCategory(id, data);
+  return repo.updateCategory(id, scrubUpdate(data));
 };
 
 export const removeCategory = async (id, outletId) => {
@@ -55,6 +98,11 @@ export const getMenuItem = async (id, outletId) => {
 export const addMenuItem = async (data, outletId) => {
   const category = await repo.findCategoryById(data.categoryId, outletId);
   if (!category) throw new AppError("Category does not exist", 400);
+  // Sub-category and kitchen section must be this outlet's own, too.
+  await assertOwnedRefs(
+    { subCategoryId: data.subCategoryId, kitchenSectionId: data.kitchenSectionId },
+    outletId,
+  );
 
   const existingSku = await repo.findMenuItemBySku(data.sku, outletId);
   if (existingSku) throw new AppError("SKU already exists", 409);
@@ -89,10 +137,8 @@ export const addMenuItem = async (data, outletId) => {
 export const editMenuItem = async (id, data, outletId) => {
   await getMenuItem(id, outletId); // throws 404 if missing or another outlet's
 
-  if (data.categoryId) {
-    const category = await repo.findCategoryById(data.categoryId, outletId);
-    if (!category) throw new AppError("Category does not exist", 400);
-  }
+  data = scrubUpdate(data);
+  await assertOwnedRefs(data, outletId);
 
   if (data.sku) {
     const existing = await repo.findMenuItemBySku(data.sku, outletId);
@@ -137,7 +183,10 @@ export const addSubCategory = async (data, outletId) => {
 
 export const editSubCategory = async (id, data, outletId) => {
   await getSubCategory(id, outletId);
-  return repo.updateSubCategory(id, data);
+  const clean = scrubUpdate(data);
+  // Moving a sub-category is fine, but only under this outlet's categories.
+  await assertOwnedRefs({ categoryId: clean.categoryId }, outletId);
+  return repo.updateSubCategory(id, clean);
 };
 
 export const removeSubCategory = async (id, outletId) => {
@@ -163,7 +212,7 @@ export const addKitchenSection = async (data, outletId) => {
 
 export const editKitchenSection = async (id, data, outletId) => {
   await getKitchenSection(id, outletId);
-  return repo.updateKitchenSection(id, data);
+  return repo.updateKitchenSection(id, scrubUpdate(data));
 };
 
 export const removeKitchenSection = async (id, outletId) => {
@@ -196,7 +245,8 @@ export const addVariant = async (menuItemId, data, outletId) => {
 export const editVariant = async (id, data, outletId) => {
   const variant = await repo.findVariantById(id, outletId);
   if (!variant) throw new AppError("Variant not found", 404);
-  return repo.updateVariant(id, data);
+  // menuItemId locked: a variant can't be re-parented onto another item.
+  return repo.updateVariant(id, scrubUpdate(data, ["menuItemId"]));
 };
 
 export const removeVariant = async (id, outletId) => {
@@ -219,7 +269,7 @@ export const addAddOn = (data, outletId) => {
 export const editAddOn = async (id, data, outletId) => {
   const addOn = await repo.findAddOnById(id, outletId);
   if (!addOn) throw new AppError("Add-on not found", 404);
-  return repo.updateAddOn(id, data);
+  return repo.updateAddOn(id, scrubUpdate(data));
 };
 
 export const removeAddOn = async (id, outletId) => {
@@ -277,7 +327,7 @@ export const addCombo = (data, outletId) => {
 
 export const editCombo = async (id, data, outletId) => {
   await getCombo(id, outletId);
-  return repo.updateCombo(id, data);
+  return repo.updateCombo(id, scrubUpdate(data));
 };
 
 export const removeCombo = async (id, outletId) => {
