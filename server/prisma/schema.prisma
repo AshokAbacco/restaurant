@@ -656,6 +656,13 @@ model Outlet {
   showBillBarcode Boolean @default(true)
   billFooterNote  String? // e.g. "Thank you! Free Wi-Fi: RoyalSpiceGuest"
 
+  // ── Default menu (prisma/defaultMenu.seed.js) ──────────────────────────
+  // When this outlet received its own copy of the default menu sections,
+  // categories, add-ons, items and kitchen branches. Null = not yet. Once
+  // set, the seeder never touches this outlet again, so a user's edits and
+  // deletions are permanent and never "reset" back to the defaults.
+  defaultMenuSeededAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

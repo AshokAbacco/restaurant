@@ -101,7 +101,11 @@ const ForgotPassword = () => {
             </div>
 
             <div>
-              <h1 className="text-4xl font-bold">Restaurant ERP</h1>
+              <h1 className="text-4xl font-bold">
+                <a href="/" className="flex items-center gap-2">
+                  Restaurant ERP
+                </a>
+              </h1>
 
               <p className="text-blue-100 mt-2">Password Recovery Portal</p>
             </div>

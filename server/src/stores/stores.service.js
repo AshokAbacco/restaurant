@@ -14,6 +14,7 @@
 // organizationId, not outletId, and the controller reads
 // req.tenant.organizationId rather than req.tenant.outletId.
 import prisma from "../config/prisma.js";
+import { ensureDefaultMenu } from "../../prisma/defaultMenu.seed.js";
 
 export const getAllOutlets = (organizationId) =>
   prisma.outlet.findMany({
@@ -93,6 +94,11 @@ export const createOutlet = async (data, organizationId) => {
       timezone: data.timezone || undefined, // let the schema default (Asia/Kolkata) apply if omitted
     },
   });
+
+  // Every new branch starts with its own independent copy of the default
+  // menu — not a link to another branch's menu, so editing one branch's
+  // menu never changes another's. Never throws; retried on next login.
+  await ensureDefaultMenu(prisma, outlet.id);
 
   return { outlet, usage: await getBranchUsage(organizationId) };
 };

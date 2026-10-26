@@ -314,7 +314,9 @@ const Login = () => {
 
         <div className="relative z-10 flex flex-col justify-center px-10 lg:px-12 xl:px-20 w-full py-10">
           <p className="text-[#22B368] dark:text-[#59C97A] text-3xl xl:text-4xl font-extrabold tracking-tight mb-5.5">
-            Restaurant ERP
+            <a href="/" className="flex items-center gap-2">
+              Restaurant ERP
+            </a>
           </p>
 
           <h1 className="text-xl lg:text-2xl xl:text-[1.85rem] font-extrabold leading-[1.15] text-[#1C2620] dark:text-white">
