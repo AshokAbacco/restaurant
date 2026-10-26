@@ -138,17 +138,17 @@ const Navbar = () => {
             <>
               <Link
                 to="/login"
-                className="hidden rounded-full px-4 py-2.5 text-[14.5px] font-semibold text-[#171C17] transition-colors hover:bg-[#E9EDE1] sm:block"
+                className="rounded-full bg-[#3FA34D] px-5 py-2.5 text-[14.5px] font-semibold text-white shadow-[0_10px_24px_-14px_rgba(63,163,77,0.95)] transition-transform duration-200 hover:-translate-y-px"
               >
                 Sign in
               </Link>
 
-              <Link
+              {/* <Link
                 to="/register"
                 className="rounded-full bg-[#3FA34D] px-5 py-2.5 text-[14.5px] font-semibold text-white shadow-[0_10px_24px_-14px_rgba(63,163,77,0.95)] transition-transform duration-200 hover:-translate-y-px"
               >
                 Start free trial
-              </Link>
+              </Link> */}
             </>
           )}
 
