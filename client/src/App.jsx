@@ -22,6 +22,7 @@ import ComingSoon from "./landing/ComingSoon";
 import Pricing from "./landing/pages/Pricing";
 import ContactUs from "./landing/pages/ContactUs";
 import ScrollToTop from "./components/ScrollToTop";
+import Products from "./landing/pages/Products";
 // ==============================================
 // Auth
 // ==============================================
@@ -92,118 +93,117 @@ function App() {
     // The outer boundary covers the shells — auth layout, admin layout,
     // kiosk. Nothing inside the public site suspends, so a first-time
     // visitor never sees this fallback at all.
-    
+
     <>
-   
-    <ScrollToTop />
-    <Suspense fallback={<RouteFallback />}>
-     
-      <Routes>
-          
-        {/* ==========================================
+      <ScrollToTop />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          {/* ==========================================
           PUBLIC SITE
            
       ========================================== */}
 
-        <Route element={<LandingLayout />}>
-          <Route path="/" element={<Home />} />
+          <Route element={<LandingLayout />}>
+            <Route path="/" element={<Home />} />
 
-          <Route path="/about" element={<ComingSoon title="About" />} />
+            <Route path="/about" element={<ComingSoon title="About" />} />
 
-          <Route path="/services" element={<ComingSoon title="Services" />} />
+            <Route path="/services" element={<ComingSoon title="Services" />} />
 
-          <Route path="/pricing" element={<Pricing />} />
+            <Route path="/pricing" element={<Pricing />} />
 
-          <Route path="/contact" element={<ContactUs />} />
-        </Route>
+            <Route path="/products" element={<Products />} />
 
-        {/* ==========================================
+            <Route path="/contact" element={<ContactUs />} />
+          </Route>
+
+          {/* ==========================================
           PUBLIC ROUTES
       ========================================== */}
 
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<Login />} />
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<Login />} />
 
-          {/* Public Owner signup. Only the OWNER role can self-register —
+            {/* Public Owner signup. Only the OWNER role can self-register —
             staff accounts are created from inside the app by the logged-in
             owner (Employees module), never from here. */}
-          <Route path="/register" element={<Register />} />
+            <Route path="/register" element={<Register />} />
 
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
-          <Route path="/reset-password" element={<ResetPassword />} />
-        </Route>
+            <Route path="/reset-password" element={<ResetPassword />} />
+          </Route>
 
-        {/* ==========================================
+          {/* ==========================================
           KIOSK ROUTES
           (No Login Required)
       ========================================== */}
 
-        <Route path="/kiosk/*" element={<KioskRoutes />} />
+          <Route path="/kiosk/*" element={<KioskRoutes />} />
 
-        {/* ==========================================
+          {/* ==========================================
           PROTECTED ADMIN ROUTES
       ========================================== */}
 
-        <Route element={<ProtectedRoute />}>
-          <Route element={<AdminLayout />}>
-            {/* An inner boundary, so a module's chunk loads inside the
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AdminLayout />}>
+              {/* An inner boundary, so a module's chunk loads inside the
               shell instead of replacing it. See RouteFallback.jsx. */}
-            <Route element={<SuspenseOutlet />}>
-              {/* Dashboard */}
+              <Route element={<SuspenseOutlet />}>
+                {/* Dashboard */}
 
-              <Route path="/dashboard/*" element={<DashboardRoutes />} />
+                <Route path="/dashboard/*" element={<DashboardRoutes />} />
 
-              {/* Profile */}
+                {/* Profile */}
 
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/change-password" element={<ChangePassword />} />
-              <Route path="/help" element={<HelpSupport />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/change-password" element={<ChangePassword />} />
+                <Route path="/help" element={<HelpSupport />} />
 
-              {/* Menu */}
+                {/* Menu */}
 
-              <Route path="/menu/*" element={<MenuRoutes />} />
+                <Route path="/menu/*" element={<MenuRoutes />} />
 
-              {/* POS */}
+                {/* POS */}
 
-              <Route path="/pos/*" element={<PosRoutes />} />
-              <Route path="/tables/*" element={<Tables />} />
-              <Route path="/kitchen/*" element={<KitchenRoutes />} />
-              <Route path="/billing/*" element={<BillingRoutes />} />
-              <Route path="/payments/*" element={<PaymentRoutes />} />
+                <Route path="/pos/*" element={<PosRoutes />} />
+                <Route path="/tables/*" element={<Tables />} />
+                <Route path="/kitchen/*" element={<KitchenRoutes />} />
+                <Route path="/billing/*" element={<BillingRoutes />} />
+                <Route path="/payments/*" element={<PaymentRoutes />} />
 
-              {/* Reports */}
-              <Route path="/reports/*" element={<ReportsRoutes />} />
-              <Route
-                path="/counter-summary/*"
-                element={<CounterSummaryRoutes />}
-              />
+                {/* Reports */}
+                <Route path="/reports/*" element={<ReportsRoutes />} />
+                <Route
+                  path="/counter-summary/*"
+                  element={<CounterSummaryRoutes />}
+                />
 
-              {/* Profit Loss */}
-              <Route path="/profit-loss/*" element={<ProfitLossRoutes />} />
+                {/* Profit Loss */}
+                <Route path="/profit-loss/*" element={<ProfitLossRoutes />} />
 
-              {/* Inventory */}
-              <Route path="/inventory/*" element={<InventoryRoutes />} />
-              <Route path="/expenses/*" element={<ExpenseRoutes />} />
+                {/* Inventory */}
+                <Route path="/inventory/*" element={<InventoryRoutes />} />
+                <Route path="/expenses/*" element={<ExpenseRoutes />} />
 
-              {/* CRM — gated inside CrmRoutes on Settings -> CRM */}
-              <Route path="/crm/*" element={<CrmRoutes />} />
+                {/* CRM — gated inside CrmRoutes on Settings -> CRM */}
+                <Route path="/crm/*" element={<CrmRoutes />} />
 
-              {/* Employees */}
-              <Route path="/employees/*" element={<EmployeesRoutes />} />
+                {/* Employees */}
+                <Route path="/employees/*" element={<EmployeesRoutes />} />
 
-              {/* Settings */}
+                {/* Settings */}
 
-              <Route path="/settings/*" element={<SettingsRoutes />} />
-              <Route
-                path="/table-reservations"
-                element={<TableReservation />}
-              />
+                <Route path="/settings/*" element={<SettingsRoutes />} />
+                <Route
+                  path="/table-reservations"
+                  element={<TableReservation />}
+                />
+              </Route>
             </Route>
           </Route>
-        </Route>
 
-        {/* ==========================================
+          {/* ==========================================
           DEFAULT ROUTE
 
           "/" used to redirect to /dashboard. It renders the public
@@ -212,13 +212,13 @@ function App() {
           is unchanged.
       ========================================== */}
 
-        {/* ==========================================
+          {/* ==========================================
           NOT FOUND
       ========================================== */}
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Suspense>
     </>
   );
 }
