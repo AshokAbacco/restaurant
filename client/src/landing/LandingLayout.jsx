@@ -8,7 +8,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/plus-jakarta-sans";
 
-import GlowCursor from "@/components/GlowCursor";
+
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import "./landing.css";
