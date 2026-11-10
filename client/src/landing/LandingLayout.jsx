@@ -39,20 +39,6 @@ const LandingLayout = () => (
   <div className="lp-root min-h-screen">
     <ScrollToTop />
 
-    <GlowCursor
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        pointerEvents: "none",
-        width: "100vw",
-        height: "100vh",
-      }}
-      blendMode="normal"
-      color="#09a743"
-      secondaryColor="#3fa34d"
-    />
-
     <Navbar />
 
     <main id="main">
