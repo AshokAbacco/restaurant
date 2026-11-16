@@ -9,7 +9,7 @@
 // HOW TO ADD PHOTOS FOR A PRODUCT (2 steps)
 // ----------------------------------------------
 // 1. Drop the files in  src/landing/images/products/  and name them
-//        <product-id>-1.png, <product-id>-2.png, <product-id>-3.png
+//        <product-id>-1.webp, <product-id>-2.png, <product-id>-3.png
 //    (the id is shown in the comment above each block below).
 //    If a file is .jpg or .png, change the extension in its import line.
 //
