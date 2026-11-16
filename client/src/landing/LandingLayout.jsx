@@ -8,7 +8,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/plus-jakarta-sans";
 
-import GlowCursor from "@/components/GlowCursor";
+
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import "./landing.css";
@@ -38,20 +38,6 @@ const ScrollToTop = () => {
 const LandingLayout = () => (
   <div className="lp-root min-h-screen">
     <ScrollToTop />
-
-    <GlowCursor
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        pointerEvents: "none",
-        width: "100vw",
-        height: "100vh",
-      }}
-      blendMode="normal"
-      color="#09a743"
-      secondaryColor="#3fa34d"
-    />
 
     <Navbar />
 
