@@ -84,6 +84,10 @@ const InventoryRoutes = lazy(() => import("./inventory/inventoryRoutes"));
 const EmployeesRoutes = lazy(() => import("./employees/employeesRoutes"));
 const CrmRoutes = lazy(() => import("./CRM/crmRoutes"));
 
+// Platform admin (SaaS operator console) — separate login at /platform/login
+const PlatformRoutes = lazy(() => import("./platform/PlatformRoutes"));
+const SupportMessages = lazy(() => import("./profile/SupportMessages"));
+
 // ==============================================
 // APP
 // ==============================================
@@ -142,6 +146,11 @@ function App() {
           <Route path="/kiosk/*" element={<KioskRoutes />} />
 
           {/* ==========================================
+          PLATFORM ADMIN (own login + session, no restaurant auth)
+      ========================================== */}
+          <Route path="/platform/*" element={<PlatformRoutes />} />
+
+          {/* ==========================================
           PROTECTED ADMIN ROUTES
       ========================================== */}
 
@@ -159,6 +168,7 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/change-password" element={<ChangePassword />} />
                 <Route path="/help" element={<HelpSupport />} />
+                <Route path="/help/messages" element={<SupportMessages />} />
 
                 {/* Menu */}
 

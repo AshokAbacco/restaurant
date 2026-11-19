@@ -66,6 +66,73 @@ export const PLANS = {
   },
 };
 
+// ==============================================
+// DB-managed plans (Platform admin -> Plans)
+// ==============================================
+// The PLANS object above is the built-in default. Once the platform admin
+// has PlatformPlan rows, syncPlansFromDb() rewrites PLANS *in place* from
+// the active rows, so every existing importer (pricing.service.js,
+// auth.service.js, the invoice PDF) immediately sees new prices, new plans
+// and deactivated plans without any of them changing. Called at boot and
+// after every plan create/update/deactivate in /api/platform/plans.
+//
+// Plans are keyed by PlatformPlan.code, which is also what lands in
+// Organization.planId — so "free" / "monthly" / "yearly" keep working.
+
+const BUILTIN_PLANS = JSON.parse(JSON.stringify(PLANS));
+
+export const builtinPlans = () => JSON.parse(JSON.stringify(BUILTIN_PLANS));
+
+const rowToPlan = (row) => {
+  const features = Array.isArray(row.features) ? row.features : [];
+  if (row.isTrial) {
+    return {
+      id: row.code,
+      name: row.name,
+      isFree: true,
+      trialDays: row.trialDays || row.durationDays || 30,
+      gstRate: row.gstRate,
+      maxBranches: 1,
+      features,
+    };
+  }
+  const tiers =
+    row.tiers && typeof row.tiers === "object" && Object.keys(row.tiers).length
+      ? row.tiers
+      : {
+          standard: { label: "Standard", price: row.price },
+          custom: { label: "Custom", price: row.price },
+        };
+  return {
+    id: row.code,
+    name: row.name,
+    cycle: row.cycle === "year" ? "year" : "month",
+    months: Math.max(1, row.months || (row.cycle === "year" ? 12 : 1)),
+    gstRate: row.gstRate,
+    maxBranches: row.maxBranches || 50,
+    tiers,
+    features,
+  };
+};
+
+export const syncPlansFromDb = async (prisma) => {
+  let rows = [];
+  try {
+    rows = await prisma.platformPlan.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+    });
+  } catch (err) {
+    console.warn("[pricing] could not load plans from DB, using built-ins:", err.message);
+    return Object.keys(PLANS);
+  }
+  if (!rows.length) return Object.keys(PLANS);
+
+  for (const key of Object.keys(PLANS)) delete PLANS[key];
+  for (const row of rows) PLANS[row.code] = rowToPlan(row);
+  return Object.keys(PLANS);
+};
+
 /** Feature list for a plan id, for the invoice PDF. Never throws. */
 export const planFeatures = (planId) => PLANS[planId]?.features || [];
 
@@ -94,6 +161,7 @@ export const priceQuote = ({ planId, tierKey, branches }) => {
       tierKey: null,
       tierLabel: "Free trial",
       cycle: "trial",
+      trialDays: plan.trialDays || 30,
       // A free trial is one branch, full stop — an unchecked `branches`
       // value here would hand out a 5-branch entitlement for ₹0.
       branches: 1,
@@ -110,9 +178,9 @@ export const priceQuote = ({ planId, tierKey, branches }) => {
     throw new Error(`Unknown tier "${tierKey}" for plan "${planId}".`);
   }
 
-  const n = Math.max(1, Math.min(50, Number(branches) || 1));
+  const n = Math.max(1, Math.min(plan.maxBranches || 50, Number(branches) || 1));
   const subtotal = tier.price * n * plan.months;
-  const gst = Math.round(subtotal * GST_RATE);
+  const gst = Math.round(subtotal * (plan.gstRate ?? GST_RATE));
   const total = subtotal + gst;
 
   return {
@@ -143,7 +211,7 @@ export const planExpiryFrom = (quote, startedAt = new Date()) => {
   const expiry = new Date(startedAt);
 
   if (quote.isFree) {
-    expiry.setDate(expiry.getDate() + 30);
+    expiry.setDate(expiry.getDate() + (quote.trialDays || 30));
     return expiry;
   }
 

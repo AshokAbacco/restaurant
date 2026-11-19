@@ -27,7 +27,7 @@ const INTRO = [
 ];
 
 const PRIMARY = { label: "Start Now", to: "/login" };
-const SECONDARY = { label: "Book Demo", to: "/contact-us" };
+const SECONDARY = { label: "Book Demo", to: "/contact" };
 
 const HIGHLIGHTS = [
   { title: "Smart POS", sub: "Orders & billing" },

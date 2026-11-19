@@ -30,6 +30,14 @@ import dashboardRoutes from "./dashboard/dashboard.routes.js";
 import printerProfilesRoutes from "./printer-profiles/printerProfiles.routes.js";
 import crmRoutes from "./crm/crm.routes.js";
 
+// Platform admin (/platform in the client) + restaurant-side support inbox
+import platformRoutes from "./platform/platform.routes.js";
+import supportRoutes from "./support/support.routes.js";
+import { withWebhookLog } from "./platform/webhooks.controller.js";
+import { requestMetrics, logServerError } from "./platform/health.monitor.js";
+import { trackUsage } from "./platform/usage.tracker.js";
+import { notifyOnSuccess } from "./platform/notify.js";
+
 const app = express();
 console.log("🚀 USING UPDATED INDEX.JS - KIOSK WITHOUT STAFF AUTH");
 app.use(
@@ -39,11 +47,16 @@ app.use(
   }),
 );
 
+// Platform observability: response-time metrics for the Health page and
+// per-restaurant feature usage for the Activity page. Both only attach
+// `finish` listeners — they never delay or alter a response.
+app.use(requestMetrics);
+app.use(trackUsage);
 
 app.post(
   "/api/pricing/webhook",
   express.raw({ type: "application/json" }),
-  razorpayWebhookHandler,
+  withWebhookLog("razorpay", razorpayWebhookHandler),
 );
 
 app.use(express.json());
@@ -56,11 +69,44 @@ app.get("/", (req, res) => {
 // ==============================================
 // AUTH (public + a couple of protected endpoints handled inside auth.routes.js)
 // ==============================================
+// Platform team alerts (Settings -> Team notifications). Only observe the
+// response; the routes themselves are unchanged.
+const signupAlert = (req) =>
+  `New restaurant signed up: ${req.body?.restaurantName} — ${req.body?.fullName} <${req.body?.email}>, ${req.body?.phone}`;
+signupAlert.subject = "New restaurant signup";
+app.post("/api/auth/register", notifyOnSuccess("onNewSignup", signupAlert));
+app.post(
+  "/api/pricing/verify-payment",
+  notifyOnSuccess(
+    "payment",
+    (req, ok) =>
+      `${ok ? "Checkout payment verified" : "Checkout verification FAILED"} — Razorpay order ${req.body?.razorpay_order_id || req.body?.orderId || "?"}`,
+  ),
+);
+const enquiryAlert = (req) =>
+  `New website enquiry from ${req.body?.fullName} (${req.body?.restaurantName}) <${req.body?.email}>, ${req.body?.phone}:\n\n${req.body?.message || ""}`;
+enquiryAlert.subject = "New website enquiry";
+app.post("/api/contact", notifyOnSuccess("onEnquiry", enquiryAlert));
+
 app.use("/api/auth", authRoutes);
 
 app.use("/api/pricing", pricingRoutes);
 
 app.use("/api/contact", contactRoutes);
+
+// ==============================================
+// PLATFORM ADMIN — separate login, separate token (see platform.auth.js).
+// Must be mounted before the catch-all `app.use("/api", requireAuth, ...)`.
+// ==============================================
+app.use("/api/platform", platformRoutes);
+
+// Restaurant <-> platform team messaging (restaurant side).
+app.use(
+  "/api/support",
+  requireAuth,
+  requireRole("OWNER", "ADMIN", "MANAGER"),
+  supportRoutes,
+);
 
 // ==============================================
 // PROTECTED MODULES
@@ -140,7 +186,15 @@ app.use(
   "/api/kitchen-branches",
   requireAuth,
   requireOutletContext,
-  requireRole("OWNER", "ADMIN", "MANAGER", "CASHIER", "WAITER", "CHEF", "KITCHEN"),
+  requireRole(
+    "OWNER",
+    "ADMIN",
+    "MANAGER",
+    "CASHIER",
+    "WAITER",
+    "CHEF",
+    "KITCHEN",
+  ),
   kitchenBranchesRoutes,
 );
 app.use(
@@ -169,12 +223,7 @@ app.use(
 );
 
 // Dashboard
-app.use(
-  "/api/dashboard",
-  requireAuth,
-  requireOutletContext,
-  dashboardRoutes,
-);
+app.use("/api/dashboard", requireAuth, requireOutletContext, dashboardRoutes);
 
 // CRM — customer profiles, purchase history, groups, notes, follow-ups.
 // Same roles as the POS, because staff pick/add customers while taking an
@@ -193,7 +242,15 @@ app.use(
   "/api/pos/printer-profiles",
   requireAuth,
   requireOutletContext,
-  requireRole("OWNER", "ADMIN", "MANAGER", "CASHIER", "WAITER", "CHEF", "KITCHEN"),
+  requireRole(
+    "OWNER",
+    "ADMIN",
+    "MANAGER",
+    "CASHIER",
+    "WAITER",
+    "CHEF",
+    "KITCHEN",
+  ),
   printerProfilesRoutes,
 );
 
@@ -202,6 +259,8 @@ app.use(
 // ==============================================
 app.use((err, req, res, next) => {
   console.error(err);
+  if (!err.status || err.status >= 500)
+    logServerError(err, req, err.status || 500);
   res.status(err.status || 500).json({
     success: false,
     message: err.expose

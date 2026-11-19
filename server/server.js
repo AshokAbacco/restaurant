@@ -2,11 +2,15 @@ import "dotenv/config";
 import app from "./src/index.js";
 import prisma from "./prisma/client.js";
 import { seedDefaultMenuForAllOutlets } from "./prisma/defaultMenu.seed.js";
+import { bootstrapPlatform } from "./src/platform/platform.bootstrap.js";
 
 const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+
+  // Platform admin: first super admin, DB-managed plans, monitors, automations.
+  bootstrapPlatform();
 
   // Give every EXISTING user's outlets the default menu, once each.
   // Runs in the background so it never delays startup, and is idempotent:
@@ -18,9 +22,13 @@ app.listen(PORT, () => {
     seedDefaultMenuForAllOutlets(prisma)
       .then(({ pending, seeded, failed }) => {
         if (pending) {
-          console.log(`🍽️  Default menu: ${seeded} outlet(s) initialised, ${failed} failed.`);
+          console.log(
+            `🍽️  Default menu: ${seeded} outlet(s) initialised, ${failed} failed.`,
+          );
         }
       })
-      .catch((err) => console.error("🍽️  Default menu backfill failed:", err.message));
+      .catch((err) =>
+        console.error("🍽️  Default menu backfill failed:", err.message),
+      );
   }
 });

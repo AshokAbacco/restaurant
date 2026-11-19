@@ -8,7 +8,8 @@
     "start": "nodemon server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed:menu": "node prisma/defaultMenu.seed.js"
+    "seed:menu": "node prisma/defaultMenu.seed.js",
+    "platform:admin": "node scripts/createPlatformAdmin.js"
   },
   "keywords": [],
   "author": "",

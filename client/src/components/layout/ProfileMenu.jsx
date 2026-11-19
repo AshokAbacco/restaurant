@@ -13,6 +13,7 @@ import {
   FiSettings,
   FiLock,
   FiHelpCircle,
+  FiMessageSquare,
   FiLogOut,
   FiX,
 } from "react-icons/fi";
@@ -177,6 +178,22 @@ const ProfileMenu = () => {
                 </p>
               </div>
             </Link> */}
+
+            <Link
+              to="/help/messages"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-4 px-5 py-4 hover:bg-[#F3F5EE] dark:hover:bg-[#1E241E] transition-colors"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#F3F5EE] dark:bg-[#232A22] flex items-center justify-center text-[#1F2937] dark:text-white">
+                <FiMessageSquare />
+              </div>
+
+              <div>
+                <h4 className="font-medium text-[#1F2937] dark:text-white">Support messages</h4>
+
+                <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">Chat with the platform team</p>
+              </div>
+            </Link>
 
             <Link
               to="/help"
