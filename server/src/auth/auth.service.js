@@ -409,6 +409,16 @@ export const registerOwner = async (payload = {}) => {
         },
       });
 
+      // Platform admin: tie the signup payment to the organization too, so
+      // /platform payments + revenue can group every payment by tenant
+      // (renewals recorded later carry organizationId directly).
+      if (payment) {
+        await tx.pricingPayment.update({
+          where: { id: payment.id },
+          data: { organizationId: organization.id },
+        });
+      }
+
       return { organization, outlet, owner };
     });
 
@@ -501,6 +511,16 @@ export const login = async (identifier, password) => {
       success: false,
       status: 403,
       message: "This account has been deactivated.",
+    };
+  }
+
+  // Suspended by the platform team (/platform/restaurants -> Suspend).
+  if (account.organization && account.organization.isActive === false) {
+    return {
+      success: false,
+      status: 403,
+      message:
+        "This restaurant's account is suspended. Please contact support to restore access.",
     };
   }
 
@@ -654,6 +674,15 @@ export const refreshAccessToken = async (rawRefreshToken) => {
       success: false,
       status: 403,
       message: "This account has been deactivated.",
+    };
+  }
+
+  if (account.organization && account.organization.isActive === false) {
+    return {
+      success: false,
+      status: 403,
+      message:
+        "This restaurant's account is suspended. Please contact support to restore access.",
     };
   }
 

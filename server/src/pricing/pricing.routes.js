@@ -8,6 +8,7 @@
 // pricing.controller.js's webhookHandler for details.
 
 import { Router } from "express";
+import { publicPlansHandler } from "../platform/plans.controller.js";
 import {
   createOrderHandler,
   verifyPaymentHandler,
@@ -21,5 +22,9 @@ const router = Router();
 router.post("/create-order", createOrderHandler);
 router.post("/verify-payment", verifyPaymentHandler);
 router.get("/payments/:id", getPaymentHandler);
+
+// Public list of active plans managed from /platform/plans, so the Pricing
+// page can render live prices instead of its hardcoded copy.
+router.get("/plans", publicPlansHandler);
 
 export default router;

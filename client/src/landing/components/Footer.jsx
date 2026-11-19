@@ -17,7 +17,7 @@ const BG_IMAGE = "/images/small-img.png";
 const BRAND = {
   name: "Abacco Technolog",
   email: "info@abaccotech.com",
-  phone: "+91 80 4718 2200",
+  phone: "+91 99724 52044",
   address: "Vidyaranyapura, Bengaluru, Karnataka 560097",
 };
 

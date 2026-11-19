@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { BASE_URL } from "../../api/apiClient";
 import {
   createPricingOrder,
   verifyPricingPayment,
@@ -223,7 +224,43 @@ const emptyForm = {
   notes: "",
 };
 
+// Live prices from /platform/plans (GET /api/pricing/plans). The server's
+// checkout already charges these, so the cards must show the same numbers.
+// Only the three plans this page has cards for are synced; names, prices,
+// compare-at prices, trial length and feature lists come from the admin.
+const applyLivePlans = (rows) => {
+  let changed = false;
+  for (const row of rows || []) {
+    const plan = PLANS[row.code];
+    if (!plan) continue;
+    plan.name = row.name || plan.name;
+    if (row.description) plan.sub = row.description;
+    if (Array.isArray(row.features) && row.features.length) plan.features = row.features;
+    if (plan.tiers && !row.isTrial) {
+      for (const t of Object.values(plan.tiers)) {
+        t.price = row.price;
+        t.mrp = row.comparePrice || Math.max(t.mrp, row.price);
+      }
+    }
+    changed = true;
+  }
+  return changed;
+};
+
 export default function Pricing() {
+  const [, setPlansVersion] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    fetch(`${BASE_URL}/pricing/plans`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d?.plans && applyLivePlans(d.plans)) setPlansVersion((v) => v + 1);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [tier, setTier] = useState({ monthly: "standard", yearly: "standard" });
   const [branches, setBranches] = useState({ monthly: 1, yearly: 1 });
   const [extraNeeds, setExtraNeeds] = useState({ monthly: "", yearly: "" });

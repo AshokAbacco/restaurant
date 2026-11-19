@@ -53,7 +53,7 @@ export const BRAND = {
   name: "Abacco",
   tag: "Restaurant ERP",
   email: "info@abaccotech.com",
-  phone: "+91 80 4718 2200",
+  phone: "+91 99 7245 2044",
   address: "Vidyaranyapura, Bengaluru, Karnataka 560097",
 };
 

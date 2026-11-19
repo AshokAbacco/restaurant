@@ -564,6 +564,19 @@ model Organization {
 
   owner Owner?
 
+  // ── Platform admin (server/src/platform/) ──────────────────────────────
+  // Why the platform team suspended this tenant, and private notes only the
+  // platform team sees. Both nullable — existing rows are unaffected.
+  suspendedAt     DateTime?
+  suspendedReason String?
+  platformNotes   String?
+
+  pricingPayments       PricingPayment[]
+  platformConversations PlatformConversation[]
+  platformFollowUps     PlatformFollowUp[]
+  platformUsage         PlatformUsageDaily[]
+  subscriptionEvents    PlatformSubscriptionEvent[]
+
   @@map("organizations")
 }
 
@@ -2918,11 +2931,24 @@ model PricingPayment {
   status PricingPaymentStatus @default(PAID)
   owner  Owner?
 
+  // ---- Platform admin additions ----
+  // Renewals/upgrades recorded from /platform are tied to an existing
+  // organization (the original signup checkout is tied through Owner).
+  // source: "checkout" (public Pricing page) | "renewal" | "manual"
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  source         String        @default("checkout")
+  paymentMethod  String? // "razorpay" | "upi" | "bank_transfer" | "cash" | "cheque" | "other"
+  reference      String? // UTR / cheque no. for offline payments
+  recordedById   String? // PlatformAdmin.id when recorded manually
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([status])
+  @@index([organizationId])
+  @@index([createdAt])
   @@map("pricing_payments")
 }
 
@@ -2945,10 +2971,382 @@ model ContactSubmission {
   address        String?
   message        String
 
+  // ---- Platform admin triage (/platform/enquiries) ----
+  // NEW | CONTACTED | QUALIFIED | CONVERTED | CLOSED
+  status       String    @default("NEW")
+  adminNotes   String?
+  handledById  String?
+  handledAt    DateTime?
+  repliedAt    DateTime?
+
+  followUps PlatformFollowUp[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([createdAt])
+  @@index([status])
   @@map("contact_submissions")
+}
+
+// ==============================================================
+// PLATFORM ADMIN (server/src/platform/, client /platform/*)
+// ==============================================================
+// Everything below belongs to the SaaS operator, not to a restaurant.
+// None of it carries an outletId — the platform team sees across every
+// tenant. Platform logins are a completely separate identity from
+// UserAccount: a platform admin can never log into a restaurant and a
+// restaurant owner can never reach /api/platform.
+
+enum PlatformRole {
+  SUPER_ADMIN // everything, including team + settings
+  ADMIN // everything except team management
+  SUPPORT // restaurants (read), messages, follow-ups, enquiries
+  FINANCE // plans, payments, renewals, reports
+  VIEWER // read-only
+}
+
+model PlatformAdmin {
+  id           String       @id @default(uuid())
+  name         String
+  email        String       @unique
+  phone        String?
+  passwordHash String
+  role         PlatformRole @default(SUPPORT)
+  // Optional per-person overrides on top of the role defaults, e.g.
+  // { "plans.write": false, "payments.read": true }
+  permissions  Json?
+  isActive     Boolean      @default(true)
+
+  lastLoginAt         DateTime?
+  lastSeenAt          DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  // Bumped on password change / deactivation; tokens carrying an older
+  // version are rejected, which logs the person out everywhere at once.
+  tokenVersion        Int       @default(0)
+
+  createdById String?
+
+  messages         PlatformMessage[]
+  assignedConvos   PlatformConversation[] @relation("ConversationAssignee")
+  assignedFollowUp PlatformFollowUp[]     @relation("FollowUpAssignee")
+  createdFollowUp  PlatformFollowUp[]     @relation("FollowUpCreator")
+  followUpActivity PlatformFollowUpActivity[]
+  auditLogs        PlatformAuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_admins")
+}
+
+// Plans the platform sells. Seeded from server/src/pricing/pricing.plans.js
+// on first boot; after that this table is the source of truth and
+// pricing.plans.js reloads its in-memory PLANS from here (see
+// syncPlansFromDb), so a price change in /platform/plans changes what the
+// public checkout charges without a deploy.
+model PlatformPlan {
+  id          String  @id @default(uuid())
+  // Stable id used by checkout + Organization.planId ("free", "monthly"...)
+  code        String  @unique
+  name        String
+  description String?
+  // "trial" | "month" | "year" | "custom"
+  cycle       String  @default("month")
+  // Billing length. months for month/year plans, days for trial/custom.
+  months      Int     @default(1)
+  durationDays Int?
+  // Whole rupees, per branch, per month (matches pricing.plans.js tiers).
+  price       Int     @default(0)
+  // Struck-through "was" price for marketing, optional.
+  comparePrice Int?
+  gstRate     Float   @default(0.18)
+  maxBranches Int     @default(50)
+  isTrial     Boolean @default(false)
+  trialDays   Int?
+  // Shown on the public pricing page?
+  isPublic    Boolean @default(true)
+  isActive    Boolean @default(true)
+  // Highlighted on the pricing page.
+  isFeatured  Boolean @default(false)
+  sortOrder   Int     @default(0)
+  features    Json? // string[]
+  // Which app modules the plan unlocks, e.g. ["pos","inventory","crm"].
+  modules     Json?
+  // Optional extra tiers { standard: { label, price }, custom: {...} }.
+  tiers       Json?
+
+  deactivatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("platform_plans")
+}
+
+// Every change to an organization's plan: signup, renewal, upgrade, trial
+// extension, manual expiry change, suspension. This is what the Renewals
+// page and a restaurant's Subscription tab read their history from.
+model PlatformSubscriptionEvent {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // "RENEWED" | "UPGRADED" | "DOWNGRADED" | "TRIAL_EXTENDED" | "EXPIRY_CHANGED"
+  // | "SUSPENDED" | "REACTIVATED" | "BRANCH_LIMIT_CHANGED" | "REMINDER_SENT"
+  type String
+
+  fromPlanId   String?
+  toPlanId     String?
+  fromExpiry   DateTime?
+  toExpiry     DateTime?
+  fromBranches Int?
+  toBranches   Int?
+  amount       Int?
+  paymentId    String?
+  note         String?
+  performedById String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([type])
+  @@map("platform_subscription_events")
+}
+
+// ---------- Two-way messaging between platform and restaurants ----------
+
+model PlatformConversation {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  subject  String
+  // OPEN | PENDING (waiting on restaurant) | RESOLVED | CLOSED
+  status   String @default("OPEN")
+  // LOW | NORMAL | HIGH | URGENT
+  priority String @default("NORMAL")
+  // "support" | "billing" | "renewal" | "onboarding" | "feedback" | "other"
+  category String @default("support")
+
+  // Who opened it: "ADMIN" | "RESTAURANT"
+  startedBy String @default("ADMIN")
+
+  assignedToId String?
+  assignedTo   PlatformAdmin? @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  lastMessageAt       DateTime @default(now())
+  lastMessagePreview  String?
+  lastSenderType      String?
+  unreadForAdmin      Int      @default(0)
+  unreadForRestaurant Int      @default(0)
+
+  messages  PlatformMessage[]
+  followUps PlatformFollowUp[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status, lastMessageAt])
+  @@map("platform_conversations")
+}
+
+model PlatformMessage {
+  id             String               @id @default(uuid())
+  conversationId String
+  conversation   PlatformConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  // "ADMIN" | "RESTAURANT" | "SYSTEM"
+  senderType String
+  adminId    String?
+  admin      PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  // UserAccount.id when the restaurant side sent it
+  userAccountId String?
+  senderName    String
+
+  body String
+  // Internal notes are visible to the platform team only.
+  isInternal Boolean @default(false)
+
+  readByAdminAt      DateTime?
+  readByRestaurantAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("platform_messages")
+}
+
+// ---------- Follow-ups ----------
+
+model PlatformFollowUp {
+  id    String @id @default(uuid())
+  title String
+  notes String?
+
+  // "RENEWAL" | "PAYMENT" | "ONBOARDING" | "SUPPORT" | "SALES" | "FEEDBACK" | "OTHER"
+  type     String @default("OTHER")
+  // PENDING | IN_PROGRESS | DONE | CANCELLED
+  status   String @default("PENDING")
+  // LOW | NORMAL | HIGH | URGENT
+  priority String @default("NORMAL")
+  // "call" | "email" | "message" | "whatsapp" | "meeting"
+  channel  String?
+
+  dueAt       DateTime
+  completedAt DateTime?
+  outcome     String?
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enquiryId      String?
+  enquiry        ContactSubmission? @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  conversationId String?
+  conversation   PlatformConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  // Free-form contact when the follow-up is about a prospect.
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+
+  assignedToId String?
+  assignedTo   PlatformAdmin? @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdById  String?
+  createdBy    PlatformAdmin? @relation("FollowUpCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  activities PlatformFollowUpActivity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, dueAt])
+  @@index([organizationId])
+  @@index([assignedToId])
+  @@map("platform_follow_ups")
+}
+
+model PlatformFollowUpActivity {
+  id         String           @id @default(uuid())
+  followUpId String
+  followUp   PlatformFollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+
+  // "NOTE" | "CALL" | "EMAIL" | "MESSAGE" | "STATUS" | "RESCHEDULED" | "CREATED"
+  type    String
+  note    String?
+  adminId String?
+  admin   PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([followUpId, createdAt])
+  @@map("platform_follow_up_activities")
+}
+
+// ---------- Observability ----------
+
+model PlatformWebhookLog {
+  id             String   @id @default(uuid())
+  provider       String // "razorpay"
+  event          String?
+  path           String
+  headers        Json?
+  payload        Json?
+  rawSize        Int?
+  statusCode     Int
+  success        Boolean
+  signatureValid Boolean?
+  error          String?
+  durationMs     Int
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  @@index([provider, createdAt])
+  @@index([success])
+  @@map("platform_webhook_logs")
+}
+
+model PlatformErrorLog {
+  id             String    @id @default(uuid())
+  method         String
+  path           String
+  statusCode     Int
+  message        String
+  stack          String?
+  organizationId String?
+  userId         String?
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedById   String?
+  createdAt      DateTime  @default(now())
+
+  @@index([resolved, createdAt])
+  @@map("platform_error_logs")
+}
+
+// One row every 5 minutes, written by platform/health.monitor.js.
+model PlatformHealthSnapshot {
+  id            String   @id @default(uuid())
+  requests      Int
+  errors5xx     Int
+  errors4xx     Int
+  avgResponseMs Int
+  p95ResponseMs Int
+  maxResponseMs Int
+  dbLatencyMs   Int?
+  dbOk          Boolean  @default(true)
+  memoryMb      Int
+  cpuLoad       Float
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("platform_health_snapshots")
+}
+
+// Per-restaurant, per-day, per-module API usage. Aggregated in memory by
+// platform/usage.tracker.js and flushed in batches, so tracking never adds
+// a DB round-trip to a restaurant's request. module "_all" is the whole
+// org's total for the day.
+model PlatformUsageDaily {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  day            DateTime     @db.Date
+  module         String
+  requests       Int          @default(0)
+  writes         Int          @default(0)
+  activeMinutes  Int          @default(0)
+  lastSeenAt     DateTime?
+
+  @@unique([organizationId, day, module])
+  @@index([day])
+  @@map("platform_usage_daily")
+}
+
+model PlatformSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+model PlatformAuditLog {
+  id         String         @id @default(uuid())
+  adminId    String?
+  admin      PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  action     String // e.g. "PLAN_CREATED", "ORG_SUSPENDED", "LOGIN"
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime       @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@map("platform_audit_logs")
 }

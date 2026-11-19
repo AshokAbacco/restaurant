@@ -1,7 +1,10 @@
 // src/profile/HelpSupport.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { apiRequest } from "../api/apiClient";
 import {
+  FiMessageSquare,
+  FiChevronRight,
   FiArrowLeft,
   FiMail,
   FiPhone,
@@ -56,6 +59,22 @@ function FaqItem({ q, a }) {
 }
 
 export default function HelpSupport() {
+  // Two-way messages with the platform team (see SupportMessages.jsx) and
+  // the support contact configured in /platform/settings. Both endpoints
+  // are owner/admin/manager only; other roles simply don't see the card.
+  const [unread, setUnread] = useState(null);
+  const [support, setSupport] = useState(null);
+  useEffect(() => {
+    apiRequest("/support/unread-count")
+      .then((r) => r.ok && setUnread(r.data.unread))
+      .catch(() => {});
+    apiRequest("/support/info")
+      .then((r) => r.ok && setSupport(r.data.support))
+      .catch(() => {});
+  }, []);
+  const supportEmail = support?.email || "support@restauranterp.com";
+  const supportPhone = support?.phone || "+91 98765 43210";
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex items-center justify-between">
@@ -76,10 +95,30 @@ export default function HelpSupport() {
         </Link>
       </div>
 
+      {/* Messages with the platform team */}
+      {unread !== null && (
+        <Link
+          to="/help/messages"
+          className="mb-4 flex items-center gap-4 rounded-2xl border border-[#3FA34D]/30 bg-[#3FA34D]/5 p-4 transition hover:border-[#3FA34D]/60 dark:bg-[#43B75A]/5"
+        >
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#3FA34D] text-white">
+            <FiMessageSquare />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-[#1F2937] dark:text-white">Messages with support</p>
+            <p className="text-sm text-[#6B7280] dark:text-[#9CA8A0]">
+              {unread > 0 ? `You have ${unread} unread message${unread > 1 ? "s" : ""} from our team.` : "Chat with our team about your plan, billing or the app."}
+            </p>
+          </div>
+          {unread > 0 && <span className="rounded-full bg-[#3FA34D] px-2.5 py-0.5 text-xs font-bold text-white">{unread}</span>}
+          <FiChevronRight className="text-[#6B7280]" />
+        </Link>
+      )}
+
       {/* Contact cards */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <a
-          href="mailto:support@restauranterp.com"
+          href={`mailto:${supportEmail}`}
           className="flex items-center gap-3 rounded-2xl border border-[#E7EAE1] bg-white p-4 transition hover:border-[#3FA34D]/40 dark:border-[#262B24] dark:bg-[#171C17]"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3FA34D]/10 text-[#3FA34D] dark:bg-[#43B75A]/10 dark:text-[#43B75A]">
@@ -88,13 +127,13 @@ export default function HelpSupport() {
           <div className="min-w-0">
             <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">Email</p>
             <p className="truncate text-sm font-medium text-[#1F2937] dark:text-white">
-              support@restauranterp.com
+              {supportEmail}
             </p>
           </div>
         </a>
 
         <a
-          href="tel:+919876543210"
+          href={`tel:${supportPhone.replace(/\s/g, "")}`}
           className="flex items-center gap-3 rounded-2xl border border-[#E7EAE1] bg-white p-4 transition hover:border-[#3FA34D]/40 dark:border-[#262B24] dark:bg-[#171C17]"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3FA34D]/10 text-[#3FA34D] dark:bg-[#43B75A]/10 dark:text-[#43B75A]">
@@ -103,7 +142,7 @@ export default function HelpSupport() {
           <div className="min-w-0">
             <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">Phone</p>
             <p className="truncate text-sm font-medium text-[#1F2937] dark:text-white">
-              +91 98765 43210
+              {supportPhone}
             </p>
           </div>
         </a>
