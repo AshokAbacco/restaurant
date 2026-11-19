@@ -4,9 +4,13 @@
 // ships to restaurant staff unless they open /platform.
 // ==============================================
 
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useLayoutEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { PlatformAuthProvider, RequirePlatformAuth, usePlatformAuth } from "./PlatformAuth";
+import {
+  PlatformAuthProvider,
+  RequirePlatformAuth,
+  usePlatformAuth,
+} from "./PlatformAuth";
 import PlatformLayout, { firstAllowedPath } from "./PlatformLayout";
 import { Loading } from "./ui";
 
@@ -34,7 +38,10 @@ function Guard({ perm, children }) {
     return (
       <div className="rounded-2xl border border-[#E7EAE1] bg-white p-10 text-center">
         <p className="text-lg font-bold text-slate-800">No access</p>
-        <p className="mt-1 text-sm text-slate-500">Your platform role doesn't include this section. Ask a super admin if you need it.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Your platform role doesn't include this section. Ask a super admin if
+          you need it.
+        </p>
       </div>
     );
   }
@@ -52,7 +59,30 @@ const page = (perm, el) => (
   </Guard>
 );
 
+// The restaurant app's dark theme puts `dark` on <html>, which turns body
+// text white. The platform admin is designed light-only, so strip the class
+// while /platform is open and put it back when leaving.
+function useForceLightTheme() {
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const hadDark = root.classList.contains("dark");
+    const prevScheme = root.style.colorScheme;
+    root.classList.remove("dark");
+    root.style.colorScheme = "light";
+    const observer = new MutationObserver(() => {
+      if (root.classList.contains("dark")) root.classList.remove("dark");
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => {
+      observer.disconnect();
+      root.style.colorScheme = prevScheme;
+      if (hadDark) root.classList.add("dark");
+    };
+  }, []);
+}
+
 export default function PlatformRoutes() {
+  useForceLightTheme();
   return (
     <PlatformAuthProvider>
       <Routes>
@@ -67,19 +97,52 @@ export default function PlatformRoutes() {
         <Route element={<RequirePlatformAuth />}>
           <Route element={<PlatformLayout />}>
             <Route index element={<Home />} />
-            <Route path="dashboard" element={page("dashboard.read", <Dashboard />)} />
-            <Route path="restaurants" element={page("restaurants.read", <Restaurants />)} />
-            <Route path="restaurants/:id" element={page("restaurants.read", <RestaurantDetail />)} />
-            <Route path="renewals" element={page("renewals.read", <Renewals />)} />
-            <Route path="messages" element={page("messages.read", <Messages />)} />
-            <Route path="follow-ups" element={page("followups.read", <FollowUps />)} />
+            <Route
+              path="dashboard"
+              element={page("dashboard.read", <Dashboard />)}
+            />
+            <Route
+              path="restaurants"
+              element={page("restaurants.read", <Restaurants />)}
+            />
+            <Route
+              path="restaurants/:id"
+              element={page("restaurants.read", <RestaurantDetail />)}
+            />
+            <Route
+              path="renewals"
+              element={page("renewals.read", <Renewals />)}
+            />
+            <Route
+              path="messages"
+              element={page("messages.read", <Messages />)}
+            />
+            <Route
+              path="follow-ups"
+              element={page("followups.read", <FollowUps />)}
+            />
             <Route path="plans" element={page("plans.read", <Plans />)} />
-            <Route path="payments" element={page("payments.read", <Payments />)} />
-            <Route path="activity" element={page("activity.read", <Activity />)} />
-            <Route path="webhooks" element={page("webhooks.read", <Webhooks />)} />
-            <Route path="enquiries" element={page("enquiries.read", <Enquiries />)} />
+            <Route
+              path="payments"
+              element={page("payments.read", <Payments />)}
+            />
+            <Route
+              path="activity"
+              element={page("activity.read", <Activity />)}
+            />
+            <Route
+              path="webhooks"
+              element={page("webhooks.read", <Webhooks />)}
+            />
+            <Route
+              path="enquiries"
+              element={page("enquiries.read", <Enquiries />)}
+            />
             <Route path="team" element={page("team.read", <Team />)} />
-            <Route path="settings" element={page("settings.read", <Settings />)} />
+            <Route
+              path="settings"
+              element={page("settings.read", <Settings />)}
+            />
             <Route path="health" element={page("health.read", <Health />)} />
             <Route path="reports" element={page("reports.read", <Reports />)} />
             <Route path="account" element={page(null, <Account />)} />
